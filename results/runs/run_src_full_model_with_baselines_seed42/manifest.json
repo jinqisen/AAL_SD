@@ -1,0 +1,129 @@
+{
+  "run_id": "run_src_full_model_with_baselines_seed42",
+  "created_at": "2026-02-18T13:21:50.752241",
+  "updated_at": "2026-02-21T14:58:53.089245",
+  "config": {
+    "ALLOW_LEGACY_POOLS": false,
+    "ALPHA": 5.0,
+    "BATCH_SIZE": 4,
+    "BUDGET_RATIO": 0.4,
+    "CHECKPOINT_DIR": "/Users/anykong/AAL_SD/results/checkpoints",
+    "DATA_DIR": "/Users/anykong/AAL_SD/data/Landslide4Sense",
+    "DETERMINISTIC": true,
+    "DEVICE": "mps",
+    "EPOCHS_PER_ROUND": 10,
+    "EPOCHS_PER_ROUND_SCHEDULE": null,
+    "ESTIMATED_TOTAL_SAMPLES": 3799,
+    "FAIL_ON_AGENT_FALLBACK": true,
+    "FAIL_ON_RANKING_DEGRADED": true,
+    "FEATURE_NUM_WORKERS": 0,
+    "FIXED_LAMBDA": 0.5,
+    "FIX_EPOCHS_PER_ROUND": true,
+    "GRAD_LOGGING": true,
+    "GRAD_LOG_MAX_BATCHES": 8,
+    "GRAD_LOG_PARAM_MAX_ELEMENTS": 200000,
+    "GRAD_LOG_VAL_ALIGNMENT": true,
+    "INITIAL_LABELED_SIZE": 0.05,
+    "IN_CHANNELS": 14,
+    "LLM_BASE_URL": "https://api.siliconflow.cn/v1",
+    "LLM_CONFIG_PATH": "/Users/anykong/AAL_SD/src/llm_config.json",
+    "LLM_MAX_RETRIES": 5,
+    "LLM_MODEL": "Pro/deepseek-ai/DeepSeek-V3.2",
+    "LLM_PROVIDER": "siliconflow",
+    "LLM_RETRY_BACKOFF": 2.0,
+    "LLM_RETRY_BASE_SECONDS": 10.0,
+    "LLM_RETRY_MAX_SECONDS": 120.0,
+    "LLM_TEMPERATURE": 0.0,
+    "LLM_TIMEOUT": 60,
+    "LOSS_TYPE": "CrossEntropyLoss",
+    "LR": 0.0001,
+    "NUM_CLASSES": 2,
+    "NUM_WORKERS": 0,
+    "N_ROUNDS": 15,
+    "POOLS_DIR": "/Users/anykong/AAL_SD/results/pools",
+    "QUERY_SIZE": 88,
+    "RANDOM_SEED": 42,
+    "REQUIRE_LLM_FOR_AGENT": true,
+    "RESEARCH_MODE": true,
+    "RESULTS_DIR": "/Users/anykong/AAL_SD/results",
+    "RESUME_FROM_LOGS": true,
+    "ROOT_DIR": "/Users/anykong/AAL_SD",
+    "STOP_ALL_EXPERIMENTS_ON_LLM_FAILURE": true,
+    "STOP_ON_LLM_FAILURE": true,
+    "STRATEGY": "ad_kucs",
+    "STRICT_INNOVATION": true,
+    "STRICT_RESUME": true,
+    "TEST_SIZE": 0.2,
+    "TOTAL_BUDGET": 1519,
+    "TRACE_AGENT_PROMPT": false,
+    "TRACE_AGENT_THOUGHT": false
+  },
+  "experiments": {
+    "full_model_v5_calibrated_risk": {
+      "description": "完整模型V5：U校准 + 风险CI触发 + λ平滑与后期偏U约束",
+      "use_agent": true,
+      "sampler_type": "ad_kucs",
+      "lambda_override": null,
+      "enable_l3_logging": true,
+      "l3_topk": 256,
+      "l3_max_selected": 256,
+      "lambda_policy": {
+        "mode": "warmup_risk_closed_loop",
+        "r1_lambda": 0.0,
+        "uncertainty_only_rounds": 2,
+        "warmup_start_round": 3,
+        "warmup_rounds": 1,
+        "warmup_lambda": 0.2,
+        "risk_control_start_round": 4,
+        "risk_trigger": "ci",
+        "risk_ci_window": 3,
+        "risk_ci_quantile": 0.1,
+        "lambda_smoothing": "ema",
+        "lambda_smoothing_alpha": 0.7,
+        "lambda_max_step": 0.05,
+        "late_u_bias_start_round": 10,
+        "late_u_bias_strength": 0.3
+      },
+      "uncertainty_calibration": {
+        "mode": "temperature",
+        "tau": 0.7,
+        "update_rounds": [
+          6,
+          9,
+          12
+        ]
+      },
+      "risk_policy": {
+        "trigger": "ci",
+        "window": 3,
+        "quantile": 0.1,
+        "min_samples": 3
+      },
+      "rollback_config": {
+        "mode": "adaptive_threshold",
+        "std_factor": 1.5,
+        "tau_min": 0.005
+      },
+      "overfit_guard": true,
+      "control_permissions": {
+        "set_lambda": false,
+        "set_query_size": false,
+        "set_epochs_per_round": false,
+        "set_alpha": false
+      }
+    }
+  },
+  "experiment_runtime": {
+    "mode": "legacy_adapter",
+    "trace_schema_version": 2
+  },
+  "code_fingerprint": {
+    "run_parallel_strict": "059d22b4421fcd0028d3abc8bd3b3b7f58c0cf875eb7efce8c2f474aa2d99f28",
+    "config": "20f85c1e4e1b7dbd150731af32426f584c7278dad3131a5b8c878bb879e5ca2a",
+    "main": "447385a0de5bba389e239e74d536912b6022d710f8f49d140060bedb20e58f4f",
+    "trainer": "2d2bbbae8343ac43a15b669aea908c626329ad0333b7d2d0a13f93014dd2d31b",
+    "ablation_config": "ca92e132d24cdb1487a9b32808afc45b56b9c15320f7e7327452b2641842ac94",
+    "prompt_template": "6e1f8ab437db69cbc0a0af9134fe598e699e53bdde7bfe74f5f4cdda16382477",
+    "plot_paper_figures": "0b27c9a3af5e7dd6fca5e6699bb53790740b1c1d9b76ffecbb1da2a26c5cb025"
+  }
+}

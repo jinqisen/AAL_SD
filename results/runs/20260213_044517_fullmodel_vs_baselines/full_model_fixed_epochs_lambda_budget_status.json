@@ -1,0 +1,51 @@
+{
+  "run_id": "20260213_044517_fullmodel_vs_baselines",
+  "experiment_name": "full_model_fixed_epochs_lambda_budget",
+  "updated_at": "2026-02-14T07:02:42.048004",
+  "pool_integrity": {
+    "counts": {
+      "labeled": 151,
+      "unlabeled": 2888,
+      "test": 760,
+      "union": 3799,
+      "dataset": 3799
+    },
+    "overlaps": {
+      "labeled_unlabeled": 0,
+      "labeled_test": 0,
+      "unlabeled_test": 0
+    }
+  },
+  "pool_integrity_ok": true,
+  "status": "failed",
+  "pools_dir": "/Users/anykong/AAL_SD/data/pools/20260213_044517_fullmodel_vs_baselines/full_model_fixed_epochs_lambda_budget",
+  "checkpoint_path": "/Users/anykong/AAL_SD/results/checkpoints/20260213_044517_fullmodel_vs_baselines/full_model_fixed_epochs_lambda_budget_state.json",
+  "initial": {
+    "labeled": 151,
+    "unlabeled": 2888,
+    "test": 760
+  },
+  "dataset_fingerprint": {
+    "count": 3799,
+    "sha256": "ab1c6ed6ffcd25606a577ecf266996d10127065c72db2f5cc8c43cb90fd7c95a"
+  },
+  "resume": {
+    "start_round": 0
+  },
+  "progress": {
+    "round": 1,
+    "epoch": 10,
+    "labeled_size": 151,
+    "loss": 0.06036372664006981,
+    "mIoU": 0.6089790420119885,
+    "f1": 0.687234788841165,
+    "best_mIoU_round": 0.6089790420119885,
+    "warnings": []
+  },
+  "error": {
+    "round": 1,
+    "message": "LLM Agent failed at Round 1: LLMAPIError: Error calling API: HTTPSConnectionPool(host='api.siliconflow.cn', port=443): Max retries exceeded with url: /v1/chat/completions (Caused by ProxyError('Unable to connect to proxy', NewConnectionError('<urllib3.connection.HTTPSConnection object at 0x301386fd0>: Failed to establish a new connection: [Errno 61] Connection refused')))",
+    "type": "unknown",
+    "exception": "RuntimeError"
+  }
+}

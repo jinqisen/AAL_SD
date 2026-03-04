@@ -1,0 +1,124 @@
+{
+  "fixed_lambda": {
+    "experiment_name": "fixed_lambda",
+    "description": "固定λ=0.5",
+    "performance_history": [
+      {
+        "round": 1,
+        "mIoU": 0.614815117933461,
+        "f1_score": 0.6956075880503734,
+        "labeled_size": 151
+      },
+      {
+        "round": 2,
+        "mIoU": 0.705998763953342,
+        "f1_score": 0.7959817852183995,
+        "labeled_size": 239
+      },
+      {
+        "round": 3,
+        "mIoU": 0.7061368687266284,
+        "f1_score": 0.7962453571012338,
+        "labeled_size": 327
+      },
+      {
+        "round": 4,
+        "mIoU": 0.7393341901363621,
+        "f1_score": 0.8269384205134979,
+        "labeled_size": 415
+      },
+      {
+        "round": 5,
+        "mIoU": 0.740243758027749,
+        "f1_score": 0.8276737123785163,
+        "labeled_size": 503
+      },
+      {
+        "round": 6,
+        "mIoU": 0.7490554860404999,
+        "f1_score": 0.8354671065746924,
+        "labeled_size": 591
+      },
+      {
+        "round": 7,
+        "mIoU": 0.7288953879214649,
+        "f1_score": 0.8172416823287445,
+        "labeled_size": 679
+      },
+      {
+        "round": 8,
+        "mIoU": 0.7559550914766222,
+        "f1_score": 0.8412961800464847,
+        "labeled_size": 767
+      },
+      {
+        "round": 9,
+        "mIoU": 0.746090900867125,
+        "f1_score": 0.8326532874505312,
+        "labeled_size": 855
+      },
+      {
+        "round": 10,
+        "mIoU": 0.7547149164027585,
+        "f1_score": 0.8401105465766984,
+        "labeled_size": 943
+      },
+      {
+        "round": 11,
+        "mIoU": 0.7622563890340595,
+        "f1_score": 0.846731585373914,
+        "labeled_size": 1031
+      },
+      {
+        "round": 12,
+        "mIoU": 0.7485346074971622,
+        "f1_score": 0.8346949667486541,
+        "labeled_size": 1119
+      },
+      {
+        "round": 13,
+        "mIoU": 0.764283206323044,
+        "f1_score": 0.8483715508771257,
+        "labeled_size": 1207
+      },
+      {
+        "round": 14,
+        "mIoU": 0.7473267952805197,
+        "f1_score": 0.8338771440015087,
+        "labeled_size": 1295
+      },
+      {
+        "round": 15,
+        "mIoU": 0.7619865531279484,
+        "f1_score": 0.8463135440688474,
+        "labeled_size": 1383
+      }
+    ],
+    "budget_history": [
+      151,
+      239,
+      327,
+      415,
+      503,
+      591,
+      679,
+      767,
+      855,
+      943,
+      1031,
+      1119,
+      1207,
+      1295,
+      1383
+    ],
+    "fallback_history": [],
+    "alc": 0.6670876659516712,
+    "final_miou": 0.7619865531279484,
+    "final_f1": 0.8463135440688474,
+    "epochs_schedule_source": null,
+    "epochs_schedule": null,
+    "status": "success",
+    "timestamp": "2026-02-08T17:36:40.448364",
+    "log_file": "results/logs_md/fixed_lambda_20260207_paper_ms_seed42.md"
+  }
+}

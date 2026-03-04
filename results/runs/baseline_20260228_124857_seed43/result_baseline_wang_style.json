@@ -1,0 +1,124 @@
+{
+  "baseline_wang_style": {
+    "experiment_name": "baseline_wang_style",
+    "description": "Wang-style基线：两阶段U→K重排",
+    "performance_history": [
+      {
+        "round": 1,
+        "mIoU": 0.6216255593511335,
+        "f1_score": 0.7037017944998031,
+        "labeled_size": 151
+      },
+      {
+        "round": 2,
+        "mIoU": 0.6858112735625176,
+        "f1_score": 0.7757377058093937,
+        "labeled_size": 239
+      },
+      {
+        "round": 3,
+        "mIoU": 0.7165829337498522,
+        "f1_score": 0.8060790061673174,
+        "labeled_size": 327
+      },
+      {
+        "round": 4,
+        "mIoU": 0.7269967845136394,
+        "f1_score": 0.815556995898539,
+        "labeled_size": 415
+      },
+      {
+        "round": 5,
+        "mIoU": 0.7448872359345997,
+        "f1_score": 0.8317543802249165,
+        "labeled_size": 503
+      },
+      {
+        "round": 6,
+        "mIoU": 0.7393330657864672,
+        "f1_score": 0.8267877965286661,
+        "labeled_size": 591
+      },
+      {
+        "round": 7,
+        "mIoU": 0.7442450718478623,
+        "f1_score": 0.8310371401579013,
+        "labeled_size": 679
+      },
+      {
+        "round": 8,
+        "mIoU": 0.7426308709728062,
+        "f1_score": 0.8295077349708133,
+        "labeled_size": 767
+      },
+      {
+        "round": 9,
+        "mIoU": 0.7450953959638642,
+        "f1_score": 0.8317644845064813,
+        "labeled_size": 855
+      },
+      {
+        "round": 10,
+        "mIoU": 0.7506422360747658,
+        "f1_score": 0.8367189223346744,
+        "labeled_size": 943
+      },
+      {
+        "round": 11,
+        "mIoU": 0.758118914477711,
+        "f1_score": 0.8431128363768314,
+        "labeled_size": 1031
+      },
+      {
+        "round": 12,
+        "mIoU": 0.7381550005882106,
+        "f1_score": 0.825487741802575,
+        "labeled_size": 1119
+      },
+      {
+        "round": 13,
+        "mIoU": 0.7552456317256426,
+        "f1_score": 0.8404666789589614,
+        "labeled_size": 1207
+      },
+      {
+        "round": 14,
+        "mIoU": 0.7574601108559442,
+        "f1_score": 0.842397951212932,
+        "labeled_size": 1295
+      },
+      {
+        "round": 15,
+        "mIoU": 0.7581073777029994,
+        "f1_score": 0.8429871483438233,
+        "labeled_size": 1383
+      }
+    ],
+    "budget_history": [
+      151,
+      239,
+      327,
+      415,
+      503,
+      591,
+      679,
+      767,
+      855,
+      943,
+      1031,
+      1119,
+      1207,
+      1295,
+      1383
+    ],
+    "fallback_history": [],
+    "alc": 0.6642981243520287,
+    "final_miou": 0.7581073777029994,
+    "final_f1": 0.8429871483438233,
+    "epochs_schedule_source": null,
+    "epochs_schedule": null,
+    "status": "success",
+    "timestamp": "2026-03-01T08:35:32.039646",
+    "log_file": "results/logs_md/baseline_wang_style_baseline_20260228_124857_seed43.md"
+  }
+}

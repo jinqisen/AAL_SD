@@ -1,0 +1,437 @@
+{
+  "run_id": "20260216_190644_strict",
+  "created_at": "2026-02-16T19:06:44.240466",
+  "updated_at": "2026-02-16T20:37:58.831571",
+  "config": {
+    "ALLOW_LEGACY_POOLS": false,
+    "ALPHA": 5.0,
+    "BATCH_SIZE": 4,
+    "BUDGET_RATIO": 0.4,
+    "CHECKPOINT_DIR": "/Users/anykong/AAL_SD/results/checkpoints",
+    "DATA_DIR": "/Users/anykong/AAL_SD/data/Landslide4Sense",
+    "DETERMINISTIC": true,
+    "DEVICE": "mps",
+    "EPOCHS_PER_ROUND": 10,
+    "EPOCHS_PER_ROUND_SCHEDULE": null,
+    "ESTIMATED_TOTAL_SAMPLES": 3799,
+    "FAIL_ON_AGENT_FALLBACK": true,
+    "FAIL_ON_RANKING_DEGRADED": true,
+    "FEATURE_NUM_WORKERS": 0,
+    "FIXED_LAMBDA": 0.5,
+    "FIX_EPOCHS_PER_ROUND": true,
+    "GRAD_LOGGING": true,
+    "GRAD_LOG_MAX_BATCHES": 8,
+    "GRAD_LOG_PARAM_MAX_ELEMENTS": 200000,
+    "GRAD_LOG_VAL_ALIGNMENT": true,
+    "INITIAL_LABELED_SIZE": 0.05,
+    "IN_CHANNELS": 14,
+    "LLM_BASE_URL": "https://api.siliconflow.cn/v1",
+    "LLM_CONFIG_PATH": "/Users/anykong/AAL_SD/src/llm_config.json",
+    "LLM_MAX_RETRIES": 5,
+    "LLM_MODEL": "Pro/deepseek-ai/DeepSeek-V3.2",
+    "LLM_PROVIDER": "siliconflow",
+    "LLM_RETRY_BACKOFF": 2.0,
+    "LLM_RETRY_BASE_SECONDS": 10.0,
+    "LLM_RETRY_MAX_SECONDS": 120.0,
+    "LLM_TEMPERATURE": 0.0,
+    "LLM_TIMEOUT": 60,
+    "LOSS_TYPE": "CrossEntropyLoss",
+    "LR": 0.0001,
+    "NUM_CLASSES": 2,
+    "NUM_WORKERS": 2,
+    "N_ROUNDS": 15,
+    "POOLS_DIR": "/Users/anykong/AAL_SD/data/pools",
+    "QUERY_SIZE": 88,
+    "RANDOM_SEED": 42,
+    "REQUIRE_LLM_FOR_AGENT": true,
+    "RESEARCH_MODE": true,
+    "RESULTS_DIR": "/Users/anykong/AAL_SD/results",
+    "RESUME_FROM_LOGS": true,
+    "ROOT_DIR": "/Users/anykong/AAL_SD",
+    "STOP_ALL_EXPERIMENTS_ON_LLM_FAILURE": true,
+    "STOP_ON_LLM_FAILURE": true,
+    "STRATEGY": "ad_kucs",
+    "STRICT_INNOVATION": true,
+    "STRICT_RESUME": true,
+    "TEST_SIZE": 0.2,
+    "TOTAL_BUDGET": 1519,
+    "TRACE_AGENT_THOUGHT": false
+  },
+  "experiments": {
+    "full_model": {
+      "description": "完整模型（最佳λ日程）：R1-2 λ=0.0；R3 warmup=0.2；R4+ 风险闭环λ（不调整query_size）",
+      "use_agent": true,
+      "sampler_type": "ad_kucs",
+      "lambda_override": null,
+      "agent_threshold_overrides": {
+        "OVERFIT_RISK_HI": 0.9,
+        "OVERFIT_TVC_MIN_HI": 0.6
+      },
+      "enable_l3_logging": true,
+      "l3_topk": 256,
+      "l3_max_selected": 256,
+      "lambda_policy": {
+        "mode": "warmup_risk_closed_loop",
+        "r1_lambda": 0.0,
+        "uncertainty_only_rounds": 2,
+        "warmup_start_round": 3,
+        "warmup_rounds": 1,
+        "warmup_lambda": 0.2,
+        "risk_control_start_round": 4
+      },
+      "rollback_config": {
+        "mode": "adaptive_threshold",
+        "std_factor": 1.5,
+        "tau_min": 0.005
+      },
+      "overfit_guard": true,
+      "control_permissions": {
+        "set_lambda": false,
+        "set_query_size": false,
+        "set_epochs_per_round": false,
+        "set_alpha": false
+      }
+    },
+    "agent_control_budget": {
+      "description": "Agent控制消融：仅允许set_query_size",
+      "use_agent": true,
+      "sampler_type": "ad_kucs",
+      "lambda_override": null,
+      "control_permissions": {
+        "set_lambda": false,
+        "set_query_size": true,
+        "set_epochs_per_round": false,
+        "set_alpha": false
+      }
+    },
+    "agent_control_lambda": {
+      "description": "Agent控制消融：仅允许set_lambda",
+      "use_agent": true,
+      "sampler_type": "ad_kucs",
+      "lambda_override": null,
+      "control_permissions": {
+        "set_lambda": true,
+        "set_query_size": false,
+        "set_epochs_per_round": false,
+        "set_alpha": false
+      }
+    },
+    "fixed_k": {
+      "description": "消融：固定K阶段（保持coreset-to-labeled），仅保留λ闭环",
+      "use_agent": true,
+      "sampler_type": "ad_kucs",
+      "lambda_override": null,
+      "k_definition": "coreset_to_labeled_fixed",
+      "lambda_policy": {
+        "mode": "warmup_risk_closed_loop",
+        "r1_lambda": 0.0,
+        "uncertainty_only_rounds": 2,
+        "warmup_start_round": 3,
+        "warmup_rounds": 1,
+        "warmup_lambda": 0.2,
+        "risk_control_start_round": 4
+      },
+      "rollback_config": {
+        "mode": "adaptive_threshold",
+        "std_factor": 1.5,
+        "tau_min": 0.005
+      },
+      "overfit_guard": true,
+      "control_permissions": {
+        "set_lambda": false,
+        "set_query_size": false,
+        "set_epochs_per_round": false,
+        "set_alpha": false
+      }
+    },
+    "full_model_default_thresholds": {
+      "description": "完整模型（旧阈值）：固定Warmup(0.2)+默认过拟合阈值(0.8/0.5) + 自适应阈值 rollback + 风险驱动 λ 闭环控制（不调整 query_size）",
+      "use_agent": true,
+      "sampler_type": "ad_kucs",
+      "lambda_override": null,
+      "agent_threshold_overrides": {
+        "OVERFIT_RISK_HI": 0.8,
+        "OVERFIT_TVC_MIN_HI": 0.5
+      },
+      "enable_l3_logging": true,
+      "l3_topk": 256,
+      "l3_max_selected": 256,
+      "lambda_policy": {
+        "mode": "warmup_risk_closed_loop",
+        "r1_lambda": 0.0,
+        "uncertainty_only_rounds": 2,
+        "warmup_start_round": 3,
+        "warmup_rounds": 1,
+        "warmup_lambda": 0.2,
+        "risk_control_start_round": 4
+      },
+      "rollback_config": {
+        "mode": "adaptive_threshold",
+        "std_factor": 1.5,
+        "tau_min": 0.005
+      },
+      "overfit_guard": true,
+      "control_permissions": {
+        "set_lambda": false,
+        "set_query_size": false,
+        "set_epochs_per_round": false,
+        "set_alpha": false
+      }
+    },
+    "full_model_fixed_epochs_lambda_budget": {
+      "description": "消融（固定epochs=10）：仅允许控制λ与query_size",
+      "use_agent": true,
+      "sampler_type": "ad_kucs",
+      "lambda_override": null,
+      "control_permissions": {
+        "set_lambda": true,
+        "set_query_size": true,
+        "set_epochs_per_round": false,
+        "set_alpha": false
+      }
+    },
+    "full_model_policy_lambda": {
+      "description": "完整模型（规则闭环λ）：固定Warmup(0.2) + 自适应阈值 rollback + 风险驱动 λ 闭环控制（不调整 query_size）",
+      "use_agent": true,
+      "sampler_type": "ad_kucs",
+      "lambda_override": null,
+      "enable_l3_logging": true,
+      "l3_topk": 256,
+      "l3_max_selected": 256,
+      "lambda_policy": {
+        "mode": "warmup_risk_closed_loop",
+        "r1_lambda": 0.0,
+        "uncertainty_only_rounds": 2,
+        "warmup_start_round": 3,
+        "warmup_rounds": 1,
+        "warmup_lambda": 0.2,
+        "risk_control_start_round": 4
+      },
+      "rollback_config": {
+        "mode": "adaptive_threshold",
+        "std_factor": 1.5,
+        "tau_min": 0.005
+      },
+      "overfit_guard": true,
+      "control_permissions": {
+        "set_lambda": false,
+        "set_query_size": false,
+        "set_epochs_per_round": false,
+        "set_alpha": false
+      }
+    },
+    "no_cold_start": {
+      "description": "消融：去除冷启动与warmup，直接进入风险闭环",
+      "use_agent": true,
+      "sampler_type": "ad_kucs",
+      "lambda_override": null,
+      "lambda_policy": {
+        "mode": "warmup_risk_closed_loop",
+        "r1_lambda": 0.0,
+        "uncertainty_only_rounds": 0,
+        "warmup_start_round": 1,
+        "warmup_rounds": 0,
+        "warmup_lambda": 0.0,
+        "risk_control_start_round": 1
+      },
+      "rollback_config": {
+        "mode": "adaptive_threshold",
+        "std_factor": 1.5,
+        "tau_min": 0.005
+      },
+      "overfit_guard": true,
+      "control_permissions": {
+        "set_lambda": false,
+        "set_query_size": false,
+        "set_epochs_per_round": false,
+        "set_alpha": false
+      }
+    },
+    "baseline_bald": {
+      "description": "BALD采样基线",
+      "use_agent": false,
+      "sampler_type": "bald",
+      "lambda_override": null
+    },
+    "baseline_coreset": {
+      "description": "Core-Set采样基线",
+      "use_agent": false,
+      "sampler_type": "coreset",
+      "lambda_override": null
+    },
+    "baseline_dial_style": {
+      "description": "DIAL-style基线：分簇多样性约束+不确定性",
+      "use_agent": false,
+      "sampler_type": "dial",
+      "lambda_override": null,
+      "enable_l3_logging": true,
+      "l3_topk": 256,
+      "l3_max_selected": 256
+    },
+    "baseline_entropy": {
+      "description": "熵采样基线",
+      "use_agent": false,
+      "sampler_type": "entropy",
+      "lambda_override": null
+    },
+    "baseline_llm_rs": {
+      "description": "LLM仅基于随机分数",
+      "use_agent": false,
+      "sampler_type": "llm_rs",
+      "lambda_override": null
+    },
+    "baseline_llm_us": {
+      "description": "LLM仅基于不确定性分数",
+      "use_agent": false,
+      "sampler_type": "llm_us",
+      "lambda_override": null
+    },
+    "baseline_random": {
+      "description": "随机采样基线",
+      "use_agent": false,
+      "sampler_type": "random",
+      "lambda_override": null
+    },
+    "baseline_wang_style": {
+      "description": "Wang-style基线：两阶段U→K重排",
+      "use_agent": false,
+      "sampler_type": "wang",
+      "lambda_override": null,
+      "enable_l3_logging": true,
+      "l3_topk": 256,
+      "l3_max_selected": 256
+    },
+    "fixed_lambda": {
+      "description": "消融：固定λ=0.5（对应方案A1：No LLM Agent）",
+      "use_agent": false,
+      "sampler_type": "ad_kucs",
+      "lambda_override": 0.5
+    },
+    "knowledge_only": {
+      "description": "固定λ=1，仅使用知识增益",
+      "use_agent": false,
+      "sampler_type": "ad_kucs",
+      "lambda_override": 1.0
+    },
+    "no_agent": {
+      "description": "消融：移除Agent；λ由sigmoid自适应(随标注进度变化)，仅使用AD-KUCS数值策略选样",
+      "use_agent": false,
+      "sampler_type": "ad_kucs",
+      "lambda_override": null
+    },
+    "no_normalization": {
+      "description": "消融：不进行U/K归一化",
+      "use_agent": false,
+      "sampler_type": "ad_kucs",
+      "lambda_override": null,
+      "score_normalization": false
+    },
+    "random_lambda": {
+      "description": "消融：随机λ控制（无LLM）",
+      "use_agent": false,
+      "sampler_type": "ad_kucs",
+      "lambda_override": null,
+      "lambda_controller": {
+        "mode": "random",
+        "lambda_min": 0.0,
+        "lambda_max": 1.0
+      }
+    },
+    "rule_based_controller_r1": {
+      "description": "消融：Rule-based Controller R1（性能驱动）",
+      "use_agent": false,
+      "sampler_type": "ad_kucs",
+      "lambda_override": null,
+      "enable_l3_logging": true,
+      "l3_topk": 256,
+      "l3_max_selected": 256,
+      "lambda_controller": {
+        "mode": "rule_based",
+        "rule": "r1",
+        "lambda_min": 0.0,
+        "lambda_max": 1.0,
+        "step_up": 0.05,
+        "step_down": 0.1,
+        "miou_delta_threshold": 0.0,
+        "rollback_priority": true
+      }
+    },
+    "rule_based_controller_r2": {
+      "description": "消融：Rule-based Controller R2（轮次日程）",
+      "use_agent": false,
+      "sampler_type": "ad_kucs",
+      "lambda_override": null,
+      "enable_l3_logging": true,
+      "l3_topk": 256,
+      "l3_max_selected": 256,
+      "lambda_controller": {
+        "mode": "rule_based",
+        "rule": "r2",
+        "lambda_min": 0.0,
+        "lambda_max": 1.0,
+        "schedule": [
+          {
+            "round": 1,
+            "lambda": 0.2
+          },
+          {
+            "round": 4,
+            "lambda": 0.5
+          },
+          {
+            "round": 8,
+            "lambda": 0.8
+          }
+        ]
+      }
+    },
+    "rule_based_controller_r3": {
+      "description": "消融：Rule-based Controller R3（日程+性能微调）",
+      "use_agent": false,
+      "sampler_type": "ad_kucs",
+      "lambda_override": null,
+      "enable_l3_logging": true,
+      "l3_topk": 256,
+      "l3_max_selected": 256,
+      "lambda_controller": {
+        "mode": "rule_based",
+        "rule": "r3",
+        "lambda_min": 0.0,
+        "lambda_max": 1.0,
+        "schedule": [
+          {
+            "round": 1,
+            "lambda": 0.2
+          },
+          {
+            "round": 4,
+            "lambda": 0.5
+          },
+          {
+            "round": 8,
+            "lambda": 0.8
+          }
+        ],
+        "step_up": 0.05,
+        "step_down": 0.1,
+        "miou_delta_threshold": 0.0,
+        "rollback_priority": true
+      }
+    },
+    "uncertainty_only": {
+      "description": "固定λ=0，仅使用不确定性",
+      "use_agent": false,
+      "sampler_type": "ad_kucs",
+      "lambda_override": 0.0
+    }
+  },
+  "code_fingerprint": {
+    "run_parallel_strict": "0d0f2d140d22f74bcbd97ed27e02c324aee6fef53c5d8aa18ee65204f6697897",
+    "config": "28ecfafc3bd9039f5ffb678c975adc6b44793004dad71eabaf52d95071ea3e3e",
+    "main": "484d7de714a7e851c1853a9ed0e8711ee4f0b45e1d8fc771690c4bff8dfcb3a0",
+    "trainer": "2d2bbbae8343ac43a15b669aea908c626329ad0333b7d2d0a13f93014dd2d31b",
+    "ablation_config": "fc94c03d628d5ecf904f24bd9e0f9cbd078e8af70db4b3e75b5789ecd4358795",
+    "prompt_template": "6e1f8ab437db69cbc0a0af9134fe598e699e53bdde7bfe74f5f4cdda16382477",
+    "plot_paper_figures": "ef48e6030dfa56a683fefb568917f60592ac6027e4e9e917aa179a51dc61e82b"
+  }
+}

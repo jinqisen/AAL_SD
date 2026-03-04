@@ -1,0 +1,124 @@
+{
+  "no_agent": {
+    "experiment_name": "no_agent",
+    "description": "消融：移除Agent，仅使用固定规则的AD-KUCS选样",
+    "performance_history": [
+      {
+        "round": 1,
+        "mIoU": 0.6146201862351981,
+        "f1_score": 0.6946168348158044,
+        "labeled_size": 151
+      },
+      {
+        "round": 2,
+        "mIoU": 0.6959390445696095,
+        "f1_score": 0.7862677429707746,
+        "labeled_size": 239
+      },
+      {
+        "round": 3,
+        "mIoU": 0.7041445151210226,
+        "f1_score": 0.7940068706394938,
+        "labeled_size": 327
+      },
+      {
+        "round": 4,
+        "mIoU": 0.7316696261198926,
+        "f1_score": 0.8201990950796674,
+        "labeled_size": 415
+      },
+      {
+        "round": 5,
+        "mIoU": 0.7361120731824349,
+        "f1_score": 0.8241307612857351,
+        "labeled_size": 503
+      },
+      {
+        "round": 6,
+        "mIoU": 0.7382230815292151,
+        "f1_score": 0.8257962605933824,
+        "labeled_size": 591
+      },
+      {
+        "round": 7,
+        "mIoU": 0.7527651797234005,
+        "f1_score": 0.8386719942942532,
+        "labeled_size": 679
+      },
+      {
+        "round": 8,
+        "mIoU": 0.7527506468941976,
+        "f1_score": 0.8385808451136119,
+        "labeled_size": 767
+      },
+      {
+        "round": 9,
+        "mIoU": 0.7482576738304556,
+        "f1_score": 0.8345391385807909,
+        "labeled_size": 855
+      },
+      {
+        "round": 10,
+        "mIoU": 0.7481095460152974,
+        "f1_score": 0.8346500071373673,
+        "labeled_size": 943
+      },
+      {
+        "round": 11,
+        "mIoU": 0.7534616254654553,
+        "f1_score": 0.8391090214198964,
+        "labeled_size": 1031
+      },
+      {
+        "round": 12,
+        "mIoU": 0.7523062518290103,
+        "f1_score": 0.8380994756084839,
+        "labeled_size": 1119
+      },
+      {
+        "round": 13,
+        "mIoU": 0.760161980126502,
+        "f1_score": 0.8450578358390102,
+        "labeled_size": 1207
+      },
+      {
+        "round": 14,
+        "mIoU": 0.7620935694694748,
+        "f1_score": 0.8463685517789106,
+        "labeled_size": 1295
+      },
+      {
+        "round": 15,
+        "mIoU": 0.7636464090616288,
+        "f1_score": 0.8478933743705512,
+        "labeled_size": 1383
+      }
+    ],
+    "budget_history": [
+      151,
+      239,
+      327,
+      415,
+      503,
+      591,
+      679,
+      767,
+      855,
+      943,
+      1031,
+      1119,
+      1207,
+      1295,
+      1383
+    ],
+    "fallback_history": [],
+    "alc": 0.6665353426244419,
+    "final_miou": 0.7636464090616288,
+    "final_f1": 0.8478933743705512,
+    "epochs_schedule_source": null,
+    "epochs_schedule": null,
+    "status": "success",
+    "timestamp": "2026-02-08T13:52:16.041546",
+    "log_file": "results/logs_md/no_agent_20260207_paper_ms_seed42.md"
+  }
+}

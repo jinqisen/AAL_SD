@@ -1,0 +1,124 @@
+{
+  "full_model_v5_calibrated_risk": {
+    "experiment_name": "full_model_v5_calibrated_risk",
+    "description": "完整模型V5：U校准 + 风险CI触发 + λ平滑与后期偏U约束",
+    "performance_history": [
+      {
+        "round": 1,
+        "mIoU": 0.7083122503279952,
+        "f1_score": 0.7973163717124265,
+        "labeled_size": 1031
+      },
+      {
+        "round": 2,
+        "mIoU": 0.6912789028621129,
+        "f1_score": 0.7801212363190659,
+        "labeled_size": 1119
+      },
+      {
+        "round": 3,
+        "mIoU": 0.7023706304725585,
+        "f1_score": 0.7912740847317798,
+        "labeled_size": 1207
+      },
+      {
+        "round": 4,
+        "mIoU": 0.6914485022705958,
+        "f1_score": 0.7803507376769024,
+        "labeled_size": 1295
+      },
+      {
+        "round": 5,
+        "mIoU": 0.721932262057915,
+        "f1_score": 0.8100581347049802,
+        "labeled_size": 1383
+      },
+      {
+        "round": 6,
+        "mIoU": 0.694630854604144,
+        "f1_score": 0.7834766478251105,
+        "labeled_size": 1031
+      },
+      {
+        "round": 7,
+        "mIoU": 0.7338955411480437,
+        "f1_score": 0.8211698391683642,
+        "labeled_size": 1119
+      },
+      {
+        "round": 8,
+        "mIoU": 0.710715013835808,
+        "f1_score": 0.7997156258968149,
+        "labeled_size": 1207
+      },
+      {
+        "round": 9,
+        "mIoU": 0.7130670102271076,
+        "f1_score": 0.8017231341015468,
+        "labeled_size": 1295
+      },
+      {
+        "round": 10,
+        "mIoU": 0.7127067318280657,
+        "f1_score": 0.8013777735921662,
+        "labeled_size": 1383
+      },
+      {
+        "round": 11,
+        "mIoU": 0.6927728052801874,
+        "f1_score": 0.7823189345984327,
+        "labeled_size": 1471
+      },
+      {
+        "round": 12,
+        "mIoU": 0.716236154203868,
+        "f1_score": 0.8045381785536873,
+        "labeled_size": 1559
+      },
+      {
+        "round": 13,
+        "mIoU": 0.6990117542514498,
+        "f1_score": 0.7879520928853487,
+        "labeled_size": 1647
+      },
+      {
+        "round": 14,
+        "mIoU": 0.7212116424943213,
+        "f1_score": 0.809605725883308,
+        "labeled_size": 1735
+      },
+      {
+        "round": 15,
+        "mIoU": 0.7068709382353439,
+        "f1_score": 0.7957979711150602,
+        "labeled_size": 1823
+      }
+    ],
+    "budget_history": [
+      1031,
+      1119,
+      1207,
+      1295,
+      1383,
+      1031,
+      1119,
+      1207,
+      1295,
+      1383,
+      1471,
+      1559,
+      1647,
+      1735,
+      1823
+    ],
+    "fallback_history": [],
+    "alc": 0.22967058740884685,
+    "final_miou": 0.7068709382353439,
+    "final_f1": 0.7957979711150602,
+    "epochs_schedule_source": null,
+    "epochs_schedule": null,
+    "status": "success",
+    "timestamp": "2026-02-27T00:43:57.206900",
+    "log_file": "results/logs_md/full_model_v5_calibrated_risk_run_src_full_model_with_baselines_seed42__eval_val.md"
+  }
+}

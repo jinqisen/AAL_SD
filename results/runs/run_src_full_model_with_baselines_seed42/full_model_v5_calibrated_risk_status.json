@@ -1,0 +1,45 @@
+{
+  "run_id": "run_src_full_model_with_baselines_seed42",
+  "experiment_name": "full_model_v5_calibrated_risk",
+  "updated_at": "2026-02-21T16:49:00.813415",
+  "pool_integrity": {
+    "counts": {
+      "labeled": 151,
+      "unlabeled": 2888,
+      "test": 760,
+      "union": 3799,
+      "dataset": 3799
+    },
+    "overlaps": {
+      "labeled_unlabeled": 0,
+      "labeled_test": 0,
+      "unlabeled_test": 0
+    }
+  },
+  "pool_integrity_ok": true,
+  "status": "running",
+  "pools_dir": "/Users/anykong/AAL_SD/results/pools/run_src_full_model_with_baselines_seed42/full_model_v5_calibrated_risk",
+  "checkpoint_path": "/Users/anykong/AAL_SD/results/checkpoints/run_src_full_model_with_baselines_seed42/full_model_v5_calibrated_risk_state.json",
+  "initial": {
+    "labeled": 151,
+    "unlabeled": 2888,
+    "test": 760
+  },
+  "dataset_fingerprint": {
+    "count": 3799,
+    "sha256": "ab1c6ed6ffcd25606a577ecf266996d10127065c72db2f5cc8c43cb90fd7c95a"
+  },
+  "resume": {
+    "start_round": 0
+  },
+  "progress": {
+    "round": 11,
+    "epoch": 4,
+    "labeled_size": 1031,
+    "loss": 0.09282781134435639,
+    "mIoU": 0.7091037408778436,
+    "f1": 0.7986879112394714,
+    "best_mIoU_round": 0.7227233771848995,
+    "warnings": []
+  }
+}

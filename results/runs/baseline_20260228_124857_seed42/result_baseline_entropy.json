@@ -1,0 +1,124 @@
+{
+  "baseline_entropy": {
+    "experiment_name": "baseline_entropy",
+    "description": "熵采样基线",
+    "performance_history": [
+      {
+        "round": 1,
+        "mIoU": 0.6706718611687259,
+        "f1_score": 0.7603824333916931,
+        "labeled_size": 151
+      },
+      {
+        "round": 2,
+        "mIoU": 0.6960473686940486,
+        "f1_score": 0.786431260837921,
+        "labeled_size": 239
+      },
+      {
+        "round": 3,
+        "mIoU": 0.716267402927473,
+        "f1_score": 0.8058300726806067,
+        "labeled_size": 327
+      },
+      {
+        "round": 4,
+        "mIoU": 0.7224701971706761,
+        "f1_score": 0.8115648288135364,
+        "labeled_size": 415
+      },
+      {
+        "round": 5,
+        "mIoU": 0.7360779418779784,
+        "f1_score": 0.8241261280501596,
+        "labeled_size": 503
+      },
+      {
+        "round": 6,
+        "mIoU": 0.746355487955868,
+        "f1_score": 0.8330343762576602,
+        "labeled_size": 591
+      },
+      {
+        "round": 7,
+        "mIoU": 0.7427968616221748,
+        "f1_score": 0.8297634342734157,
+        "labeled_size": 679
+      },
+      {
+        "round": 8,
+        "mIoU": 0.7406151599820359,
+        "f1_score": 0.8279823655932923,
+        "labeled_size": 767
+      },
+      {
+        "round": 9,
+        "mIoU": 0.7462610292096125,
+        "f1_score": 0.8329433074409345,
+        "labeled_size": 855
+      },
+      {
+        "round": 10,
+        "mIoU": 0.7568993409810767,
+        "f1_score": 0.8420651721271488,
+        "labeled_size": 943
+      },
+      {
+        "round": 11,
+        "mIoU": 0.7602003932702929,
+        "f1_score": 0.8448979303383448,
+        "labeled_size": 1031
+      },
+      {
+        "round": 12,
+        "mIoU": 0.757423301436692,
+        "f1_score": 0.8425774959668597,
+        "labeled_size": 1119
+      },
+      {
+        "round": 13,
+        "mIoU": 0.7646892082328646,
+        "f1_score": 0.8486383727074747,
+        "labeled_size": 1207
+      },
+      {
+        "round": 14,
+        "mIoU": 0.7534073207542755,
+        "f1_score": 0.8389476354130652,
+        "labeled_size": 1295
+      },
+      {
+        "round": 15,
+        "mIoU": 0.755490965110232,
+        "f1_score": 0.8408657828954962,
+        "labeled_size": 1383
+      }
+    ],
+    "budget_history": [
+      151,
+      239,
+      327,
+      415,
+      503,
+      591,
+      679,
+      767,
+      855,
+      943,
+      1031,
+      1119,
+      1207,
+      1295,
+      1383
+    ],
+    "fallback_history": [],
+    "alc": 0.6673962507263936,
+    "final_miou": 0.755490965110232,
+    "final_f1": 0.8408657828954962,
+    "epochs_schedule_source": null,
+    "epochs_schedule": null,
+    "status": "success",
+    "timestamp": "2026-02-28T17:25:22.379162",
+    "log_file": "results/logs_md/baseline_entropy_baseline_20260228_124857_seed42.md"
+  }
+}

@@ -1,0 +1,124 @@
+{
+  "baseline_llm_us": {
+    "experiment_name": "baseline_llm_us",
+    "description": "LLM仅基于不确定性分数",
+    "performance_history": [
+      {
+        "round": 1,
+        "mIoU": 0.6498862812775614,
+        "f1_score": 0.7373505505623404,
+        "labeled_size": 151
+      },
+      {
+        "round": 2,
+        "mIoU": 0.7011978453755678,
+        "f1_score": 0.7913470533033634,
+        "labeled_size": 239
+      },
+      {
+        "round": 3,
+        "mIoU": 0.6976021426178781,
+        "f1_score": 0.7875397339289602,
+        "labeled_size": 327
+      },
+      {
+        "round": 4,
+        "mIoU": 0.7324195123318662,
+        "f1_score": 0.8210583063683816,
+        "labeled_size": 415
+      },
+      {
+        "round": 5,
+        "mIoU": 0.7300457261605925,
+        "f1_score": 0.8184119854550886,
+        "labeled_size": 503
+      },
+      {
+        "round": 6,
+        "mIoU": 0.7413760933569098,
+        "f1_score": 0.8286285407811784,
+        "labeled_size": 591
+      },
+      {
+        "round": 7,
+        "mIoU": 0.749300983505493,
+        "f1_score": 0.8355000490346676,
+        "labeled_size": 679
+      },
+      {
+        "round": 8,
+        "mIoU": 0.7577773884889936,
+        "f1_score": 0.8428092401655153,
+        "labeled_size": 767
+      },
+      {
+        "round": 9,
+        "mIoU": 0.7478298007388375,
+        "f1_score": 0.834306005548695,
+        "labeled_size": 855
+      },
+      {
+        "round": 10,
+        "mIoU": 0.7586891152673942,
+        "f1_score": 0.8436046849946126,
+        "labeled_size": 943
+      },
+      {
+        "round": 11,
+        "mIoU": 0.7487429513462007,
+        "f1_score": 0.8350636431575592,
+        "labeled_size": 1031
+      },
+      {
+        "round": 12,
+        "mIoU": 0.7595013729294705,
+        "f1_score": 0.8441914608675216,
+        "labeled_size": 1119
+      },
+      {
+        "round": 13,
+        "mIoU": 0.7593876890545563,
+        "f1_score": 0.8441997671141259,
+        "labeled_size": 1207
+      },
+      {
+        "round": 14,
+        "mIoU": 0.7636188544509613,
+        "f1_score": 0.8476485216555977,
+        "labeled_size": 1295
+      },
+      {
+        "round": 15,
+        "mIoU": 0.7682803358020485,
+        "f1_score": 0.8515859469444236,
+        "labeled_size": 1383
+      }
+    ],
+    "budget_history": [
+      151,
+      239,
+      327,
+      415,
+      503,
+      591,
+      679,
+      767,
+      855,
+      943,
+      1031,
+      1119,
+      1207,
+      1295,
+      1383
+    ],
+    "fallback_history": [],
+    "alc": 0.6687719095954949,
+    "final_miou": 0.7682803358020485,
+    "final_f1": 0.8515859469444236,
+    "epochs_schedule_source": null,
+    "epochs_schedule": null,
+    "status": "success",
+    "timestamp": "2026-02-26T15:49:40.149527",
+    "log_file": "results/logs_md/baseline_llm_us_run_src_full_model_with_baselines_seed45.md"
+  }
+}

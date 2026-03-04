@@ -1,0 +1,209 @@
+{
+  "full_model": {
+    "experiment_name": "full_model",
+    "description": "完整模型（我们的方法）：Agent驱动的自适应梯度选样（epochs固定=10）",
+    "performance_history": [
+      {
+        "round": 1,
+        "mIoU": 0.6045984265487527,
+        "f1_score": 0.6815622931663696,
+        "labeled_size": 151
+      },
+      {
+        "round": 2,
+        "mIoU": 0.6905794572516198,
+        "f1_score": 0.780929659204469,
+        "labeled_size": 239
+      },
+      {
+        "round": 3,
+        "mIoU": 0.7041573894407654,
+        "f1_score": 0.794251490785578,
+        "labeled_size": 327
+      },
+      {
+        "round": 4,
+        "mIoU": 0.7292619230980939,
+        "f1_score": 0.8177519151426614,
+        "labeled_size": 415
+      },
+      {
+        "round": 5,
+        "mIoU": 0.7299792513892968,
+        "f1_score": 0.8184242485247666,
+        "labeled_size": 503
+      },
+      {
+        "round": 6,
+        "mIoU": 0.7448995740353498,
+        "f1_score": 0.8318217404314951,
+        "labeled_size": 591
+      },
+      {
+        "round": 7,
+        "mIoU": 0.7506367584196815,
+        "f1_score": 0.8366389290196288,
+        "labeled_size": 679
+      },
+      {
+        "round": 8,
+        "mIoU": 0.7526222607471957,
+        "f1_score": 0.8383773230208718,
+        "labeled_size": 767
+      },
+      {
+        "round": 9,
+        "mIoU": 0.7486547299458581,
+        "f1_score": 0.835021430627555,
+        "labeled_size": 855
+      },
+      {
+        "round": 10,
+        "mIoU": 0.7595423236068648,
+        "f1_score": 0.844336806725456,
+        "labeled_size": 943
+      },
+      {
+        "round": 11,
+        "mIoU": 0.7606118507925694,
+        "f1_score": 0.8451572558395156,
+        "labeled_size": 1031
+      },
+      {
+        "round": 12,
+        "mIoU": 0.7572035657794928,
+        "f1_score": 0.842334135470091,
+        "labeled_size": 1119
+      },
+      {
+        "round": 13,
+        "mIoU": 0.7568434784246212,
+        "f1_score": 0.8421269703725212,
+        "labeled_size": 1207
+      },
+      {
+        "round": 14,
+        "mIoU": 0.7485433124254379,
+        "f1_score": 0.8349381541099572,
+        "labeled_size": 1295
+      },
+      {
+        "round": 15,
+        "mIoU": 0.7600713322227439,
+        "f1_score": 0.8446211955285934,
+        "labeled_size": 1383
+      }
+    ],
+    "budget_history": [
+      151,
+      239,
+      327,
+      415,
+      503,
+      591,
+      679,
+      767,
+      855,
+      943,
+      1031,
+      1119,
+      1207,
+      1295,
+      1383
+    ],
+    "fallback_history": [
+      {
+        "round": 1,
+        "fallback_used": false,
+        "preferred_count": 88,
+        "fallback_added": 0
+      },
+      {
+        "round": 2,
+        "fallback_used": false,
+        "preferred_count": 88,
+        "fallback_added": 0
+      },
+      {
+        "round": 3,
+        "fallback_used": false,
+        "preferred_count": 88,
+        "fallback_added": 0
+      },
+      {
+        "round": 4,
+        "fallback_used": false,
+        "preferred_count": 88,
+        "fallback_added": 0
+      },
+      {
+        "round": 5,
+        "fallback_used": false,
+        "preferred_count": 88,
+        "fallback_added": 0
+      },
+      {
+        "round": 6,
+        "fallback_used": false,
+        "preferred_count": 88,
+        "fallback_added": 0
+      },
+      {
+        "round": 7,
+        "fallback_used": false,
+        "preferred_count": 88,
+        "fallback_added": 0
+      },
+      {
+        "round": 8,
+        "fallback_used": false,
+        "preferred_count": 88,
+        "fallback_added": 0
+      },
+      {
+        "round": 9,
+        "fallback_used": false,
+        "preferred_count": 88,
+        "fallback_added": 0
+      },
+      {
+        "round": 10,
+        "fallback_used": false,
+        "preferred_count": 88,
+        "fallback_added": 0
+      },
+      {
+        "round": 11,
+        "fallback_used": false,
+        "preferred_count": 88,
+        "fallback_added": 0
+      },
+      {
+        "round": 12,
+        "fallback_used": false,
+        "preferred_count": 88,
+        "fallback_added": 0
+      },
+      {
+        "round": 13,
+        "fallback_used": false,
+        "preferred_count": 88,
+        "fallback_added": 0
+      },
+      {
+        "round": 14,
+        "fallback_used": false,
+        "preferred_count": 88,
+        "fallback_added": 0
+      }
+    ],
+    "alc": 0.6656789516785001,
+    "final_miou": 0.7600713322227439,
+    "final_f1": 0.8446211955285934,
+    "epochs_schedule_source": null,
+    "epochs_schedule": null,
+    "status": "success",
+    "timestamp": "2026-02-08T01:28:45.538241",
+    "log_file": "results/logs_md/full_model_20260207_paper_ms_seed42.md"
+  }
+}

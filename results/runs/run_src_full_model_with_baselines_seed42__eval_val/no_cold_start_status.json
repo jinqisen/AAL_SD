@@ -1,0 +1,51 @@
+{
+  "run_id": "run_src_full_model_with_baselines_seed42__eval_val",
+  "experiment_name": "no_cold_start",
+  "updated_at": "2026-02-27T03:12:26.450285",
+  "pool_integrity": {
+    "counts": {
+      "labeled": 1383,
+      "unlabeled": 1656,
+      "test": 760,
+      "union": 3799,
+      "dataset": 3799
+    },
+    "overlaps": {
+      "labeled_unlabeled": 0,
+      "labeled_test": 0,
+      "unlabeled_test": 0
+    }
+  },
+  "pool_integrity_ok": true,
+  "status": "failed",
+  "pools_dir": "/Users/anykong/AAL_SD/results/pools/run_src_full_model_with_baselines_seed42__eval_val/no_cold_start",
+  "checkpoint_path": "results/checkpoints/run_src_full_model_with_baselines_seed42__eval_val/no_cold_start_state.json",
+  "initial": {
+    "labeled": 1383,
+    "unlabeled": 1656,
+    "test": 760
+  },
+  "dataset_fingerprint": {
+    "count": 3799,
+    "sha256": "ab1c6ed6ffcd25606a577ecf266996d10127065c72db2f5cc8c43cb90fd7c95a"
+  },
+  "resume": {
+    "start_round": 0
+  },
+  "progress": {
+    "round": 2,
+    "epoch": 10,
+    "labeled_size": 1471,
+    "loss": 0.058353089491458614,
+    "mIoU": 0.6599950895337826,
+    "f1": 0.7468885511531616,
+    "best_mIoU_round": 0.7024273564653012,
+    "warnings": []
+  },
+  "error": {
+    "round": 2,
+    "message": "LLM Agent failed at Round 2: Only 48 valid selections, but 88 required",
+    "type": "unknown",
+    "exception": "RuntimeError"
+  }
+}

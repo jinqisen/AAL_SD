@@ -1,0 +1,43 @@
+{
+  "full_model": {
+    "experiment_name": "full_model",
+    "description": "完整模型（最佳λ日程）：R1-2 λ=0.0；R3 warmup=0.2；R4+ 风险闭环λ（不调整query_size）",
+    "status": "failed",
+    "error": "LLM Agent failed at Round 3: Only 48 valid selections, but 88 required",
+    "performance_history": [
+      {
+        "round": 1,
+        "mIoU": 0.7085,
+        "f1_score": 0.7976,
+        "labeled_size": 1383
+      },
+      {
+        "round": 2,
+        "mIoU": 0.7246,
+        "f1_score": 0.8128,
+        "labeled_size": 1471
+      },
+      {
+        "round": 2,
+        "mIoU": 0.7208,
+        "f1_score": 0.8094,
+        "labeled_size": 1383
+      },
+      {
+        "round": 3,
+        "mIoU": 0.7097,
+        "f1_score": 0.7985,
+        "labeled_size": 1471
+      }
+    ],
+    "budget_history": [
+      1383,
+      1471,
+      1383,
+      1471
+    ],
+    "last_round": 3,
+    "timestamp": "2026-02-26T22:49:27.621979",
+    "log_file": "results/logs_md/full_model_run_src_full_model_with_baselines_seed42__eval_val.md"
+  }
+}

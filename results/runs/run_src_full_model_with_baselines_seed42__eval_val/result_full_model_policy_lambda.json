@@ -1,0 +1,29 @@
+{
+  "full_model_policy_lambda": {
+    "experiment_name": "full_model_policy_lambda",
+    "description": "完整模型（规则闭环λ）：固定Warmup(0.2) + 自适应阈值 rollback + 风险驱动 λ 闭环控制（不调整 query_size）",
+    "status": "failed",
+    "error": "LLM Agent failed at Round 3: Only 48 valid selections, but 88 required",
+    "performance_history": [
+      {
+        "round": 2,
+        "mIoU": 0.7103,
+        "f1_score": 0.799,
+        "labeled_size": 1383
+      },
+      {
+        "round": 3,
+        "mIoU": 0.6872,
+        "f1_score": 0.7762,
+        "labeled_size": 1471
+      }
+    ],
+    "budget_history": [
+      1383,
+      1471
+    ],
+    "last_round": 3,
+    "timestamp": "2026-02-26T23:19:43.025778",
+    "log_file": "results/logs_md/full_model_policy_lambda_run_src_full_model_with_baselines_seed42__eval_val.md"
+  }
+}

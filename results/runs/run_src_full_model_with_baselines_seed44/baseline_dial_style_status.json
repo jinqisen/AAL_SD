@@ -1,0 +1,62 @@
+{
+  "run_id": "run_src_full_model_with_baselines_seed44",
+  "experiment_name": "baseline_dial_style",
+  "updated_at": "2026-02-26T09:18:05.286964",
+  "pool_integrity": {
+    "counts": {
+      "labeled": 151,
+      "unlabeled": 2888,
+      "test": 760,
+      "union": 3799,
+      "dataset": 3799
+    },
+    "overlaps": {
+      "labeled_unlabeled": 0,
+      "labeled_test": 0,
+      "unlabeled_test": 0
+    }
+  },
+  "pool_integrity_ok": true,
+  "status": "completed",
+  "pools_dir": "/Users/anykong/AAL_SD/results/pools/run_src_full_model_with_baselines_seed44/baseline_dial_style",
+  "checkpoint_path": "results/checkpoints/run_src_full_model_with_baselines_seed44/baseline_dial_style_state.json",
+  "initial": {
+    "labeled": 151,
+    "unlabeled": 2888,
+    "test": 760
+  },
+  "dataset_fingerprint": {
+    "count": 3799,
+    "sha256": "ab1c6ed6ffcd25606a577ecf266996d10127065c72db2f5cc8c43cb90fd7c95a"
+  },
+  "resume": {
+    "start_round": 0
+  },
+  "progress": {
+    "round": 15,
+    "epoch": "finished",
+    "labeled_size": 1383
+  },
+  "result": {
+    "alc": 0.6587832201310816,
+    "final_mIoU": 0.7511362741805324,
+    "final_f1": 0.8371873867501101,
+    "budget_history": [
+      151,
+      239,
+      327,
+      415,
+      503,
+      591,
+      679,
+      767,
+      855,
+      943,
+      1031,
+      1119,
+      1207,
+      1295,
+      1383
+    ]
+  }
+}

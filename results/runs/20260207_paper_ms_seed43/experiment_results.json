@@ -1,0 +1,697 @@
+{
+  "full_model": {
+    "experiment_name": "full_model",
+    "description": "完整模型（我们的方法）：Agent驱动的自适应梯度选样（epochs固定=10）",
+    "performance_history": [
+      {
+        "round": 1,
+        "mIoU": 0.6087314884103969,
+        "f1_score": 0.6870206841697337,
+        "labeled_size": 151
+      },
+      {
+        "round": 2,
+        "mIoU": 0.7100491350264255,
+        "f1_score": 0.8003849429199779,
+        "labeled_size": 239
+      },
+      {
+        "round": 3,
+        "mIoU": 0.7108243230019203,
+        "f1_score": 0.8004793057487193,
+        "labeled_size": 327
+      },
+      {
+        "round": 4,
+        "mIoU": 0.7368746093108258,
+        "f1_score": 0.8247380224273624,
+        "labeled_size": 415
+      },
+      {
+        "round": 5,
+        "mIoU": 0.7391571579115351,
+        "f1_score": 0.8266918345561743,
+        "labeled_size": 503
+      },
+      {
+        "round": 6,
+        "mIoU": 0.7415500013459728,
+        "f1_score": 0.8289357448553152,
+        "labeled_size": 591
+      },
+      {
+        "round": 7,
+        "mIoU": 0.746453900291798,
+        "f1_score": 0.8333413784180901,
+        "labeled_size": 679
+      },
+      {
+        "round": 8,
+        "mIoU": 0.7361953161432349,
+        "f1_score": 0.8238540037166187,
+        "labeled_size": 767
+      },
+      {
+        "round": 9,
+        "mIoU": 0.7524078982514564,
+        "f1_score": 0.8381761704615416,
+        "labeled_size": 811
+      },
+      {
+        "round": 10,
+        "mIoU": 0.756947048387546,
+        "f1_score": 0.8419687456772578,
+        "labeled_size": 899
+      },
+      {
+        "round": 11,
+        "mIoU": 0.7434976001325673,
+        "f1_score": 0.8303911293023121,
+        "labeled_size": 987
+      },
+      {
+        "round": 12,
+        "mIoU": 0.7426219718046692,
+        "f1_score": 0.8296279134997104,
+        "labeled_size": 1031
+      },
+      {
+        "round": 13,
+        "mIoU": 0.7581859286959605,
+        "f1_score": 0.8433253760134795,
+        "labeled_size": 1081
+      },
+      {
+        "round": 14,
+        "mIoU": 0.7576627562596685,
+        "f1_score": 0.8427077336622864,
+        "labeled_size": 1169
+      },
+      {
+        "round": 15,
+        "mIoU": 0.7582813014313301,
+        "f1_score": 0.8432551678254565,
+        "labeled_size": 1257
+      }
+    ],
+    "budget_history": [
+      151,
+      239,
+      327,
+      415,
+      503,
+      591,
+      679,
+      767,
+      811,
+      899,
+      987,
+      1031,
+      1081,
+      1169,
+      1257
+    ],
+    "fallback_history": [
+      {
+        "round": 1,
+        "fallback_used": false,
+        "preferred_count": 88,
+        "fallback_added": 0
+      },
+      {
+        "round": 2,
+        "fallback_used": false,
+        "preferred_count": 88,
+        "fallback_added": 0
+      },
+      {
+        "round": 3,
+        "fallback_used": false,
+        "preferred_count": 88,
+        "fallback_added": 0
+      },
+      {
+        "round": 4,
+        "fallback_used": false,
+        "preferred_count": 88,
+        "fallback_added": 0
+      },
+      {
+        "round": 5,
+        "fallback_used": false,
+        "preferred_count": 88,
+        "fallback_added": 0
+      },
+      {
+        "round": 6,
+        "fallback_used": false,
+        "preferred_count": 88,
+        "fallback_added": 0
+      },
+      {
+        "round": 7,
+        "fallback_used": false,
+        "preferred_count": 88,
+        "fallback_added": 0
+      },
+      {
+        "round": 8,
+        "fallback_used": false,
+        "preferred_count": 44,
+        "fallback_added": 0
+      },
+      {
+        "round": 9,
+        "fallback_used": false,
+        "preferred_count": 88,
+        "fallback_added": 0
+      },
+      {
+        "round": 10,
+        "fallback_used": false,
+        "preferred_count": 88,
+        "fallback_added": 0
+      },
+      {
+        "round": 11,
+        "fallback_used": false,
+        "preferred_count": 44,
+        "fallback_added": 0
+      },
+      {
+        "round": 12,
+        "fallback_used": false,
+        "preferred_count": 50,
+        "fallback_added": 0
+      },
+      {
+        "round": 13,
+        "fallback_used": false,
+        "preferred_count": 88,
+        "fallback_added": 0
+      },
+      {
+        "round": 14,
+        "fallback_used": false,
+        "preferred_count": 88,
+        "fallback_added": 0
+      }
+    ],
+    "alc": 0.6665652700571595,
+    "final_miou": 0.7582813014313301,
+    "final_f1": 0.8432551678254565,
+    "epochs_schedule_source": null,
+    "epochs_schedule": null,
+    "status": "success",
+    "timestamp": "2026-02-08T04:15:55.869326",
+    "log_file": "results/logs_md/full_model_20260207_paper_ms_seed43.md"
+  },
+  "baseline_entropy": {
+    "experiment_name": "baseline_entropy",
+    "description": "熵采样基线",
+    "performance_history": [
+      {
+        "round": 1,
+        "mIoU": 0.63911912307156,
+        "f1_score": 0.724730643525439,
+        "labeled_size": 151
+      },
+      {
+        "round": 2,
+        "mIoU": 0.6999773191851326,
+        "f1_score": 0.7903460799533455,
+        "labeled_size": 239
+      },
+      {
+        "round": 3,
+        "mIoU": 0.7064173513725119,
+        "f1_score": 0.7963810815619421,
+        "labeled_size": 327
+      },
+      {
+        "round": 4,
+        "mIoU": 0.7218984147801717,
+        "f1_score": 0.8110394858140799,
+        "labeled_size": 415
+      },
+      {
+        "round": 5,
+        "mIoU": 0.7379452292221905,
+        "f1_score": 0.8257356100061763,
+        "labeled_size": 503
+      },
+      {
+        "round": 6,
+        "mIoU": 0.741760463083234,
+        "f1_score": 0.828837137570348,
+        "labeled_size": 591
+      },
+      {
+        "round": 7,
+        "mIoU": 0.7442516592164402,
+        "f1_score": 0.8311089454589415,
+        "labeled_size": 679
+      },
+      {
+        "round": 8,
+        "mIoU": 0.7386896973778334,
+        "f1_score": 0.8260206261665467,
+        "labeled_size": 767
+      },
+      {
+        "round": 9,
+        "mIoU": 0.7527586776160922,
+        "f1_score": 0.8386421393108368,
+        "labeled_size": 855
+      },
+      {
+        "round": 10,
+        "mIoU": 0.7477269329372636,
+        "f1_score": 0.8341359275674303,
+        "labeled_size": 943
+      },
+      {
+        "round": 11,
+        "mIoU": 0.7572456003163652,
+        "f1_score": 0.8422769917177404,
+        "labeled_size": 1031
+      },
+      {
+        "round": 12,
+        "mIoU": 0.7497784120842892,
+        "f1_score": 0.8357641849031019,
+        "labeled_size": 1119
+      },
+      {
+        "round": 13,
+        "mIoU": 0.7553763706089252,
+        "f1_score": 0.840637784382034,
+        "labeled_size": 1207
+      },
+      {
+        "round": 14,
+        "mIoU": 0.7613576429867674,
+        "f1_score": 0.8457499342492316,
+        "labeled_size": 1295
+      },
+      {
+        "round": 15,
+        "mIoU": 0.7581943182109505,
+        "f1_score": 0.843013509994495,
+        "labeled_size": 1383
+      }
+    ],
+    "budget_history": [
+      151,
+      239,
+      327,
+      415,
+      503,
+      591,
+      679,
+      767,
+      855,
+      943,
+      1031,
+      1119,
+      1207,
+      1295,
+      1383
+    ],
+    "fallback_history": [],
+    "alc": 0.6653932788165864,
+    "final_miou": 0.7581943182109505,
+    "final_f1": 0.843013509994495,
+    "epochs_schedule_source": null,
+    "epochs_schedule": null,
+    "status": "success",
+    "timestamp": "2026-02-08T08:24:35.127927",
+    "log_file": "results/logs_md/baseline_entropy_20260207_paper_ms_seed43.md"
+  },
+  "baseline_random": {
+    "experiment_name": "baseline_random",
+    "description": "随机采样基线",
+    "performance_history": [
+      {
+        "round": 1,
+        "mIoU": 0.6495046850693498,
+        "f1_score": 0.7369920082799816,
+        "labeled_size": 151
+      },
+      {
+        "round": 2,
+        "mIoU": 0.6797874859101374,
+        "f1_score": 0.7696860698633031,
+        "labeled_size": 239
+      },
+      {
+        "round": 3,
+        "mIoU": 0.700825326915545,
+        "f1_score": 0.7908154710714836,
+        "labeled_size": 327
+      },
+      {
+        "round": 4,
+        "mIoU": 0.7141294513930003,
+        "f1_score": 0.8046549870887199,
+        "labeled_size": 415
+      },
+      {
+        "round": 5,
+        "mIoU": 0.6940521603971582,
+        "f1_score": 0.7843606493294509,
+        "labeled_size": 503
+      },
+      {
+        "round": 6,
+        "mIoU": 0.7224777178071738,
+        "f1_score": 0.812064452423723,
+        "labeled_size": 591
+      },
+      {
+        "round": 7,
+        "mIoU": 0.7251215272972336,
+        "f1_score": 0.8141265170541333,
+        "labeled_size": 679
+      },
+      {
+        "round": 8,
+        "mIoU": 0.7199046816256935,
+        "f1_score": 0.8093179704094349,
+        "labeled_size": 767
+      },
+      {
+        "round": 9,
+        "mIoU": 0.7234065788236107,
+        "f1_score": 0.8123001326456656,
+        "labeled_size": 855
+      },
+      {
+        "round": 10,
+        "mIoU": 0.7319370026618167,
+        "f1_score": 0.8206735470273956,
+        "labeled_size": 943
+      },
+      {
+        "round": 11,
+        "mIoU": 0.7376413529976993,
+        "f1_score": 0.825608786167445,
+        "labeled_size": 1031
+      },
+      {
+        "round": 12,
+        "mIoU": 0.7486306268540486,
+        "f1_score": 0.8351527917102948,
+        "labeled_size": 1119
+      },
+      {
+        "round": 13,
+        "mIoU": 0.733257180004659,
+        "f1_score": 0.8214177533231779,
+        "labeled_size": 1207
+      },
+      {
+        "round": 14,
+        "mIoU": 0.7418552161635452,
+        "f1_score": 0.8289219334598301,
+        "labeled_size": 1295
+      },
+      {
+        "round": 15,
+        "mIoU": 0.7476416787896798,
+        "f1_score": 0.833994477063122,
+        "labeled_size": 1383
+      }
+    ],
+    "budget_history": [
+      151,
+      239,
+      327,
+      415,
+      503,
+      591,
+      679,
+      767,
+      855,
+      943,
+      1031,
+      1119,
+      1207,
+      1295,
+      1383
+    ],
+    "fallback_history": [],
+    "alc": 0.650414762017189,
+    "final_miou": 0.7476416787896798,
+    "final_f1": 0.833994477063122,
+    "epochs_schedule_source": null,
+    "epochs_schedule": null,
+    "status": "success",
+    "timestamp": "2026-02-08T12:35:56.271995",
+    "log_file": "results/logs_md/baseline_random_20260207_paper_ms_seed43.md"
+  },
+  "no_agent": {
+    "experiment_name": "no_agent",
+    "description": "消融：移除Agent，仅使用固定规则的AD-KUCS选样",
+    "performance_history": [
+      {
+        "round": 1,
+        "mIoU": 0.6125217718973288,
+        "f1_score": 0.692218216281651,
+        "labeled_size": 151
+      },
+      {
+        "round": 2,
+        "mIoU": 0.6602313933414682,
+        "f1_score": 0.7483726352278908,
+        "labeled_size": 239
+      },
+      {
+        "round": 3,
+        "mIoU": 0.7167137569605966,
+        "f1_score": 0.8060512514571585,
+        "labeled_size": 327
+      },
+      {
+        "round": 4,
+        "mIoU": 0.7341663431186009,
+        "f1_score": 0.8223202678756074,
+        "labeled_size": 415
+      },
+      {
+        "round": 5,
+        "mIoU": 0.7363151187612342,
+        "f1_score": 0.8240255841103266,
+        "labeled_size": 503
+      },
+      {
+        "round": 6,
+        "mIoU": 0.73725120440601,
+        "f1_score": 0.8248249087804611,
+        "labeled_size": 591
+      },
+      {
+        "round": 7,
+        "mIoU": 0.7417474671661071,
+        "f1_score": 0.8287418920873837,
+        "labeled_size": 679
+      },
+      {
+        "round": 8,
+        "mIoU": 0.7534008973332982,
+        "f1_score": 0.8391945131334663,
+        "labeled_size": 767
+      },
+      {
+        "round": 9,
+        "mIoU": 0.7519021798255509,
+        "f1_score": 0.8378873695535897,
+        "labeled_size": 855
+      },
+      {
+        "round": 10,
+        "mIoU": 0.7463766606350641,
+        "f1_score": 0.8327894806265608,
+        "labeled_size": 943
+      },
+      {
+        "round": 11,
+        "mIoU": 0.7583021497971875,
+        "f1_score": 0.8431474582301238,
+        "labeled_size": 1031
+      },
+      {
+        "round": 12,
+        "mIoU": 0.7634629588152884,
+        "f1_score": 0.8475747333349053,
+        "labeled_size": 1119
+      },
+      {
+        "round": 13,
+        "mIoU": 0.757548086121593,
+        "f1_score": 0.8425381746899517,
+        "labeled_size": 1207
+      },
+      {
+        "round": 14,
+        "mIoU": 0.7530494631785263,
+        "f1_score": 0.8385612136605286,
+        "labeled_size": 1295
+      },
+      {
+        "round": 15,
+        "mIoU": 0.7607087489602318,
+        "f1_score": 0.8452807981874642,
+        "labeled_size": 1383
+      }
+    ],
+    "budget_history": [
+      151,
+      239,
+      327,
+      415,
+      503,
+      591,
+      679,
+      767,
+      855,
+      943,
+      1031,
+      1119,
+      1207,
+      1295,
+      1383
+    ],
+    "fallback_history": [],
+    "alc": 0.6646475895779135,
+    "final_miou": 0.7607087489602318,
+    "final_f1": 0.8452807981874642,
+    "epochs_schedule_source": null,
+    "epochs_schedule": null,
+    "status": "success",
+    "timestamp": "2026-02-08T16:30:56.053960",
+    "log_file": "results/logs_md/no_agent_20260207_paper_ms_seed43.md"
+  },
+  "fixed_lambda": {
+    "experiment_name": "fixed_lambda",
+    "description": "固定λ=0.5",
+    "performance_history": [
+      {
+        "round": 1,
+        "mIoU": 0.6530607023638055,
+        "f1_score": 0.7410637098346654,
+        "labeled_size": 151
+      },
+      {
+        "round": 2,
+        "mIoU": 0.7070356383848784,
+        "f1_score": 0.797290917988883,
+        "labeled_size": 239
+      },
+      {
+        "round": 3,
+        "mIoU": 0.7238875460459371,
+        "f1_score": 0.8131561303658353,
+        "labeled_size": 327
+      },
+      {
+        "round": 4,
+        "mIoU": 0.7295801481967962,
+        "f1_score": 0.8182666712952124,
+        "labeled_size": 415
+      },
+      {
+        "round": 5,
+        "mIoU": 0.7222221641492151,
+        "f1_score": 0.8112294012523853,
+        "labeled_size": 503
+      },
+      {
+        "round": 6,
+        "mIoU": 0.75353599941953,
+        "f1_score": 0.839251543763648,
+        "labeled_size": 591
+      },
+      {
+        "round": 7,
+        "mIoU": 0.7398051211246545,
+        "f1_score": 0.8272632644595024,
+        "labeled_size": 679
+      },
+      {
+        "round": 8,
+        "mIoU": 0.7466696727562934,
+        "f1_score": 0.8332152665304382,
+        "labeled_size": 767
+      },
+      {
+        "round": 9,
+        "mIoU": 0.747814673114247,
+        "f1_score": 0.8344780055225125,
+        "labeled_size": 855
+      },
+      {
+        "round": 10,
+        "mIoU": 0.7518495443518989,
+        "f1_score": 0.8375727049582334,
+        "labeled_size": 943
+      },
+      {
+        "round": 11,
+        "mIoU": 0.7570441138914982,
+        "f1_score": 0.8421165990452799,
+        "labeled_size": 1031
+      },
+      {
+        "round": 12,
+        "mIoU": 0.7484522298577834,
+        "f1_score": 0.8346386403887176,
+        "labeled_size": 1119
+      },
+      {
+        "round": 13,
+        "mIoU": 0.7457202806841906,
+        "f1_score": 0.8324916547965024,
+        "labeled_size": 1207
+      },
+      {
+        "round": 14,
+        "mIoU": 0.7657014212208599,
+        "f1_score": 0.8492815583961122,
+        "labeled_size": 1295
+      },
+      {
+        "round": 15,
+        "mIoU": 0.7596106169204109,
+        "f1_score": 0.8442562454499221,
+        "labeled_size": 1383
+      }
+    ],
+    "budget_history": [
+      151,
+      239,
+      327,
+      415,
+      503,
+      591,
+      679,
+      767,
+      855,
+      943,
+      1031,
+      1119,
+      1207,
+      1295,
+      1383
+    ],
+    "fallback_history": [],
+    "alc": 0.6673631432726044,
+    "final_miou": 0.7596106169204109,
+    "final_f1": 0.8442562454499221,
+    "epochs_schedule_source": null,
+    "epochs_schedule": null,
+    "status": "success",
+    "timestamp": "2026-02-08T19:35:08.606758",
+    "log_file": "results/logs_md/fixed_lambda_20260207_paper_ms_seed43.md"
+  }
+}

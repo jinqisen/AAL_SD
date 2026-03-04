@@ -1,0 +1,9 @@
+src/llm_config.json
+__pycache__/
+*.pyc
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+data/CAS_Landslide/
+data/ChestX-ray14/
+data/Landslide4Sense/

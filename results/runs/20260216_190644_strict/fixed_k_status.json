@@ -1,0 +1,45 @@
+{
+  "run_id": "20260216_190644_strict",
+  "experiment_name": "fixed_k",
+  "updated_at": "2026-02-18T12:17:18.575064",
+  "pool_integrity": {
+    "counts": {
+      "labeled": 151,
+      "unlabeled": 2888,
+      "test": 760,
+      "union": 3799,
+      "dataset": 3799
+    },
+    "overlaps": {
+      "labeled_unlabeled": 0,
+      "labeled_test": 0,
+      "unlabeled_test": 0
+    }
+  },
+  "pool_integrity_ok": true,
+  "status": "running",
+  "pools_dir": "/Users/anykong/AAL_SD/data/pools/20260216_190644_strict/fixed_k",
+  "checkpoint_path": "/Users/anykong/AAL_SD/results/checkpoints/20260216_190644_strict/fixed_k_state.json",
+  "initial": {
+    "labeled": 151,
+    "unlabeled": 2888,
+    "test": 760
+  },
+  "dataset_fingerprint": {
+    "count": 3799,
+    "sha256": "ab1c6ed6ffcd25606a577ecf266996d10127065c72db2f5cc8c43cb90fd7c95a"
+  },
+  "resume": {
+    "start_round": 0
+  },
+  "progress": {
+    "round": 2,
+    "epoch": 9,
+    "labeled_size": 239,
+    "loss": 0.11684187956280627,
+    "mIoU": 0.6633746062398976,
+    "f1": 0.7518073180070349,
+    "best_mIoU_round": 0.692116954553998,
+    "warnings": []
+  }
+}

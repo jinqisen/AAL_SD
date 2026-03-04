@@ -1,0 +1,124 @@
+{
+  "baseline_bald": {
+    "experiment_name": "baseline_bald",
+    "description": "BALD采样基线",
+    "performance_history": [
+      {
+        "round": 1,
+        "mIoU": 0.6695202376085423,
+        "f1_score": 0.7593034777850025,
+        "labeled_size": 151
+      },
+      {
+        "round": 2,
+        "mIoU": 0.6920084785908638,
+        "f1_score": 0.7830160948924916,
+        "labeled_size": 239
+      },
+      {
+        "round": 3,
+        "mIoU": 0.706345638240308,
+        "f1_score": 0.7967304530250199,
+        "labeled_size": 327
+      },
+      {
+        "round": 4,
+        "mIoU": 0.723766057761652,
+        "f1_score": 0.8129243899332677,
+        "labeled_size": 415
+      },
+      {
+        "round": 5,
+        "mIoU": 0.7422767473347782,
+        "f1_score": 0.8300437785594722,
+        "labeled_size": 503
+      },
+      {
+        "round": 6,
+        "mIoU": 0.734131880554922,
+        "f1_score": 0.8226183831512769,
+        "labeled_size": 591
+      },
+      {
+        "round": 7,
+        "mIoU": 0.7405228981543897,
+        "f1_score": 0.8278597731429007,
+        "labeled_size": 679
+      },
+      {
+        "round": 8,
+        "mIoU": 0.7424556012750203,
+        "f1_score": 0.8297815867302434,
+        "labeled_size": 767
+      },
+      {
+        "round": 9,
+        "mIoU": 0.7537903881634909,
+        "f1_score": 0.8395528425990579,
+        "labeled_size": 855
+      },
+      {
+        "round": 10,
+        "mIoU": 0.759411188901751,
+        "f1_score": 0.8443679267250962,
+        "labeled_size": 943
+      },
+      {
+        "round": 11,
+        "mIoU": 0.7499682178300281,
+        "f1_score": 0.8363145689679778,
+        "labeled_size": 1031
+      },
+      {
+        "round": 12,
+        "mIoU": 0.7601405888715445,
+        "f1_score": 0.8448748313356654,
+        "labeled_size": 1119
+      },
+      {
+        "round": 13,
+        "mIoU": 0.7579089675474429,
+        "f1_score": 0.8429608035682427,
+        "labeled_size": 1207
+      },
+      {
+        "round": 14,
+        "mIoU": 0.7631594285098107,
+        "f1_score": 0.8473973997533717,
+        "labeled_size": 1295
+      },
+      {
+        "round": 15,
+        "mIoU": 0.7624171177877159,
+        "f1_score": 0.8466617538641864,
+        "labeled_size": 1383
+      }
+    ],
+    "budget_history": [
+      151,
+      239,
+      327,
+      415,
+      503,
+      591,
+      679,
+      767,
+      855,
+      943,
+      1031,
+      1119,
+      1207,
+      1295,
+      1383
+    ],
+    "fallback_history": [],
+    "alc": 0.6673943033899492,
+    "final_miou": 0.7624171177877159,
+    "final_f1": 0.8466617538641864,
+    "epochs_schedule_source": null,
+    "epochs_schedule": null,
+    "status": "success",
+    "timestamp": "2026-02-26T08:22:49.730810",
+    "log_file": "results/logs_md/baseline_bald_run_src_full_model_with_baselines_seed46.md"
+  }
+}

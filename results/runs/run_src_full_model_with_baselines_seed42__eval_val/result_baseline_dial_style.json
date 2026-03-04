@@ -1,0 +1,124 @@
+{
+  "baseline_dial_style": {
+    "experiment_name": "baseline_dial_style",
+    "description": "DIAL-style基线：分簇多样性约束+不确定性",
+    "performance_history": [
+      {
+        "round": 1,
+        "mIoU": 0.7093326027383723,
+        "f1_score": 0.7982303883998536,
+        "labeled_size": 1383
+      },
+      {
+        "round": 2,
+        "mIoU": 0.7168218079949131,
+        "f1_score": 0.8052495771849542,
+        "labeled_size": 1471
+      },
+      {
+        "round": 3,
+        "mIoU": 0.7208928228328081,
+        "f1_score": 0.80920718357263,
+        "labeled_size": 1559
+      },
+      {
+        "round": 4,
+        "mIoU": 0.7105778316265198,
+        "f1_score": 0.7993155332998233,
+        "labeled_size": 1647
+      },
+      {
+        "round": 5,
+        "mIoU": 0.7124083505257357,
+        "f1_score": 0.8011402564661266,
+        "labeled_size": 1735
+      },
+      {
+        "round": 6,
+        "mIoU": 0.7310663710940298,
+        "f1_score": 0.8188877795178966,
+        "labeled_size": 1823
+      },
+      {
+        "round": 7,
+        "mIoU": 0.7082695268036049,
+        "f1_score": 0.7974546249073191,
+        "labeled_size": 1911
+      },
+      {
+        "round": 8,
+        "mIoU": 0.7112296125653732,
+        "f1_score": 0.800280248532178,
+        "labeled_size": 1999
+      },
+      {
+        "round": 9,
+        "mIoU": 0.7051812233514929,
+        "f1_score": 0.7940750370523106,
+        "labeled_size": 2087
+      },
+      {
+        "round": 10,
+        "mIoU": 0.720262940452326,
+        "f1_score": 0.8084386282442747,
+        "labeled_size": 2175
+      },
+      {
+        "round": 11,
+        "mIoU": 0.7274769491050235,
+        "f1_score": 0.8152634330300135,
+        "labeled_size": 2263
+      },
+      {
+        "round": 12,
+        "mIoU": 0.708500269784012,
+        "f1_score": 0.7973784233964409,
+        "labeled_size": 2351
+      },
+      {
+        "round": 13,
+        "mIoU": 0.7419165350984396,
+        "f1_score": 0.8283023380365309,
+        "labeled_size": 2439
+      },
+      {
+        "round": 14,
+        "mIoU": 0.7004444246875139,
+        "f1_score": 0.7892676714202929,
+        "labeled_size": 2527
+      },
+      {
+        "round": 15,
+        "mIoU": 0.7108616973215296,
+        "f1_score": 0.7996903291315475,
+        "labeled_size": 2615
+      }
+    ],
+    "budget_history": [
+      1383,
+      1471,
+      1559,
+      1647,
+      1735,
+      1823,
+      1911,
+      1999,
+      2087,
+      2175,
+      2263,
+      2351,
+      2439,
+      2527,
+      2615
+    ],
+    "fallback_history": [],
+    "alc": 0.06402629704551008,
+    "final_miou": 0.7108616973215296,
+    "final_f1": 0.7996903291315475,
+    "epochs_schedule_source": null,
+    "epochs_schedule": null,
+    "status": "success",
+    "timestamp": "2026-02-27T23:27:32.148876",
+    "log_file": "results/logs_md/baseline_dial_style_run_src_full_model_with_baselines_seed42__eval_val.md"
+  }
+}

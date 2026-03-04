@@ -1,0 +1,124 @@
+{
+  "fixed_lambda": {
+    "experiment_name": "fixed_lambda",
+    "description": "消融：固定λ=0.5（对应方案A1：No LLM Agent）",
+    "performance_history": [
+      {
+        "round": 1,
+        "mIoU": 0.7318163597087497,
+        "f1_score": 0.8190756429843824,
+        "labeled_size": 1383
+      },
+      {
+        "round": 2,
+        "mIoU": 0.6943056665358418,
+        "f1_score": 0.7829952216147953,
+        "labeled_size": 1471
+      },
+      {
+        "round": 3,
+        "mIoU": 0.7191783403716647,
+        "f1_score": 0.8076158986796467,
+        "labeled_size": 1559
+      },
+      {
+        "round": 4,
+        "mIoU": 0.7277558526449641,
+        "f1_score": 0.8152698589938194,
+        "labeled_size": 1647
+      },
+      {
+        "round": 5,
+        "mIoU": 0.7090382989420686,
+        "f1_score": 0.7975820611270821,
+        "labeled_size": 1735
+      },
+      {
+        "round": 6,
+        "mIoU": 0.7004407635782579,
+        "f1_score": 0.7893864583857094,
+        "labeled_size": 1823
+      },
+      {
+        "round": 7,
+        "mIoU": 0.7153423238350703,
+        "f1_score": 0.8038658659999434,
+        "labeled_size": 1911
+      },
+      {
+        "round": 8,
+        "mIoU": 0.7099794612074504,
+        "f1_score": 0.7987832658176841,
+        "labeled_size": 1999
+      },
+      {
+        "round": 9,
+        "mIoU": 0.7084556904002948,
+        "f1_score": 0.7971979324346254,
+        "labeled_size": 2087
+      },
+      {
+        "round": 10,
+        "mIoU": 0.7019712074446505,
+        "f1_score": 0.7922445755202163,
+        "labeled_size": 2175
+      },
+      {
+        "round": 11,
+        "mIoU": 0.7118763283602679,
+        "f1_score": 0.8004850572376145,
+        "labeled_size": 2263
+      },
+      {
+        "round": 12,
+        "mIoU": 0.7226840270713977,
+        "f1_score": 0.8111512707413207,
+        "labeled_size": 2351
+      },
+      {
+        "round": 13,
+        "mIoU": 0.6947838213777635,
+        "f1_score": 0.7834838052439874,
+        "labeled_size": 1383
+      },
+      {
+        "round": 14,
+        "mIoU": 0.7200442508379159,
+        "f1_score": 0.808341029057712,
+        "labeled_size": 1471
+      },
+      {
+        "round": 15,
+        "mIoU": 0.7106941645346228,
+        "f1_score": 0.7994824309052833,
+        "labeled_size": 1559
+      }
+    ],
+    "budget_history": [
+      1383,
+      1471,
+      1559,
+      1647,
+      1735,
+      1823,
+      1911,
+      1999,
+      2087,
+      2175,
+      2263,
+      2351,
+      1383,
+      1471,
+      1559
+    ],
+    "fallback_history": [],
+    "alc": 0.0647947393371186,
+    "final_miou": 0.7106941645346228,
+    "final_f1": 0.7994824309052833,
+    "epochs_schedule_source": null,
+    "epochs_schedule": null,
+    "status": "success",
+    "timestamp": "2026-02-27T01:20:35.928484",
+    "log_file": "results/logs_md/fixed_lambda_run_src_full_model_with_baselines_seed42__eval_val.md"
+  }
+}

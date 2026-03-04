@@ -1,0 +1,225 @@
+{
+  "run_id": "run_src2_full_model_v2_with_baselines_seed42",
+  "created_at": "2026-02-18T13:21:57.712378",
+  "updated_at": "2026-02-18T20:56:05.746252",
+  "config": {
+    "ALLOW_LEGACY_POOLS": false,
+    "ALPHA": 5.0,
+    "BATCH_SIZE": 4,
+    "BUDGET_RATIO": 0.4,
+    "CHECKPOINT_DIR": "/Users/anykong/AAL_SD/results/checkpoints",
+    "DATA_DIR": "/Users/anykong/AAL_SD/data/Landslide4Sense",
+    "DETERMINISTIC": true,
+    "DEVICE": "mps",
+    "EPOCHS_PER_ROUND": 10,
+    "EPOCHS_PER_ROUND_SCHEDULE": null,
+    "ESTIMATED_TOTAL_SAMPLES": 3799,
+    "FAIL_ON_AGENT_FALLBACK": true,
+    "FAIL_ON_RANKING_DEGRADED": true,
+    "FEATURE_NUM_WORKERS": 0,
+    "FIXED_LAMBDA": 0.5,
+    "FIX_EPOCHS_PER_ROUND": true,
+    "GRAD_LOGGING": true,
+    "GRAD_LOG_MAX_BATCHES": 8,
+    "GRAD_LOG_PARAM_MAX_ELEMENTS": 200000,
+    "GRAD_LOG_VAL_ALIGNMENT": true,
+    "INITIAL_LABELED_SIZE": 0.05,
+    "IN_CHANNELS": 14,
+    "LLM_BASE_URL": "https://api.siliconflow.cn/v1",
+    "LLM_CONFIG_PATH": "/Users/anykong/AAL_SD/src 2/llm_config.json",
+    "LLM_MAX_RETRIES": 5,
+    "LLM_MODEL": "Pro/deepseek-ai/DeepSeek-V3.2",
+    "LLM_PROVIDER": "siliconflow",
+    "LLM_RETRY_BACKOFF": 2.0,
+    "LLM_RETRY_BASE_SECONDS": 10.0,
+    "LLM_RETRY_MAX_SECONDS": 120.0,
+    "LLM_TEMPERATURE": 0.0,
+    "LLM_TIMEOUT": 60,
+    "LOSS_TYPE": "CrossEntropyLoss",
+    "LR": 0.0001,
+    "NUM_CLASSES": 2,
+    "NUM_WORKERS": 0,
+    "N_ROUNDS": 15,
+    "POOLS_DIR": "/Users/anykong/AAL_SD/results/pools",
+    "QUERY_SIZE": 88,
+    "RANDOM_SEED": 42,
+    "REQUIRE_LLM_FOR_AGENT": true,
+    "RESEARCH_MODE": true,
+    "RESULTS_DIR": "/Users/anykong/AAL_SD/results",
+    "RESUME_FROM_LOGS": true,
+    "ROOT_DIR": "/Users/anykong/AAL_SD",
+    "STOP_ALL_EXPERIMENTS_ON_LLM_FAILURE": true,
+    "STOP_ON_LLM_FAILURE": true,
+    "STRATEGY": "ad_kucs",
+    "STRICT_INNOVATION": true,
+    "STRICT_RESUME": true,
+    "TEST_SIZE": 0.2,
+    "TOTAL_BUDGET": 1519,
+    "TRACE_AGENT_PROMPT": true,
+    "TRACE_AGENT_THOUGHT": true
+  },
+  "experiments": {
+    "full_model": {
+      "description": "完整模型（正式方案）：coreset-to-labeled K + 自适应阈值 rollback + 风险驱动 λ 闭环控制（不调整 query_size）",
+      "use_agent": true,
+      "sampler_type": "ad_kucs",
+      "lambda_override": null,
+      "lambda_policy": {
+        "mode": "warmup_risk_closed_loop",
+        "r1_lambda": 0.0,
+        "uncertainty_only_rounds": 2,
+        "warmup_start_round": 3,
+        "warmup_rounds": 1,
+        "warmup_lambda": 0.2,
+        "risk_control_start_round": 4
+      },
+      "rollback_config": {
+        "mode": "adaptive_threshold",
+        "std_factor": 1.5,
+        "tau_min": 0.005
+      },
+      "overfit_guard": true,
+      "control_permissions": {
+        "set_lambda": false,
+        "set_query_size": false,
+        "set_epochs_per_round": false,
+        "set_alpha": false
+      }
+    },
+    "agent_control_budget": {
+      "description": "Agent控制消融：仅允许set_query_size",
+      "use_agent": true,
+      "sampler_type": "ad_kucs",
+      "lambda_override": null,
+      "control_permissions": {
+        "set_lambda": false,
+        "set_query_size": true,
+        "set_epochs_per_round": false,
+        "set_alpha": false
+      }
+    },
+    "agent_control_lambda": {
+      "description": "Agent控制消融：仅允许set_lambda",
+      "use_agent": true,
+      "sampler_type": "ad_kucs",
+      "lambda_override": null,
+      "control_permissions": {
+        "set_lambda": true,
+        "set_query_size": false,
+        "set_epochs_per_round": false,
+        "set_alpha": false
+      }
+    },
+    "full_model_fixed_epochs_lambda_budget": {
+      "description": "消融（固定epochs=10）：仅允许控制λ与query_size",
+      "use_agent": true,
+      "sampler_type": "ad_kucs",
+      "lambda_override": null,
+      "control_permissions": {
+        "set_lambda": true,
+        "set_query_size": true,
+        "set_epochs_per_round": false,
+        "set_alpha": false
+      }
+    },
+    "full_model_v2_fixed_warmup_relaxed_risk": {
+      "description": "完整模型V2：固定Warmup(0.2)+放宽过拟合阈值(0.9/-0.6)",
+      "use_agent": true,
+      "sampler_type": "ad_kucs",
+      "lambda_override": null,
+      "enable_l3_logging": true,
+      "l3_topk": 256,
+      "l3_max_selected": 256,
+      "lambda_policy": {
+        "mode": "warmup_risk_closed_loop",
+        "r1_lambda": 0.0,
+        "uncertainty_only_rounds": 2,
+        "warmup_start_round": 3,
+        "warmup_rounds": 1,
+        "warmup_lambda": 0.2,
+        "risk_control_start_round": 4
+      },
+      "rollback_config": {
+        "mode": "adaptive_threshold",
+        "std_factor": 1.5,
+        "tau_min": 0.005
+      },
+      "overfit_guard": true,
+      "control_permissions": {
+        "set_lambda": false,
+        "set_query_size": false,
+        "set_epochs_per_round": false,
+        "set_alpha": false
+      }
+    },
+    "baseline_bald": {
+      "description": "BALD采样基线",
+      "use_agent": false,
+      "sampler_type": "bald",
+      "lambda_override": null
+    },
+    "baseline_coreset": {
+      "description": "Core-Set采样基线",
+      "use_agent": false,
+      "sampler_type": "coreset",
+      "lambda_override": null
+    },
+    "baseline_entropy": {
+      "description": "熵采样基线",
+      "use_agent": false,
+      "sampler_type": "entropy",
+      "lambda_override": null
+    },
+    "baseline_llm_rs": {
+      "description": "LLM仅基于随机分数",
+      "use_agent": false,
+      "sampler_type": "llm_rs",
+      "lambda_override": null
+    },
+    "baseline_llm_us": {
+      "description": "LLM仅基于不确定性分数",
+      "use_agent": false,
+      "sampler_type": "llm_us",
+      "lambda_override": null
+    },
+    "baseline_random": {
+      "description": "随机采样基线",
+      "use_agent": false,
+      "sampler_type": "random",
+      "lambda_override": null
+    },
+    "fixed_lambda": {
+      "description": "固定λ=0.5",
+      "use_agent": false,
+      "sampler_type": "ad_kucs",
+      "lambda_override": 0.5
+    },
+    "knowledge_only": {
+      "description": "固定λ=1，仅使用知识增益",
+      "use_agent": false,
+      "sampler_type": "ad_kucs",
+      "lambda_override": 1.0
+    },
+    "no_agent": {
+      "description": "消融：移除Agent，仅使用固定规则的AD-KUCS选样",
+      "use_agent": false,
+      "sampler_type": "ad_kucs",
+      "lambda_override": null
+    },
+    "uncertainty_only": {
+      "description": "固定λ=0，仅使用不确定性",
+      "use_agent": false,
+      "sampler_type": "ad_kucs",
+      "lambda_override": 0.0
+    }
+  },
+  "code_fingerprint": {
+    "run_parallel_strict": "927734866bccc46fb1f915a5ae3f980b9c8a526fa2ee984f3c5af817da58fe1f",
+    "config": "476d381ff619d698683136a282dcb5b7a689cc31ebf85d2ad66d0a17e5251141",
+    "main": "8ce094a61157a671e4d5210fee09fb114f255dfd244f944032b12aeb58643f47",
+    "trainer": "25eea00389accdfe2dee5918a82804cd304da8c01216cbb72df8a9ec8a3422f8",
+    "ablation_config": "0a0183d9400ac1a8207ee0abe37cc7e807254faf41973d99238663688f928556",
+    "prompt_template": "6e1f8ab437db69cbc0a0af9134fe598e699e53bdde7bfe74f5f4cdda16382477",
+    "plot_paper_figures": "702db9667059983b1a9b47fea9d905877758119c4abe0b84ae37fd613b2df478"
+  }
+}

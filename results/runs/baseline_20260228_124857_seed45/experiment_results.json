@@ -1,0 +1,734 @@
+{
+  "baseline_entropy": {
+    "experiment_name": "baseline_entropy",
+    "description": "熵采样基线",
+    "performance_history": [
+      {
+        "round": 1,
+        "mIoU": 0.6434139739704977,
+        "f1_score": 0.7300691984918026,
+        "labeled_size": 151
+      },
+      {
+        "round": 2,
+        "mIoU": 0.6951430334641777,
+        "f1_score": 0.7851615241169642,
+        "labeled_size": 239
+      },
+      {
+        "round": 3,
+        "mIoU": 0.7177057079513487,
+        "f1_score": 0.8070050004625937,
+        "labeled_size": 327
+      },
+      {
+        "round": 4,
+        "mIoU": 0.7306299534631123,
+        "f1_score": 0.8190139998941472,
+        "labeled_size": 415
+      },
+      {
+        "round": 5,
+        "mIoU": 0.7420289442843635,
+        "f1_score": 0.8295481465190238,
+        "labeled_size": 503
+      },
+      {
+        "round": 6,
+        "mIoU": 0.7331117380682752,
+        "f1_score": 0.8211214711309299,
+        "labeled_size": 591
+      },
+      {
+        "round": 7,
+        "mIoU": 0.7436407394795607,
+        "f1_score": 0.83056860043961,
+        "labeled_size": 679
+      },
+      {
+        "round": 8,
+        "mIoU": 0.7405690839281357,
+        "f1_score": 0.8277886659479756,
+        "labeled_size": 767
+      },
+      {
+        "round": 9,
+        "mIoU": 0.7543359847140659,
+        "f1_score": 0.8399613838023764,
+        "labeled_size": 855
+      },
+      {
+        "round": 10,
+        "mIoU": 0.7534439695253206,
+        "f1_score": 0.8389865145861132,
+        "labeled_size": 943
+      },
+      {
+        "round": 11,
+        "mIoU": 0.7520172057804833,
+        "f1_score": 0.8378948137442862,
+        "labeled_size": 1031
+      },
+      {
+        "round": 12,
+        "mIoU": 0.7591521401178336,
+        "f1_score": 0.8439771114956245,
+        "labeled_size": 1119
+      },
+      {
+        "round": 13,
+        "mIoU": 0.7578101964829054,
+        "f1_score": 0.8428936168513224,
+        "labeled_size": 1207
+      },
+      {
+        "round": 14,
+        "mIoU": 0.7597643172280875,
+        "f1_score": 0.844359517710131,
+        "labeled_size": 1295
+      },
+      {
+        "round": 15,
+        "mIoU": 0.7550936032525789,
+        "f1_score": 0.8408405228993419,
+        "labeled_size": 1383
+      }
+    ],
+    "budget_history": [
+      151,
+      239,
+      327,
+      415,
+      503,
+      591,
+      679,
+      767,
+      855,
+      943,
+      1031,
+      1119,
+      1207,
+      1295,
+      1383
+    ],
+    "fallback_history": [],
+    "alc": 0.6665504468170382,
+    "final_miou": 0.7550936032525789,
+    "final_f1": 0.8408405228993419,
+    "epochs_schedule_source": null,
+    "epochs_schedule": null,
+    "status": "success",
+    "timestamp": "2026-03-01T18:35:31.896037",
+    "log_file": "results/logs_md/baseline_entropy_baseline_20260228_124857_seed45.md"
+  },
+  "baseline_random": {
+    "experiment_name": "baseline_random",
+    "description": "随机采样基线",
+    "performance_history": [
+      {
+        "round": 1,
+        "mIoU": 0.6556108056075196,
+        "f1_score": 0.7441174502938199,
+        "labeled_size": 151
+      },
+      {
+        "round": 2,
+        "mIoU": 0.6847325460881859,
+        "f1_score": 0.7753083336001216,
+        "labeled_size": 239
+      },
+      {
+        "round": 3,
+        "mIoU": 0.7047841547370963,
+        "f1_score": 0.7957399847954919,
+        "labeled_size": 327
+      },
+      {
+        "round": 4,
+        "mIoU": 0.733868019631595,
+        "f1_score": 0.8223743653682818,
+        "labeled_size": 415
+      },
+      {
+        "round": 5,
+        "mIoU": 0.7246163491203066,
+        "f1_score": 0.8139142250179356,
+        "labeled_size": 503
+      },
+      {
+        "round": 6,
+        "mIoU": 0.7327347288063353,
+        "f1_score": 0.8212052350474359,
+        "labeled_size": 591
+      },
+      {
+        "round": 7,
+        "mIoU": 0.7299022113451274,
+        "f1_score": 0.8190831252502773,
+        "labeled_size": 679
+      },
+      {
+        "round": 8,
+        "mIoU": 0.7180080821710034,
+        "f1_score": 0.8078434334694751,
+        "labeled_size": 767
+      },
+      {
+        "round": 9,
+        "mIoU": 0.7427585236299801,
+        "f1_score": 0.8302061427485552,
+        "labeled_size": 855
+      },
+      {
+        "round": 10,
+        "mIoU": 0.7403650136980988,
+        "f1_score": 0.8277229974616243,
+        "labeled_size": 943
+      },
+      {
+        "round": 11,
+        "mIoU": 0.7527622455014131,
+        "f1_score": 0.8386718873048108,
+        "labeled_size": 1031
+      },
+      {
+        "round": 12,
+        "mIoU": 0.7462964539474128,
+        "f1_score": 0.8331329849504884,
+        "labeled_size": 1119
+      },
+      {
+        "round": 13,
+        "mIoU": 0.7536580846658975,
+        "f1_score": 0.8393490943962707,
+        "labeled_size": 1207
+      },
+      {
+        "round": 14,
+        "mIoU": 0.7400752280521906,
+        "f1_score": 0.8276288549657238,
+        "labeled_size": 1295
+      },
+      {
+        "round": 15,
+        "mIoU": 0.7582920175876566,
+        "f1_score": 0.8432758775488276,
+        "labeled_size": 1383
+      }
+    ],
+    "budget_history": [
+      151,
+      239,
+      327,
+      415,
+      503,
+      591,
+      679,
+      767,
+      855,
+      943,
+      1031,
+      1119,
+      1207,
+      1295,
+      1383
+    ],
+    "fallback_history": [],
+    "alc": 0.6594739058954824,
+    "final_miou": 0.7582920175876566,
+    "final_f1": 0.8432758775488276,
+    "epochs_schedule_source": null,
+    "epochs_schedule": null,
+    "status": "success",
+    "timestamp": "2026-03-01T18:35:31.901307",
+    "log_file": "results/logs_md/baseline_random_baseline_20260228_124857_seed45.md"
+  },
+  "baseline_coreset": {
+    "experiment_name": "baseline_coreset",
+    "description": "Core-Set采样基线",
+    "performance_history": [
+      {
+        "round": 1,
+        "mIoU": 0.646059101202666,
+        "f1_score": 0.7339633997922352,
+        "labeled_size": 151
+      },
+      {
+        "round": 2,
+        "mIoU": 0.6417880547051815,
+        "f1_score": 0.7276904756883479,
+        "labeled_size": 239
+      },
+      {
+        "round": 3,
+        "mIoU": 0.6901958193963137,
+        "f1_score": 0.780525396714378,
+        "labeled_size": 327
+      },
+      {
+        "round": 4,
+        "mIoU": 0.7011541349598436,
+        "f1_score": 0.7911977788851061,
+        "labeled_size": 415
+      },
+      {
+        "round": 5,
+        "mIoU": 0.7250108853198136,
+        "f1_score": 0.8143231201518839,
+        "labeled_size": 503
+      },
+      {
+        "round": 6,
+        "mIoU": 0.7257785296083523,
+        "f1_score": 0.8147336556287013,
+        "labeled_size": 591
+      },
+      {
+        "round": 7,
+        "mIoU": 0.7258150415408081,
+        "f1_score": 0.8150817986353809,
+        "labeled_size": 679
+      },
+      {
+        "round": 8,
+        "mIoU": 0.7419458138594224,
+        "f1_score": 0.8294981912464086,
+        "labeled_size": 767
+      },
+      {
+        "round": 9,
+        "mIoU": 0.7340321287450358,
+        "f1_score": 0.8220982384410546,
+        "labeled_size": 855
+      },
+      {
+        "round": 10,
+        "mIoU": 0.7476604784231617,
+        "f1_score": 0.8341944900100491,
+        "labeled_size": 943
+      },
+      {
+        "round": 11,
+        "mIoU": 0.7416526670608548,
+        "f1_score": 0.8291448644424689,
+        "labeled_size": 1031
+      },
+      {
+        "round": 12,
+        "mIoU": 0.7484093289480455,
+        "f1_score": 0.8351313198374822,
+        "labeled_size": 1119
+      },
+      {
+        "round": 13,
+        "mIoU": 0.7473324273429692,
+        "f1_score": 0.8338929670262956,
+        "labeled_size": 1207
+      },
+      {
+        "round": 14,
+        "mIoU": 0.7457165806436221,
+        "f1_score": 0.8326845351308791,
+        "labeled_size": 1295
+      },
+      {
+        "round": 15,
+        "mIoU": 0.7558301393616114,
+        "f1_score": 0.8411888075791597,
+        "labeled_size": 1383
+      }
+    ],
+    "budget_history": [
+      151,
+      239,
+      327,
+      415,
+      503,
+      591,
+      679,
+      767,
+      855,
+      943,
+      1031,
+      1119,
+      1207,
+      1295,
+      1383
+    ],
+    "fallback_history": [],
+    "alc": 0.653803365310539,
+    "final_miou": 0.7558301393616114,
+    "final_f1": 0.8411888075791597,
+    "epochs_schedule_source": null,
+    "epochs_schedule": null,
+    "status": "success",
+    "timestamp": "2026-03-01T20:37:03.450848",
+    "log_file": "results/logs_md/baseline_coreset_baseline_20260228_124857_seed45.md"
+  },
+  "baseline_bald": {
+    "experiment_name": "baseline_bald",
+    "description": "BALD采样基线",
+    "performance_history": [
+      {
+        "round": 1,
+        "mIoU": 0.6445679925815234,
+        "f1_score": 0.7313532895361122,
+        "labeled_size": 151
+      },
+      {
+        "round": 2,
+        "mIoU": 0.6811647947889994,
+        "f1_score": 0.7711784744324948,
+        "labeled_size": 239
+      },
+      {
+        "round": 3,
+        "mIoU": 0.7141223974152099,
+        "f1_score": 0.8038250526933823,
+        "labeled_size": 327
+      },
+      {
+        "round": 4,
+        "mIoU": 0.7377404789450005,
+        "f1_score": 0.8254450098405177,
+        "labeled_size": 415
+      },
+      {
+        "round": 5,
+        "mIoU": 0.7236890011323789,
+        "f1_score": 0.8126417095181253,
+        "labeled_size": 503
+      },
+      {
+        "round": 6,
+        "mIoU": 0.7436861907597538,
+        "f1_score": 0.8309434677161194,
+        "labeled_size": 591
+      },
+      {
+        "round": 7,
+        "mIoU": 0.7564855400044113,
+        "f1_score": 0.8417740600442822,
+        "labeled_size": 679
+      },
+      {
+        "round": 8,
+        "mIoU": 0.7580770547804583,
+        "f1_score": 0.8431429249341054,
+        "labeled_size": 767
+      },
+      {
+        "round": 9,
+        "mIoU": 0.7563536134992336,
+        "f1_score": 0.8417211164759901,
+        "labeled_size": 855
+      },
+      {
+        "round": 10,
+        "mIoU": 0.7506939585930341,
+        "f1_score": 0.8367747932485172,
+        "labeled_size": 943
+      },
+      {
+        "round": 11,
+        "mIoU": 0.7561583209208447,
+        "f1_score": 0.8414002255916209,
+        "labeled_size": 1031
+      },
+      {
+        "round": 12,
+        "mIoU": 0.7667676461117695,
+        "f1_score": 0.8503310912405453,
+        "labeled_size": 1119
+      },
+      {
+        "round": 13,
+        "mIoU": 0.7620356228939974,
+        "f1_score": 0.8463484632434687,
+        "labeled_size": 1207
+      },
+      {
+        "round": 14,
+        "mIoU": 0.7551455846116003,
+        "f1_score": 0.8404290711791345,
+        "labeled_size": 1295
+      },
+      {
+        "round": 15,
+        "mIoU": 0.7557757580997643,
+        "f1_score": 0.8411738007538785,
+        "labeled_size": 1383
+      }
+    ],
+    "budget_history": [
+      151,
+      239,
+      327,
+      415,
+      503,
+      591,
+      679,
+      767,
+      855,
+      943,
+      1031,
+      1119,
+      1207,
+      1295,
+      1383
+    ],
+    "fallback_history": [],
+    "alc": 0.667983677500812,
+    "final_miou": 0.7557757580997643,
+    "final_f1": 0.8411738007538785,
+    "epochs_schedule_source": null,
+    "epochs_schedule": null,
+    "status": "success",
+    "timestamp": "2026-03-01T21:00:14.687461",
+    "log_file": "results/logs_md/baseline_bald_baseline_20260228_124857_seed45.md"
+  },
+  "baseline_dial_style": {
+    "experiment_name": "baseline_dial_style",
+    "description": "DIAL-style基线：分簇多样性约束+不确定性",
+    "performance_history": [
+      {
+        "round": 1,
+        "mIoU": 0.6568416897664374,
+        "f1_score": 0.7453019090398264,
+        "labeled_size": 151
+      },
+      {
+        "round": 2,
+        "mIoU": 0.6990029031144122,
+        "f1_score": 0.7903555792284029,
+        "labeled_size": 239
+      },
+      {
+        "round": 3,
+        "mIoU": 0.7193421056130603,
+        "f1_score": 0.8089638845938942,
+        "labeled_size": 327
+      },
+      {
+        "round": 4,
+        "mIoU": 0.711089862375094,
+        "f1_score": 0.8007017278432571,
+        "labeled_size": 415
+      },
+      {
+        "round": 5,
+        "mIoU": 0.7241508282310771,
+        "f1_score": 0.8133405523531142,
+        "labeled_size": 503
+      },
+      {
+        "round": 6,
+        "mIoU": 0.7462918921647802,
+        "f1_score": 0.8331641398111935,
+        "labeled_size": 591
+      },
+      {
+        "round": 7,
+        "mIoU": 0.7451711384239111,
+        "f1_score": 0.831938150136105,
+        "labeled_size": 679
+      },
+      {
+        "round": 8,
+        "mIoU": 0.7489581440940423,
+        "f1_score": 0.8354037871703495,
+        "labeled_size": 767
+      },
+      {
+        "round": 9,
+        "mIoU": 0.7457805519950986,
+        "f1_score": 0.8324787584959099,
+        "labeled_size": 855
+      },
+      {
+        "round": 10,
+        "mIoU": 0.7486421131667425,
+        "f1_score": 0.8348927348184715,
+        "labeled_size": 943
+      },
+      {
+        "round": 11,
+        "mIoU": 0.7550629341010504,
+        "f1_score": 0.8404712059127479,
+        "labeled_size": 1031
+      },
+      {
+        "round": 12,
+        "mIoU": 0.7546071541401866,
+        "f1_score": 0.8401394864561025,
+        "labeled_size": 1119
+      },
+      {
+        "round": 13,
+        "mIoU": 0.7578462004680744,
+        "f1_score": 0.842791805789693,
+        "labeled_size": 1207
+      },
+      {
+        "round": 14,
+        "mIoU": 0.7599834736915727,
+        "f1_score": 0.8449963185166214,
+        "labeled_size": 1295
+      },
+      {
+        "round": 15,
+        "mIoU": 0.7622311109977729,
+        "f1_score": 0.8466604621397508,
+        "labeled_size": 1383
+      }
+    ],
+    "budget_history": [
+      151,
+      239,
+      327,
+      415,
+      503,
+      591,
+      679,
+      767,
+      855,
+      943,
+      1031,
+      1119,
+      1207,
+      1295,
+      1383
+    ],
+    "fallback_history": [],
+    "alc": 0.6664281849034124,
+    "final_miou": 0.7622311109977729,
+    "final_f1": 0.8466604621397508,
+    "epochs_schedule_source": null,
+    "epochs_schedule": null,
+    "status": "success",
+    "timestamp": "2026-03-01T22:56:16.260202",
+    "log_file": "results/logs_md/baseline_dial_style_baseline_20260228_124857_seed45.md"
+  },
+  "baseline_wang_style": {
+    "experiment_name": "baseline_wang_style",
+    "description": "Wang-style基线：两阶段U→K重排",
+    "performance_history": [
+      {
+        "round": 1,
+        "mIoU": 0.6489212302333557,
+        "f1_score": 0.7371888529345093,
+        "labeled_size": 151
+      },
+      {
+        "round": 2,
+        "mIoU": 0.7116512954839477,
+        "f1_score": 0.8014773609441846,
+        "labeled_size": 239
+      },
+      {
+        "round": 3,
+        "mIoU": 0.7297179886525704,
+        "f1_score": 0.818251821031337,
+        "labeled_size": 327
+      },
+      {
+        "round": 4,
+        "mIoU": 0.7317293792091866,
+        "f1_score": 0.8200070137376121,
+        "labeled_size": 415
+      },
+      {
+        "round": 5,
+        "mIoU": 0.7449708717722384,
+        "f1_score": 0.8319052927348358,
+        "labeled_size": 503
+      },
+      {
+        "round": 6,
+        "mIoU": 0.7454855943189169,
+        "f1_score": 0.8324463537255565,
+        "labeled_size": 591
+      },
+      {
+        "round": 7,
+        "mIoU": 0.7533595027686264,
+        "f1_score": 0.8389994117476745,
+        "labeled_size": 679
+      },
+      {
+        "round": 8,
+        "mIoU": 0.7463676802967087,
+        "f1_score": 0.8330567538882903,
+        "labeled_size": 767
+      },
+      {
+        "round": 9,
+        "mIoU": 0.7537983087320288,
+        "f1_score": 0.8395594669996778,
+        "labeled_size": 855
+      },
+      {
+        "round": 10,
+        "mIoU": 0.7530979044792618,
+        "f1_score": 0.8388453410808554,
+        "labeled_size": 943
+      },
+      {
+        "round": 11,
+        "mIoU": 0.7591946908021009,
+        "f1_score": 0.844004343505301,
+        "labeled_size": 1031
+      },
+      {
+        "round": 12,
+        "mIoU": 0.7601526882703298,
+        "f1_score": 0.8448517991299358,
+        "labeled_size": 1119
+      },
+      {
+        "round": 13,
+        "mIoU": 0.75513934175957,
+        "f1_score": 0.8406207725897801,
+        "labeled_size": 1207
+      },
+      {
+        "round": 14,
+        "mIoU": 0.7661927870393653,
+        "f1_score": 0.8498848101598437,
+        "labeled_size": 1295
+      },
+      {
+        "round": 15,
+        "mIoU": 0.7603890444501249,
+        "f1_score": 0.8449025941738749,
+        "labeled_size": 1383
+      }
+    ],
+    "budget_history": [
+      151,
+      239,
+      327,
+      415,
+      503,
+      591,
+      679,
+      767,
+      855,
+      943,
+      1031,
+      1119,
+      1207,
+      1295,
+      1383
+    ],
+    "fallback_history": [],
+    "alc": 0.6714799664823944,
+    "final_miou": 0.7603890444501249,
+    "final_f1": 0.8449025941738749,
+    "epochs_schedule_source": null,
+    "epochs_schedule": null,
+    "status": "success",
+    "timestamp": "2026-03-01T23:34:27.596036",
+    "log_file": "results/logs_md/baseline_wang_style_baseline_20260228_124857_seed45.md"
+  }
+}

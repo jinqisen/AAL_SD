@@ -1,0 +1,100 @@
+{
+  "run_id": "20260210_full_model_k_coreset_to_labeled",
+  "created_at": "2026-02-10T18:11:21.285945",
+  "updated_at": "2026-02-13T01:55:25.056271",
+  "config": {
+    "ALLOW_LEGACY_POOLS": false,
+    "ALPHA": 5.0,
+    "BATCH_SIZE": 4,
+    "BUDGET_RATIO": 0.4,
+    "CHECKPOINT_DIR": "/Users/anykong/AAL_SD/results/checkpoints",
+    "DATA_DIR": "/Users/anykong/AAL_SD/data/Landslide4Sense",
+    "DETERMINISTIC": true,
+    "DEVICE": "mps",
+    "EPOCHS_PER_ROUND": 10,
+    "EPOCHS_PER_ROUND_SCHEDULE": null,
+    "ESTIMATED_TOTAL_SAMPLES": 3799,
+    "FAIL_ON_AGENT_FALLBACK": true,
+    "FAIL_ON_RANKING_DEGRADED": true,
+    "FIXED_LAMBDA": 0.5,
+    "FIX_EPOCHS_PER_ROUND": true,
+    "GRAD_LOGGING": true,
+    "GRAD_LOG_MAX_BATCHES": 8,
+    "GRAD_LOG_PARAM_MAX_ELEMENTS": 200000,
+    "GRAD_LOG_VAL_ALIGNMENT": true,
+    "INITIAL_LABELED_SIZE": 0.05,
+    "IN_CHANNELS": 14,
+    "LLM_BASE_URL": "https://api.siliconflow.cn/v1",
+    "LLM_CONFIG_PATH": "/Users/anykong/AAL_SD/src/llm_config.json",
+    "LLM_MAX_RETRIES": 5,
+    "LLM_MODEL": "Pro/deepseek-ai/DeepSeek-V3.2",
+    "LLM_PROVIDER": "siliconflow",
+    "LLM_RETRY_BACKOFF": 2.0,
+    "LLM_RETRY_BASE_SECONDS": 10.0,
+    "LLM_RETRY_MAX_SECONDS": 120.0,
+    "LLM_TEMPERATURE": 0.0,
+    "LLM_TIMEOUT": 60,
+    "LOSS_TYPE": "CrossEntropyLoss",
+    "LR": 0.0001,
+    "NUM_CLASSES": 2,
+    "NUM_WORKERS": 0,
+    "N_ROUNDS": 15,
+    "POOLS_DIR": "/Users/anykong/AAL_SD/data/pools",
+    "QUERY_SIZE": 88,
+    "RANDOM_SEED": 42,
+    "REQUIRE_LLM_FOR_AGENT": true,
+    "RESEARCH_MODE": true,
+    "RESULTS_DIR": "/Users/anykong/AAL_SD/results",
+    "RESUME_FROM_LOGS": true,
+    "ROOT_DIR": "/Users/anykong/AAL_SD",
+    "STOP_ALL_EXPERIMENTS_ON_LLM_FAILURE": true,
+    "STOP_ON_LLM_FAILURE": true,
+    "STRATEGY": "ad_kucs",
+    "STRICT_INNOVATION": true,
+    "STRICT_RESUME": true,
+    "TEST_SIZE": 0.2,
+    "TOTAL_BUDGET": 1519,
+    "TRACE_AGENT_THOUGHT": false
+  },
+  "experiments": {
+    "full_model": {
+      "description": "完整模型（正式方案）：coreset-to-labeled K + 自适应阈值 rollback + 风险驱动 λ 闭环控制（不调整 query_size）",
+      "use_agent": true,
+      "sampler_type": "ad_kucs",
+      "lambda_override": null,
+      "lambda_policy": {
+        "mode": "warmup_risk_closed_loop",
+        "r1_lambda": 0.0,
+        "uncertainty_only_rounds": 2,
+        "warmup_start_round": 3,
+        "warmup_rounds": 1,
+        "warmup_lambda_range": [
+          0.2,
+          0.25
+        ],
+        "risk_control_start_round": 4
+      },
+      "rollback_config": {
+        "mode": "adaptive_threshold",
+        "std_factor": 1.5,
+        "tau_min": 0.005
+      },
+      "overfit_guard": true,
+      "control_permissions": {
+        "set_lambda": false,
+        "set_query_size": false,
+        "set_epochs_per_round": false,
+        "set_alpha": false
+      }
+    }
+  },
+  "code_fingerprint": {
+    "run_parallel_strict": "08ed9977ae771b2546371ab0359391c4af24e6bb1c91ac7b7f03d579608965fc",
+    "config": "f6d45d68ca122f5a341dfbc6cebc2fe8efdab83f9420669ed07cc58c7def9930",
+    "main": "b0f371ed2f575443a4f22f7b8bfad774e01966b158818d86fb586ab3b4458cf9",
+    "trainer": "25eea00389accdfe2dee5918a82804cd304da8c01216cbb72df8a9ec8a3422f8",
+    "ablation_config": "644aac6b0943b0087ceb67115f37ce0e826d52471e5c8f0c9c83919d6bced4f2",
+    "prompt_template": "6e1f8ab437db69cbc0a0af9134fe598e699e53bdde7bfe74f5f4cdda16382477",
+    "plot_paper_figures": "702db9667059983b1a9b47fea9d905877758119c4abe0b84ae37fd613b2df478"
+  }
+}

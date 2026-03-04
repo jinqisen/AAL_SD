@@ -1,0 +1,40 @@
+{
+  "run_id": "20260223_203847",
+  "experiment_name": "full_model",
+  "updated_at": "2026-02-24T01:32:19.932873",
+  "pool_integrity": {
+    "counts": {
+      "labeled": 189,
+      "unlabeled": 3610,
+      "test": 0,
+      "union": 3799,
+      "dataset": 3799
+    },
+    "overlaps": {
+      "labeled_unlabeled": 0,
+      "labeled_test": 0,
+      "unlabeled_test": 0
+    }
+  },
+  "pool_integrity_ok": true,
+  "status": "running",
+  "pools_dir": "/Users/anykong/AAL_SD/results/pools/20260223_203847/full_model",
+  "checkpoint_path": "results/checkpoints/20260223_203847/full_model_state.json",
+  "initial": {
+    "labeled": 189,
+    "unlabeled": 3610,
+    "test": 0
+  },
+  "dataset_fingerprint": {
+    "count": 3799,
+    "sha256": "ab1c6ed6ffcd25606a577ecf266996d10127065c72db2f5cc8c43cb90fd7c95a"
+  },
+  "resume": {
+    "start_round": 0
+  },
+  "progress": {
+    "round": 11,
+    "epoch": "finished",
+    "labeled_size": 1157
+  }
+}

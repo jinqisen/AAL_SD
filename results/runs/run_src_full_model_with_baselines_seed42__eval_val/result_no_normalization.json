@@ -1,0 +1,124 @@
+{
+  "no_normalization": {
+    "experiment_name": "no_normalization",
+    "description": "消融：不进行U/K归一化",
+    "performance_history": [
+      {
+        "round": 1,
+        "mIoU": 0.6913141606495187,
+        "f1_score": 0.7805437578125727,
+        "labeled_size": 1383
+      },
+      {
+        "round": 2,
+        "mIoU": 0.7197977441325328,
+        "f1_score": 0.8081329538599383,
+        "labeled_size": 1471
+      },
+      {
+        "round": 3,
+        "mIoU": 0.7119514417684384,
+        "f1_score": 0.8008327162179073,
+        "labeled_size": 1559
+      },
+      {
+        "round": 4,
+        "mIoU": 0.7242047146619853,
+        "f1_score": 0.8121870598470007,
+        "labeled_size": 1647
+      },
+      {
+        "round": 5,
+        "mIoU": 0.7143583142672159,
+        "f1_score": 0.8031780917839668,
+        "labeled_size": 1735
+      },
+      {
+        "round": 6,
+        "mIoU": 0.7131060280507386,
+        "f1_score": 0.8021464594739899,
+        "labeled_size": 1823
+      },
+      {
+        "round": 7,
+        "mIoU": 0.7081100512310444,
+        "f1_score": 0.7970471125820529,
+        "labeled_size": 1911
+      },
+      {
+        "round": 8,
+        "mIoU": 0.7214188065390974,
+        "f1_score": 0.8095920258724343,
+        "labeled_size": 1999
+      },
+      {
+        "round": 9,
+        "mIoU": 0.7124866324486782,
+        "f1_score": 0.8012153365638153,
+        "labeled_size": 2087
+      },
+      {
+        "round": 10,
+        "mIoU": 0.7112947206645519,
+        "f1_score": 0.7999765746714514,
+        "labeled_size": 2175
+      },
+      {
+        "round": 11,
+        "mIoU": 0.7323493858246772,
+        "f1_score": 0.8195930491840788,
+        "labeled_size": 2263
+      },
+      {
+        "round": 12,
+        "mIoU": 0.7103311827519095,
+        "f1_score": 0.7992731454739703,
+        "labeled_size": 2351
+      },
+      {
+        "round": 13,
+        "mIoU": 0.7033337045481167,
+        "f1_score": 0.7924764147552149,
+        "labeled_size": 2439
+      },
+      {
+        "round": 14,
+        "mIoU": 0.7273897446398291,
+        "f1_score": 0.8151253298350822,
+        "labeled_size": 2527
+      },
+      {
+        "round": 15,
+        "mIoU": 0.7192346543864219,
+        "f1_score": 0.8075876661935468,
+        "labeled_size": 2615
+      }
+    ],
+    "budget_history": [
+      1383,
+      1471,
+      1559,
+      1647,
+      1735,
+      1823,
+      1911,
+      1999,
+      2087,
+      2175,
+      2263,
+      2351,
+      2439,
+      2527,
+      2615
+    ],
+    "fallback_history": [],
+    "alc": 0.06349631617645393,
+    "final_miou": 0.7192346543864219,
+    "final_f1": 0.8075876661935468,
+    "epochs_schedule_source": null,
+    "epochs_schedule": null,
+    "status": "success",
+    "timestamp": "2026-02-27T07:44:25.650418",
+    "log_file": "results/logs_md/no_normalization_run_src_full_model_with_baselines_seed42__eval_val.md"
+  }
+}

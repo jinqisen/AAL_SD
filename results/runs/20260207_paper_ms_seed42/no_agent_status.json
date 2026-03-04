@@ -1,0 +1,62 @@
+{
+  "run_id": "20260207_paper_ms_seed42",
+  "experiment_name": "no_agent",
+  "updated_at": "2026-02-08T13:52:16.037613",
+  "pool_integrity": {
+    "counts": {
+      "labeled": 151,
+      "unlabeled": 2888,
+      "test": 760,
+      "union": 3799,
+      "dataset": 3799
+    },
+    "overlaps": {
+      "labeled_unlabeled": 0,
+      "labeled_test": 0,
+      "unlabeled_test": 0
+    }
+  },
+  "pool_integrity_ok": true,
+  "status": "completed",
+  "pools_dir": "/Users/anykong/AAL_SD/data/pools/20260207_paper_ms_seed42/no_agent",
+  "checkpoint_path": "results/checkpoints/20260207_paper_ms_seed42/no_agent_state.json",
+  "initial": {
+    "labeled": 151,
+    "unlabeled": 2888,
+    "test": 760
+  },
+  "dataset_fingerprint": {
+    "count": 3799,
+    "sha256": "ab1c6ed6ffcd25606a577ecf266996d10127065c72db2f5cc8c43cb90fd7c95a"
+  },
+  "resume": {
+    "start_round": 0
+  },
+  "progress": {
+    "round": 15,
+    "epoch": "finished",
+    "labeled_size": 1383
+  },
+  "result": {
+    "alc": 0.6665353426244419,
+    "final_mIoU": 0.7636464090616288,
+    "final_f1": 0.8478933743705512,
+    "budget_history": [
+      151,
+      239,
+      327,
+      415,
+      503,
+      591,
+      679,
+      767,
+      855,
+      943,
+      1031,
+      1119,
+      1207,
+      1295,
+      1383
+    ]
+  }
+}

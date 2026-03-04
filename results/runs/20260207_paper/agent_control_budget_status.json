@@ -1,0 +1,62 @@
+{
+  "run_id": "20260207_paper",
+  "experiment_name": "agent_control_budget",
+  "updated_at": "2026-02-08T05:16:13.097904",
+  "pool_integrity": {
+    "counts": {
+      "labeled": 151,
+      "unlabeled": 2888,
+      "test": 760,
+      "union": 3799,
+      "dataset": 3799
+    },
+    "overlaps": {
+      "labeled_unlabeled": 0,
+      "labeled_test": 0,
+      "unlabeled_test": 0
+    }
+  },
+  "pool_integrity_ok": true,
+  "status": "completed",
+  "pools_dir": "/Users/anykong/AAL_SD/data/pools/20260207_paper/agent_control_budget",
+  "checkpoint_path": "/Users/anykong/AAL_SD/results/checkpoints/20260207_paper/agent_control_budget_state.json",
+  "initial": {
+    "labeled": 151,
+    "unlabeled": 2888,
+    "test": 760
+  },
+  "dataset_fingerprint": {
+    "count": 3799,
+    "sha256": "ab1c6ed6ffcd25606a577ecf266996d10127065c72db2f5cc8c43cb90fd7c95a"
+  },
+  "resume": {
+    "start_round": 0
+  },
+  "progress": {
+    "round": 15,
+    "epoch": "finished",
+    "labeled_size": 1291
+  },
+  "result": {
+    "alc": 0.6680175215170127,
+    "final_mIoU": 0.7638065278510502,
+    "final_f1": 0.8481573571274161,
+    "budget_history": [
+      151,
+      239,
+      327,
+      415,
+      503,
+      591,
+      679,
+      719,
+      807,
+      895,
+      983,
+      1071,
+      1115,
+      1203,
+      1291
+    ]
+  }
+}

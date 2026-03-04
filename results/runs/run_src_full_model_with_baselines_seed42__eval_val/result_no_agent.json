@@ -1,0 +1,124 @@
+{
+  "no_agent": {
+    "experiment_name": "no_agent",
+    "description": "消融：移除Agent；λ由sigmoid自适应(随标注进度变化)，仅使用AD-KUCS数值策略选样",
+    "performance_history": [
+      {
+        "round": 1,
+        "mIoU": 0.6748704885018326,
+        "f1_score": 0.7637813699222589,
+        "labeled_size": 1383
+      },
+      {
+        "round": 2,
+        "mIoU": 0.7128752078454924,
+        "f1_score": 0.801964060707952,
+        "labeled_size": 1471
+      },
+      {
+        "round": 3,
+        "mIoU": 0.7053957104696589,
+        "f1_score": 0.7947106890166663,
+        "labeled_size": 1559
+      },
+      {
+        "round": 4,
+        "mIoU": 0.7128406629294741,
+        "f1_score": 0.8015834909439379,
+        "labeled_size": 1647
+      },
+      {
+        "round": 5,
+        "mIoU": 0.7092245996175295,
+        "f1_score": 0.7979919009291097,
+        "labeled_size": 1735
+      },
+      {
+        "round": 6,
+        "mIoU": 0.7089358162277786,
+        "f1_score": 0.7980731739338134,
+        "labeled_size": 1823
+      },
+      {
+        "round": 7,
+        "mIoU": 0.7264121327122048,
+        "f1_score": 0.8142301093419101,
+        "labeled_size": 1911
+      },
+      {
+        "round": 8,
+        "mIoU": 0.7165039118713558,
+        "f1_score": 0.8049971921190735,
+        "labeled_size": 1999
+      },
+      {
+        "round": 9,
+        "mIoU": 0.7106902769213976,
+        "f1_score": 0.7997793831562929,
+        "labeled_size": 2087
+      },
+      {
+        "round": 10,
+        "mIoU": 0.6933465686553849,
+        "f1_score": 0.7824685714266398,
+        "labeled_size": 2175
+      },
+      {
+        "round": 11,
+        "mIoU": 0.7205350442549241,
+        "f1_score": 0.8085953526936941,
+        "labeled_size": 2263
+      },
+      {
+        "round": 12,
+        "mIoU": 0.7167271953142241,
+        "f1_score": 0.8050252513259643,
+        "labeled_size": 2351
+      },
+      {
+        "round": 13,
+        "mIoU": 0.6956504460126164,
+        "f1_score": 0.7846824055880534,
+        "labeled_size": 2439
+      },
+      {
+        "round": 14,
+        "mIoU": 0.7125139491841135,
+        "f1_score": 0.8014816737510326,
+        "labeled_size": 2527
+      },
+      {
+        "round": 15,
+        "mIoU": 0.7181158138386918,
+        "f1_score": 0.806413396971261,
+        "labeled_size": 2615
+      }
+    ],
+    "budget_history": [
+      1383,
+      1471,
+      1559,
+      1647,
+      1735,
+      1823,
+      1911,
+      1999,
+      2087,
+      2175,
+      2263,
+      2351,
+      2439,
+      2527,
+      2615
+    ],
+    "fallback_history": [],
+    "alc": 0.06260652579252526,
+    "final_miou": 0.7181158138386918,
+    "final_f1": 0.806413396971261,
+    "epochs_schedule_source": null,
+    "epochs_schedule": null,
+    "status": "success",
+    "timestamp": "2026-02-27T05:50:02.247253",
+    "log_file": "results/logs_md/no_agent_run_src_full_model_with_baselines_seed42__eval_val.md"
+  }
+}

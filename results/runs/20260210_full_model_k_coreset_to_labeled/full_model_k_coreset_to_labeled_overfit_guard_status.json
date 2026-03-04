@@ -1,0 +1,45 @@
+{
+  "run_id": "20260210_full_model_k_coreset_to_labeled",
+  "experiment_name": "full_model_k_coreset_to_labeled_overfit_guard",
+  "updated_at": "2026-02-12T16:05:53.655445",
+  "pool_integrity": {
+    "counts": {
+      "labeled": 151,
+      "unlabeled": 2888,
+      "test": 760,
+      "union": 3799,
+      "dataset": 3799
+    },
+    "overlaps": {
+      "labeled_unlabeled": 0,
+      "labeled_test": 0,
+      "unlabeled_test": 0
+    }
+  },
+  "pool_integrity_ok": true,
+  "status": "running",
+  "pools_dir": "/Users/anykong/AAL_SD/data/pools/20260210_full_model_k_coreset_to_labeled/full_model_k_coreset_to_labeled_overfit_guard",
+  "checkpoint_path": "/Users/anykong/AAL_SD/results/checkpoints/20260210_full_model_k_coreset_to_labeled/full_model_k_coreset_to_labeled_overfit_guard_state.json",
+  "initial": {
+    "labeled": 151,
+    "unlabeled": 2888,
+    "test": 760
+  },
+  "dataset_fingerprint": {
+    "count": 3799,
+    "sha256": "ab1c6ed6ffcd25606a577ecf266996d10127065c72db2f5cc8c43cb90fd7c95a"
+  },
+  "resume": {
+    "start_round": 0
+  },
+  "progress": {
+    "round": 1,
+    "epoch": 6,
+    "labeled_size": 151,
+    "loss": 0.0922255907711145,
+    "mIoU": 0.6071673999545557,
+    "f1": 0.6858999105259576,
+    "best_mIoU_round": 0.6071673999545557,
+    "warnings": []
+  }
+}

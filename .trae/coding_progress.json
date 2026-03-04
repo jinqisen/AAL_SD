@@ -1,0 +1,132 @@
+{
+  "updated_at": "2026-03-03",
+  "goals": [
+    "对齐 ablation_config 实验口径与论文方案",
+    "实验名重命名并保持向后兼容",
+    "消除实验降级/分支不一致的不可观测性",
+    "将缺失 LLM_API_KEY 变为可观测且可终止的失败",
+    "对齐 A/B λ 控制为风险-收益一致的护栏与局部搜索"
+  ],
+  "tasks": [
+    {
+      "id": "t1",
+      "title": "梳理缺失 LLM_API_KEY 的所有触发路径",
+      "status": "completed"
+    },
+    {
+      "id": "t2",
+      "title": "改为缺失 LLM_API_KEY 直接报错并写入 trace",
+      "status": "completed"
+    },
+    {
+      "id": "t3",
+      "title": "清理/统一其他降级路径的失败策略",
+      "status": "completed"
+    },
+    {
+      "id": "t4",
+      "title": "运行测试与静态检查并更新进展记录",
+      "status": "completed"
+    },
+    {
+      "id": "t5",
+      "title": "做架构一致性审查并总结长期影响",
+      "status": "completed"
+    },
+    {
+      "id": "t6",
+      "title": "对齐 ablation_config 的论文实验矩阵口径",
+      "status": "completed"
+    },
+    {
+      "id": "t7",
+      "title": "同步更新 paper 绘图 include/labels 与报告列表",
+      "status": "completed"
+    },
+    {
+      "id": "t8",
+      "title": "更新回归测试并运行 pytest 验证",
+      "status": "completed"
+    },
+    {
+      "id": "t9",
+      "title": "B 实验强制显式 set_lambda，移除 policy 自动填充",
+      "status": "completed"
+    },
+    {
+      "id": "t10",
+      "title": "重命名 A/B 实验名并引入别名映射保持兼容",
+      "status": "completed"
+    },
+    {
+      "id": "t11",
+      "title": "同步更新绘图/报告/CLI 默认实验名并跑 pytest",
+      "status": "completed"
+    },
+    {
+      "id": "t12",
+      "title": "为既有 baseline seeds 补跑 A/B full_model 实验脚本",
+      "status": "completed"
+    },
+    {
+      "id": "t13",
+      "title": "为 baseline_seed42 构建论文消融矩阵执行脚本（并发2）",
+      "status": "completed"
+    },
+    {
+      "id": "t14",
+      "title": "修复 trace 初始化记录的 require_explicit_lambda 字段缺失",
+      "status": "completed"
+    },
+    {
+      "id": "t15",
+      "title": "避免同一轮重复写入 lambda_override trace 事件",
+      "status": "completed"
+    },
+    {
+      "id": "t16",
+      "title": "新增 A/B v2 λ 控制实验配置用于性能修复验证",
+      "status": "completed"
+    },
+    {
+      "id": "t17",
+      "title": "支持 set_lambda 在 uncertainty-only 阶段放宽 clamp_min",
+      "status": "completed"
+    },
+    {
+      "id": "t18",
+      "title": "补充单测覆盖并回归 pytest 验证 A/B v2 改动",
+      "status": "completed"
+    },
+    {
+      "id": "t19",
+      "title": "为同一 run 的多实验输出 λ 轨迹对比图",
+      "status": "completed"
+    },
+    {
+      "id": "t20",
+      "title": "为同一 run 的消融实验输出 mIoU/λ 汇总对比",
+      "status": "completed"
+    },
+    {
+      "id": "t21",
+      "title": "分析脚本解析 lambda_policy_apply 并补全 lambda_eff",
+      "status": "completed"
+    },
+    {
+      "id": "t22",
+      "title": "set_training_state 使用可覆盖阈值计算 low_gain_streak",
+      "status": "completed"
+    },
+    {
+      "id": "t23",
+      "title": "升级 A/B 默认配置为 CI+AND 的风险闭环 λ 策略",
+      "status": "completed"
+    },
+    {
+      "id": "t24",
+      "title": "强化 set_lambda 护栏并对齐 Agent 提示词",
+      "status": "completed"
+    }
+  ]
+}
