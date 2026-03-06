@@ -1,9 +1,0 @@
-# Anomaly Analysis: rule_based_controller_r1
-
-## Anomalies
-[
-  "Significant performance drop: mIoU 0.7595 -> 0.6579"
-]
-
-## LLM Insight
-LLM Client not available.
