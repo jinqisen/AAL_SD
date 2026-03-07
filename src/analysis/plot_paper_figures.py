@@ -16,36 +16,30 @@ from matplotlib.patches import FancyArrowPatch, FancyBboxPatch
 
 
 def _read_json(path: Path) -> Dict[str, Any]:
-    try:
-        with path.open("r", encoding="utf-8") as f:
-            obj = json.load(f)
-        return obj if isinstance(obj, dict) else {}
-    except Exception:
-        return {}
+    with path.open("r", encoding="utf-8") as f:
+        obj = json.load(f)
+    if not isinstance(obj, dict):
+        raise TypeError(f"Expected JSON object in {path}, got {type(obj).__name__}")
+    return obj
 
 
 def _read_text(path: Path) -> str:
-    try:
-        return path.read_text(encoding="utf-8")
-    except Exception:
-        return ""
+    return path.read_text(encoding="utf-8")
 
 
 def _iter_jsonl(path: Path):
-    try:
-        with path.open("r", encoding="utf-8") as f:
-            for line in f:
-                line = line.strip()
-                if not line:
-                    continue
-                try:
-                    obj = json.loads(line)
-                except Exception:
-                    continue
-                if isinstance(obj, dict):
-                    yield obj
-    except Exception:
-        return
+    with path.open("r", encoding="utf-8") as f:
+        for line_no, line in enumerate(f, 1):
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                obj = json.loads(line)
+            except Exception as e:
+                raise ValueError(f"Invalid JSONL at {path}:{line_no}: {e}") from e
+            if not isinstance(obj, dict):
+                raise TypeError(f"Expected JSON object at {path}:{line_no}, got {type(obj).__name__}")
+            yield obj
 
 
 def _parse_ts(ts: Any) -> Optional[datetime]:
@@ -99,10 +93,7 @@ def _summarize(values: List[float]) -> Dict[str, Any]:
 
 
 def _load_json_obj(path: Path) -> Any:
-    try:
-        return json.loads(path.read_text(encoding="utf-8"))
-    except Exception:
-        return None
+    return json.loads(path.read_text(encoding="utf-8"))
 
 
 def _discover_multi_seed_run_ids(group_dir: Path) -> List[str]:
@@ -270,7 +261,7 @@ def parse_round_summary(trace_path: Path) -> Tuple[pd.DataFrame, pd.DataFrame]:
                     "selection_source": selection.get("context", {}).get("source") if isinstance(selection.get("context"), dict) else None,
                     "avg_uncertainty": ranking.get("avg_uncertainty"),
                     "avg_knowledge_gain": ranking.get("avg_knowledge_gain"),
-                    "lambda_t": ranking.get("lambda_t"),
+                    "lambda_t": ranking.get("lambda_effective"),
                     "lambda_controller": lambda_ctrl.get("lambda"),
                     "lambda_controller_mode": lambda_ctrl.get("mode"),
                     "miou_delta": training_state.get("miou_delta"),
@@ -296,6 +287,50 @@ def parse_round_summary(trace_path: Path) -> Tuple[pd.DataFrame, pd.DataFrame]:
             df_summary[col] = pd.to_numeric(df_summary[col], errors="coerce")
     if "round" in df_l3.columns:
         df_l3["round"] = pd.to_numeric(df_l3["round"], errors="coerce")
+
+    if (not df_summary.empty) and (not df_l3.empty) and ("round" in df_summary.columns) and ("round" in df_l3.columns):
+        l3_stats_rows: List[Dict[str, Any]] = []
+        l3g = df_l3.dropna(subset=["round"]).copy()
+        if not l3g.empty:
+            l3g["round"] = l3g["round"].astype(int)
+            l3g = l3g.sort_values("round").groupby("round", as_index=False).tail(1)
+            sel_map = {}
+            if "selection_selected" in df_summary.columns:
+                for _, rr in df_summary.dropna(subset=["round"]).iterrows():
+                    sel_map[int(rr["round"])] = int(rr["selection_selected"]) if pd.notna(rr["selection_selected"]) else None
+            for _, rrow in l3g.iterrows():
+                rr = int(rrow["round"])
+                top_items = json.loads(rrow["top_items"]) if isinstance(rrow.get("top_items"), str) else []
+                selected_items = json.loads(rrow["selected_items"]) if isinstance(rrow.get("selected_items"), str) else []
+                top_df = _l3_items_to_df(top_items).dropna(subset=["uncertainty", "knowledge_gain"]).copy()
+                sel_df = _l3_items_to_df(selected_items).dropna(subset=["uncertainty", "knowledge_gain"]).copy()
+                n_sel = sel_map.get(rr)
+                use_df = None
+                if n_sel is not None and n_sel > 0 and (not top_df.empty):
+                    use_df = top_df.head(int(n_sel)).copy()
+                if use_df is None or use_df.empty:
+                    use_df = sel_df if not sel_df.empty else top_df
+                if use_df is None or use_df.empty:
+                    continue
+                l3_stats_rows.append(
+                    {
+                        "round": rr,
+                        "avg_uncertainty_l3": float(use_df["uncertainty"].astype(float).mean()),
+                        "avg_knowledge_gain_l3": float(use_df["knowledge_gain"].astype(float).mean()),
+                    }
+                )
+        if l3_stats_rows:
+            df_l3s = pd.DataFrame(l3_stats_rows)
+            for c in ["avg_uncertainty_l3", "avg_knowledge_gain_l3"]:
+                df_l3s[c] = pd.to_numeric(df_l3s[c], errors="coerce")
+            df_summary = df_summary.merge(df_l3s, on="round", how="left")
+            if "avg_uncertainty" not in df_summary.columns:
+                df_summary["avg_uncertainty"] = pd.NA
+            if "avg_knowledge_gain" not in df_summary.columns:
+                df_summary["avg_knowledge_gain"] = pd.NA
+            df_summary["avg_uncertainty"] = pd.to_numeric(df_summary["avg_uncertainty"], errors="coerce").fillna(df_summary["avg_uncertainty_l3"])
+            df_summary["avg_knowledge_gain"] = pd.to_numeric(df_summary["avg_knowledge_gain"], errors="coerce").fillna(df_summary["avg_knowledge_gain_l3"])
+            df_summary = df_summary.drop(columns=[c for c in ["avg_uncertainty_l3", "avg_knowledge_gain_l3"] if c in df_summary.columns])
     return df_summary, df_l3
 
 

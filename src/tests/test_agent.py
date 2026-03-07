@@ -316,7 +316,6 @@ class TestLambdaPolicyWarmupRisk(unittest.TestCase):
         v1 = float(self.tools.apply_round_lambda_policy())
         self.assertGreaterEqual(v1, 0.2)
         self.assertLessEqual(v1, 0.25)
-
         self.tools.reset_round_controls()
         v2 = float(self.tools.apply_round_lambda_policy())
         self.assertAlmostEqual(v1, v2, places=12)
@@ -389,3 +388,27 @@ class TestLambdaPolicyWarmupRisk(unittest.TestCase):
         })
         v = float(self.tools.apply_round_lambda_policy())
         self.assertAlmostEqual(v, float(warmup_v) + 0.05, places=12)
+
+
+class TestAgentObservationContract(unittest.TestCase):
+    def test_get_system_status_exposes_observation_contract(self):
+        controller = _PolicyController()
+        tools = Toolbox(controller, MagicMock(), model=None)
+        controller.current_round = 1
+        payload = json.loads(tools.get_system_status())
+        self.assertEqual(payload.get("status"), "success")
+        meta = payload.get("meta")
+        self.assertIsInstance(meta, dict)
+        contract = meta.get("observation_contract")
+        self.assertIsInstance(contract, dict)
+        self.assertEqual(contract.get("raw_image_access"), False)
+        self.assertIn("sample_details_fields", contract)
+
+    def test_get_sample_details_marks_raw_image_access_false(self):
+        controller = _PolicyController()
+        tools = Toolbox(controller, MagicMock(), model=None)
+        payload = json.loads(tools.get_sample_details("dummy"))
+        self.assertEqual(payload.get("status"), "success")
+        result = payload.get("result")
+        self.assertIsInstance(result, dict)
+        self.assertEqual(result.get("raw_image_access"), False)

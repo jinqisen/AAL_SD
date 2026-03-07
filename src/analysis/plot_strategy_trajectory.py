@@ -40,21 +40,47 @@ def load_trace(trace_path: str) -> pd.DataFrame:
 
     per_round: Dict[int, Dict[str, Any]] = {}
 
+    def _summarize(xs: List[float]) -> Dict[str, Optional[float]]:
+        vals = [float(v) for v in xs if v is not None and math.isfinite(float(v))]
+        if not vals:
+            return {"mean": None, "p50": None, "p75": None}
+        arr = np.array(vals, dtype=float)
+        return {
+            "mean": float(np.mean(arr)),
+            "p50": float(np.quantile(arr, 0.5)),
+            "p75": float(np.quantile(arr, 0.75)),
+        }
+
+    def _extract_values(items: Any, key: str, limit: Optional[int] = None) -> List[float]:
+        if not isinstance(items, list) or not items:
+            return []
+        if limit is not None:
+            limit = int(limit)
+        out: List[float] = []
+        seq = items[:limit] if limit is not None and limit > 0 else items
+        for it in seq:
+            if not isinstance(it, dict):
+                raise TypeError(f"Expected dict item for key={key}, got {type(it).__name__}")
+            v = it.get(key)
+            if v is None:
+                continue
+            fv = float(v)
+            if math.isfinite(fv):
+                out.append(fv)
+        return out
+
     def _row(r: Any) -> Dict[str, Any]:
-        try:
-            rr = int(r)
-        except Exception:
-            rr = -1
+        rr = int(r)
         if rr not in per_round:
             per_round[rr] = {"round": rr}
         return per_round[rr]
 
     with open(trace_path, "r") as f:
-        for line in f:
+        for line_no, line in enumerate(f, 1):
             try:
                 entry = json.loads(line)
             except json.JSONDecodeError:
-                continue
+                raise ValueError(f"Invalid JSONL at {trace_path}:{line_no}")
 
             etype = entry.get("type")
 
@@ -144,9 +170,6 @@ def load_trace(trace_path: str) -> pd.DataFrame:
                 ranking = entry.get("ranking") if isinstance(entry.get("ranking"), dict) else {}
                 lambda_ctrl = entry.get("lambda_controller") if isinstance(entry.get("lambda_controller"), dict) else {}
                 training_state = entry.get("training_state") if isinstance(entry.get("training_state"), dict) else {}
-                rank_lambda_t = ranking.get("lambda_t")
-                if row.get("lambda_t") is None and rank_lambda_t is not None:
-                    row["lambda_t"] = rank_lambda_t
                 row.update(
                     {
                         "final_miou": entry.get("mIoU"),
@@ -158,10 +181,53 @@ def load_trace(trace_path: str) -> pd.DataFrame:
                         "k_definition": entry.get("sampler", {}).get("k_definition") if isinstance(entry.get("sampler"), dict) else None,
                         "avg_uncertainty": ranking.get("avg_uncertainty"),
                         "avg_knowledge_gain": ranking.get("avg_knowledge_gain"),
+                        "lambda_effective": ranking.get("lambda_effective"),
+                        "lambda_source": ranking.get("lambda_source"),
                         "lambda_controller": lambda_ctrl.get("lambda"),
                         "lambda_controller_mode": lambda_ctrl.get("mode"),
                         "rollback_flag": training_state.get("rollback_flag"),
                         "miou_delta": training_state.get("miou_delta"),
+                    }
+                )
+
+            elif etype == "l3_selection":
+                r = entry.get("round")
+                row = _row(r)
+                top_items = entry.get("top_items") if isinstance(entry.get("top_items"), list) else []
+                selected_items = entry.get("selected_items") if isinstance(entry.get("selected_items"), list) else []
+                row["l3_source"] = entry.get("source")
+                row["l3_topk"] = entry.get("topk")
+                row["l3_selected_limit"] = entry.get("selected_limit")
+                row["l3_top_items"] = top_items
+                row["l3_selected_items"] = selected_items
+
+                sel_n = row.get("selected_count")
+                sel_n_i = int(sel_n) if sel_n is not None else None
+
+                sel_u = _extract_values(selected_items, "uncertainty")
+                sel_k = _extract_values(selected_items, "knowledge_gain")
+                sel_s = _extract_values(selected_items, "final_score")
+                top_u = _extract_values(top_items, "uncertainty", limit=sel_n_i)
+                top_k = _extract_values(top_items, "knowledge_gain", limit=sel_n_i)
+                top_s = _extract_values(top_items, "final_score", limit=sel_n_i)
+
+                su = _summarize(sel_u)
+                sk = _summarize(sel_k)
+                ss = _summarize(sel_s)
+                tu = _summarize(top_u)
+                tk = _summarize(top_k)
+                ts = _summarize(top_s)
+
+                row.update(
+                    {
+                        "l3_u_mean_selected": su.get("mean"),
+                        "l3_u_p75_selected": su.get("p75"),
+                        "l3_k_mean_selected": sk.get("mean"),
+                        "l3_k_p75_selected": sk.get("p75"),
+                        "l3_score_mean_selected": ss.get("mean"),
+                        "l3_u_mean_topn": tu.get("mean"),
+                        "l3_k_mean_topn": tk.get("mean"),
+                        "l3_score_mean_topn": ts.get("mean"),
                     }
                 )
 
@@ -173,18 +239,37 @@ def load_trace(trace_path: str) -> pd.DataFrame:
     if "selected_ids" in df.columns:
         df["selected_ids_count"] = df["selected_ids"].apply(lambda x: len(x) if isinstance(x, list) else None)
 
+    for col in ["avg_uncertainty", "avg_knowledge_gain", "u_mean", "k_mean", "u_p75", "k_p75"]:
+        if col not in df.columns:
+            df[col] = np.nan
+        df[col] = pd.to_numeric(df[col], errors="coerce")
+
+    if "l3_u_mean_topn" in df.columns:
+        df["avg_uncertainty"] = df["avg_uncertainty"].fillna(pd.to_numeric(df["l3_u_mean_topn"], errors="coerce"))
+    if "l3_k_mean_topn" in df.columns:
+        df["avg_knowledge_gain"] = df["avg_knowledge_gain"].fillna(pd.to_numeric(df["l3_k_mean_topn"], errors="coerce"))
+    if "l3_u_mean_selected" in df.columns:
+        df["u_mean"] = df["u_mean"].fillna(pd.to_numeric(df["l3_u_mean_selected"], errors="coerce"))
+    if "l3_k_mean_selected" in df.columns:
+        df["k_mean"] = df["k_mean"].fillna(pd.to_numeric(df["l3_k_mean_selected"], errors="coerce"))
+    if "l3_u_p75_selected" in df.columns:
+        df["u_p75"] = df["u_p75"].fillna(pd.to_numeric(df["l3_u_p75_selected"], errors="coerce"))
+    if "l3_k_p75_selected" in df.columns:
+        df["k_p75"] = df["k_p75"].fillna(pd.to_numeric(df["l3_k_p75_selected"], errors="coerce"))
+
     return df
 
 def plot_lambda_trajectory(df: pd.DataFrame, output_dir: str):
-    if "lambda_t" not in df.columns or df["lambda_t"].isnull().all():
-        print("Skipping Lambda Plot: No lambda_t data found.")
+    lam = _effective_lambda(df)
+    if lam.isna().all():
+        print("Skipping Lambda Plot: No lambda_effective data found.")
         return
 
     plt.figure(figsize=(10, 6))
-    plt.plot(df["round"], df["lambda_t"], marker="o", linewidth=2.5)
+    plt.plot(df["round"], lam, marker="o", linewidth=2.5)
     plt.title("Lambda Trajectory", fontsize=14)
     plt.xlabel("Round", fontsize=12)
-    plt.ylabel("Lambda", fontsize=12)
+    plt.ylabel("Lambda (effective)", fontsize=12)
     plt.grid(True, linestyle="--", alpha=0.7)
     plt.ylim(-0.05, 1.05)
     plt.savefig(os.path.join(output_dir, "strategy_lambda_trajectory.png"), dpi=300)
@@ -469,16 +554,10 @@ def aggregate_gradients_per_round(epoch_df: pd.DataFrame) -> pd.DataFrame:
     return out
 
 def _effective_lambda(per_round_df: pd.DataFrame) -> pd.Series:
-    if "lambda_override" in per_round_df.columns:
-        lam = pd.to_numeric(per_round_df["lambda_override"], errors="coerce")
+    if "lambda_effective" in per_round_df.columns:
+        lam = pd.to_numeric(per_round_df["lambda_effective"], errors="coerce")
     else:
         lam = pd.Series([pd.NA] * len(per_round_df))
-    if "lambda_t" in per_round_df.columns:
-        lam2 = pd.to_numeric(per_round_df["lambda_t"], errors="coerce")
-        lam = lam.where(~lam.isna(), lam2)
-    if "lambda_policy_apply" in per_round_df.columns:
-        lam3 = pd.to_numeric(per_round_df["lambda_policy_apply"], errors="coerce")
-        lam = lam.where(~lam.isna(), lam3)
     return pd.to_numeric(lam, errors="coerce").astype(float)
 
 def _corr(x: pd.Series, y: pd.Series) -> Optional[float]:

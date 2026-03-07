@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-03-03",
+  "updated_at": "2026-03-07",
   "goals": [
     "对齐 ablation_config 实验口径与论文方案",
     "实验名重命名并保持向后兼容",
@@ -126,6 +126,31 @@
     {
       "id": "t24",
       "title": "强化 set_lambda 护栏并对齐 Agent 提示词",
+      "status": "completed"
+    },
+    {
+      "id": "t25",
+      "title": "为 multi-seed 执行脚本接入监控并落盘日志",
+      "status": "completed"
+    },
+    {
+      "id": "t26",
+      "title": "落盘 lambda_effective 与来源规则到 trace/summary",
+      "status": "completed"
+    },
+    {
+      "id": "t27",
+      "title": "落盘 Agent 观测范围契约与状态元信息",
+      "status": "completed"
+    },
+    {
+      "id": "t28",
+      "title": "移除旧轨迹兼容逻辑并改用 lambda_effective",
+      "status": "completed"
+    },
+    {
+      "id": "t29",
+      "title": "补齐单测并运行 pytest 验证",
       "status": "completed"
     }
   ]

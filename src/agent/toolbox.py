@@ -553,6 +553,22 @@ class Toolbox:
             
             meta = {
                 "schema_version": self.SCHEMA_VERSION,
+                "observation_contract": {
+                    "version": 1,
+                    "raw_image_access": False,
+                    "sample_details_fields": [
+                        "id",
+                        "U_score",
+                        "K_score",
+                        "image_name",
+                        "split",
+                        "image_mean",
+                        "image_std",
+                        "mask_positive_ratio",
+                        "in_labeled_pool",
+                        "in_unlabeled_pool",
+                    ],
+                },
                 "overfit_thresholds": {
                     "tvc_warn": float(self._agent_threshold("OVERFIT_TVC_WARN", getattr(AgentThresholds, "OVERFIT_TVC_WARN", 0.0))),
                     "tvc_severe": float(self._agent_threshold("OVERFIT_TVC_SEVERE", getattr(AgentThresholds, "OVERFIT_TVC_SEVERE", 0.0))),
@@ -1222,6 +1238,7 @@ class Toolbox:
             idx = None
         if idx is not None:
             info.update(self._get_sample_metadata(idx))
+        info["raw_image_access"] = False
         return json.dumps({'status': 'success', 'result': info})
 
     def get_training_status(self) -> str:

@@ -99,50 +99,6 @@ def build_sampler(config: Any, exp_config: Mapping[str, Any]) -> SamplerBuildRes
     )
 
 
-class LegacyLambdaProvider:
-    def __init__(self, pipeline: Any):
-        self._pipeline = pipeline
-
-    def get(self, round_idx: int | None) -> float | None:
-        exp_config = getattr(self._pipeline, "exp_config", None)
-        if not isinstance(exp_config, dict):
-            return None
-
-        def _from_exp_override() -> float | None:
-            return exp_config.get("lambda_override")
-
-        def _from_agent_override() -> float | None:
-            use_agent = bool(getattr(self._pipeline, "use_agent", False))
-            has_toolbox = bool(hasattr(self._pipeline, "toolbox"))
-            if not (use_agent and has_toolbox):
-                return None
-            return self._pipeline.toolbox.control_state.get("lambda_override_round")
-
-        def _from_lambda_policy() -> float | None:
-            has_toolbox = bool(hasattr(self._pipeline, "toolbox"))
-            has_policy = isinstance(exp_config.get("lambda_policy"), dict)
-            if not (has_toolbox and has_policy):
-                return None
-            return self._pipeline.toolbox.apply_round_lambda_policy()
-
-        def _from_controller() -> float | None:
-            if bool(getattr(self._pipeline, "use_agent", False)):
-                return None
-            return self._pipeline._apply_lambda_controller(round_idx)
-
-        providers: Sequence[Callable[[], float | None]] = (
-            _from_exp_override,
-            _from_agent_override,
-            _from_lambda_policy,
-            _from_controller,
-        )
-        for provider in providers:
-            value = provider()
-            if value is not None:
-                return value
-        return None
-
-
 @dataclass(frozen=True)
 class LegacySelectionPostprocessor:
     post_cfg: Mapping[str, Any]

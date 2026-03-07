@@ -23,7 +23,6 @@ from agent.config import AgentThresholds
 from baselines.bald_sampler import BALDSampler
 from experiments.ablation_config import ABLATION_SETTINGS, EXPERIMENT_NAME_ALIASES, build_spec_from_legacy_dict
 from experiments.components import (
-    LegacyLambdaProvider,
     build_sampler,
     build_selection_postprocessor,
 )
@@ -112,18 +111,16 @@ class ActiveLearningPipeline:
 
             base_dir = os.path.join(config.POOLS_DIR, base_subdir)
             os.makedirs(self.pools_dir, exist_ok=True)
-            for name in ("labeled_pool.csv", "unlabeled_pool.csv", "test_pool.csv"):
+            for name in (
+                "labeled_pool.csv",
+                "unlabeled_pool.csv",
+                "val_pool.csv",
+                "test_pool.csv",
+            ):
                 src = os.path.join(base_dir, name)
                 dst = os.path.join(self.pools_dir, name)
                 if not os.path.exists(src):
-                    pools_subdir = os.path.relpath(self.pools_dir, config.POOLS_DIR)
-                    fallback_preprocessor = DataPreprocessor(
-                        config, experiment_name=pools_subdir
-                    )
-                    fallback_preprocessor.create_data_pools(
-                        force=(start_mode == "fresh")
-                    )
-                    break
+                    raise FileNotFoundError(f"Missing base pool file: {src}")
                 if start_mode == "fresh" or (not os.path.exists(dst)):
                     tmp = dst + ".tmp"
                     shutil.copy2(src, tmp)
@@ -136,7 +133,14 @@ class ActiveLearningPipeline:
         self.unlabeled_df = pd.read_csv(
             os.path.join(self.pools_dir, "unlabeled_pool.csv")
         )
-        self.test_df = pd.read_csv(os.path.join(self.pools_dir, "test_pool.csv"))
+        val_path = os.path.join(self.pools_dir, "val_pool.csv")
+        test_path = os.path.join(self.pools_dir, "test_pool.csv")
+        if not os.path.exists(val_path):
+            raise FileNotFoundError(f"Missing val_pool.csv: {val_path}")
+        if not os.path.exists(test_path):
+            raise FileNotFoundError(f"Missing test_pool.csv: {test_path}")
+        self.val_df = pd.read_csv(val_path)
+        self.test_df = pd.read_csv(test_path)
 
         # Map sample_id to indices in the full dataset is tricky if we don't load full dataset.
         # But Dataset class loads by directory.
@@ -156,21 +160,17 @@ class ActiveLearningPipeline:
         self.unlabeled_indices = self._map_filenames_to_indices(
             self.full_dataset, self.unlabeled_df["sample_id"].tolist()
         )
-
-        self.test_dataset = Landslide4SenseDataset(
-            config.DATA_DIR, split="test"
-        )  # or val if split logic differs
-        # Wait, create_data_pools split TrainData into Labeled/Unlabeled/Test.
-        # So 'test_pool.csv' are samples from 'TrainData' folder that we reserved for testing this AL experiment.
-        # They are NOT the official 'TestData' folder (which usually has no masks).
-        # So we should use full_dataset for everything, just different indices.
-
+        self.val_indices = self._map_filenames_to_indices(
+            self.full_dataset, self.val_df["sample_id"].tolist()
+        )
+        if self.test_df.empty:
+            raise RuntimeError("test_pool.csv is empty (internal test split required)")
         self.test_indices = self._map_filenames_to_indices(
             self.full_dataset, self.test_df["sample_id"].tolist()
         )
 
         logger.info(
-            f"Initial Labeled: {len(self.labeled_indices)}, Unlabeled: {len(self.unlabeled_indices)}, Test: {len(self.test_indices)}"
+            f"Initial Labeled: {len(self.labeled_indices)}, Unlabeled: {len(self.unlabeled_indices)}, Val: {len(self.val_indices)}, Test: {len(self.test_indices)}"
         )
 
         self._assert_pool_integrity()
@@ -274,7 +274,6 @@ class ActiveLearningPipeline:
                 getattr(config, "LLM_RETRY_MAX_SECONDS", 0.0) or 0.0
             )
             self.agent_manager.reset()
-        self.lambda_provider = LegacyLambdaProvider(self)
         self.selection_postprocessor = build_selection_postprocessor(self)
         self.current_round = None
         self._last_query_selected_count = None
@@ -300,6 +299,7 @@ class ActiveLearningPipeline:
                 "initial": {
                     "labeled": int(len(self.labeled_indices)),
                     "unlabeled": int(len(self.unlabeled_indices)),
+                    "val": int(len(self.val_indices)),
                     "test": int(len(self.test_indices)),
                 },
             }
@@ -347,7 +347,14 @@ class ActiveLearningPipeline:
                     )
                     if isinstance(self.exp_config, dict)
                     else None,
-                    "enable_l3_logging": self.exp_config.get("enable_l3_logging")
+                    "enable_l3_selection_logging": self.exp_config.get(
+                        "enable_l3_selection_logging"
+                    )
+                    if isinstance(self.exp_config, dict)
+                    else None,
+                    "enable_agent_prompt_logging": self.exp_config.get(
+                        "enable_agent_prompt_logging"
+                    )
                     if isinstance(self.exp_config, dict)
                     else None,
                 },
@@ -367,6 +374,7 @@ class ActiveLearningPipeline:
                 "counts": {
                     "labeled": int(len(self.labeled_indices)),
                     "unlabeled": int(len(self.unlabeled_indices)),
+                    "val": int(len(self.val_indices)),
                     "test": int(len(self.test_indices)),
                 },
             }
@@ -433,10 +441,12 @@ class ActiveLearningPipeline:
             legacy = os.path.join(self.config.POOLS_DIR, self.experiment_name)
             labeled = os.path.join(legacy, "labeled_pool.csv")
             unlabeled = os.path.join(legacy, "unlabeled_pool.csv")
+            val = os.path.join(legacy, "val_pool.csv")
             test = os.path.join(legacy, "test_pool.csv")
             if (
                 os.path.exists(labeled)
                 or os.path.exists(unlabeled)
+                or os.path.exists(val)
                 or os.path.exists(test)
             ):
                 return legacy
@@ -463,27 +473,39 @@ class ActiveLearningPipeline:
             if hasattr(self, "unlabeled_df")
             else set()
         )
+        val_ids = (
+            set(self.val_df["sample_id"].tolist())
+            if hasattr(self, "val_df")
+            else set()
+        )
         test_ids = (
             set(self.test_df["sample_id"].tolist())
             if hasattr(self, "test_df")
             else set()
         )
         overlap_l_u = len(labeled_ids.intersection(unlabeled_ids))
+        overlap_l_v = len(labeled_ids.intersection(val_ids))
         overlap_l_t = len(labeled_ids.intersection(test_ids))
+        overlap_u_v = len(unlabeled_ids.intersection(val_ids))
         overlap_u_t = len(unlabeled_ids.intersection(test_ids))
-        union = labeled_ids.union(unlabeled_ids).union(test_ids)
+        overlap_v_t = len(val_ids.intersection(test_ids))
+        union = labeled_ids.union(unlabeled_ids).union(val_ids).union(test_ids)
         return {
             "counts": {
                 "labeled": int(len(labeled_ids)),
                 "unlabeled": int(len(unlabeled_ids)),
+                "val": int(len(val_ids)),
                 "test": int(len(test_ids)),
                 "union": int(len(union)),
                 "dataset": int(len(getattr(self.full_dataset, "images", []) or [])),
             },
             "overlaps": {
                 "labeled_unlabeled": int(overlap_l_u),
+                "labeled_val": int(overlap_l_v),
                 "labeled_test": int(overlap_l_t),
+                "unlabeled_val": int(overlap_u_v),
                 "unlabeled_test": int(overlap_u_t),
+                "val_test": int(overlap_v_t),
             },
         }
 
@@ -494,8 +516,11 @@ class ActiveLearningPipeline:
                 raise RuntimeError(f"Labeled pool is empty: {integrity}")
         ok = (
             integrity["overlaps"]["labeled_unlabeled"] == 0
+            and integrity["overlaps"]["labeled_val"] == 0
             and integrity["overlaps"]["labeled_test"] == 0
+            and integrity["overlaps"]["unlabeled_val"] == 0
             and integrity["overlaps"]["unlabeled_test"] == 0
+            and integrity["overlaps"]["val_test"] == 0
             and integrity["counts"]["union"] == integrity["counts"]["dataset"]
         )
         self._write_status({"pool_integrity": integrity, "pool_integrity_ok": bool(ok)})
@@ -531,8 +556,11 @@ class ActiveLearningPipeline:
         if not isinstance(rollback_cfg, dict):
             rollback_cfg = {}
         ranking_meta = getattr(self, "_last_ranking_metadata", None)
-        ranking_lambda_t = (
-            ranking_meta.get("lambda_t") if isinstance(ranking_meta, dict) else None
+        ranking_lambda_eff = (
+            ranking_meta.get("lambda_effective") if isinstance(ranking_meta, dict) else None
+        )
+        ranking_lambda_source = (
+            ranking_meta.get("lambda_source") if isinstance(ranking_meta, dict) else None
         )
         lambda_ctrl = (
             self.exp_config.get("lambda_controller")
@@ -558,7 +586,8 @@ class ActiveLearningPipeline:
             else None,
             "k_definition": getattr(self, "k_definition", None),
             "score_normalization": getattr(self, "score_normalization", None),
-            "lambda_t": ranking_lambda_t,
+            "lambda_effective": ranking_lambda_eff,
+            "lambda_source": ranking_lambda_source,
             "lambda_policy_mode": lambda_policy_mode,
             "lambda_controller_mode": lambda_mode,
             "lambda_controller_rule": lambda_rule,
@@ -654,6 +683,36 @@ class ActiveLearningPipeline:
             )
         return value
 
+    def _resolve_lambda_override(self, round_idx: int | None) -> tuple[float | None, str | None]:
+        exp_config = getattr(self, "exp_config", None)
+        if not isinstance(exp_config, dict):
+            return None, None
+
+        exp_override = exp_config.get("lambda_override")
+        if exp_override is not None:
+            return float(exp_override), "exp_override"
+
+        if bool(getattr(self, "use_agent", False)) and hasattr(self, "toolbox"):
+            override = getattr(self.toolbox, "control_state", {}).get("lambda_override_round")
+            if override is not None:
+                return float(override), "agent_override"
+
+            if isinstance(exp_config.get("lambda_policy"), dict):
+                applied = self.toolbox.apply_round_lambda_policy()
+                if applied is None:
+                    raise RuntimeError(
+                        "lambda_policy is configured but apply_round_lambda_policy returned None"
+                    )
+                return float(applied), "lambda_policy"
+
+        if not bool(getattr(self, "use_agent", False)):
+            if isinstance(exp_config.get("lambda_controller"), dict):
+                value = self._apply_lambda_controller(round_idx)
+                if value is not None:
+                    return float(value), "lambda_controller"
+
+        return None, None
+
     def _schedule_lambda(
         self, schedule, round_idx: int | None, fallback: float
     ) -> float:
@@ -693,7 +752,7 @@ class ActiveLearningPipeline:
     def _append_l3_selection(self, selected_ids, source: str | None = None):
         opts = getattr(getattr(self, "experiment_runtime", None), "trace_options", None)
         if opts is not None:
-            if not bool(getattr(opts, "enable_l3_logging", False)):
+            if not bool(getattr(opts, "enable_l3_selection_logging", False)):
                 return
             topk = int(getattr(opts, "l3_topk", 256) or 256)
             max_selected_opt = getattr(opts, "l3_max_selected", None)
@@ -701,7 +760,7 @@ class ActiveLearningPipeline:
         else:
             if not isinstance(self.exp_config, dict):
                 return
-            if not self.exp_config.get("enable_l3_logging"):
+            if not self.exp_config.get("enable_l3_selection_logging"):
                 return
             topk = int(self.exp_config.get("l3_topk", 256) or 256)
             max_selected = int(self.exp_config.get("l3_max_selected", topk) or topk)
@@ -884,6 +943,8 @@ class ActiveLearningPipeline:
         performance_history = []
         budget_history = []
         best_miou_so_far = 0.0
+        final_report = None
+        final_report_split = None
 
         start_mode = getattr(self.config, "START_MODE", "resume")
 
@@ -933,7 +994,11 @@ class ActiveLearningPipeline:
                             "BUDGET_RATIO",
                             "TOTAL_BUDGET",
                             "INITIAL_LABELED_SIZE",
-                            "TEST_SIZE",
+                            "INTERNAL_VAL_SIZE",
+                            "INTERNAL_TEST_SIZE",
+                            "CLOSED_LOOP_SPLIT",
+                            "REPORT_SPLIT",
+                            "NO_TEST_DURING_TRAINING",
                             "N_ROUNDS",
                             "QUERY_SIZE",
                             "EPOCHS_PER_ROUND",
@@ -954,10 +1019,7 @@ class ActiveLearningPipeline:
                                     "current": current,
                                     "manifest": value,
                                 }
-                            try:
-                                setattr(self.config, key, value)
-                            except Exception:
-                                pass
+                            setattr(self.config, key, value)
                         if mismatches:
                             self._write_status({"manifest_config_mismatch": mismatches})
                             self._append_trace(
@@ -1181,13 +1243,15 @@ class ActiveLearningPipeline:
                     train_loader_kwargs["prefetch_factor"] = int(getattr(self.config, "PREFETCH_FACTOR", 2) or 2)
                 labeled_loader = DataLoader(labeled_subset, **train_loader_kwargs)
 
-                eval_split = str(getattr(self.config, "EVAL_SPLIT", "internal") or "internal").strip().lower()
-                use_official_val = eval_split in ("val", "valid", "official_val", "l4s_val")
+                closed_loop_split = str(getattr(self.config, "CLOSED_LOOP_SPLIT", "internal_val") or "internal_val").strip().lower()
+                use_official_val = closed_loop_split in ("val", "valid", "official_val", "l4s_val")
                 if use_official_val:
-                    test_dataset = Landslide4SenseDataset(self.config.DATA_DIR, split="val")
+                    val_dataset = Landslide4SenseDataset(self.config.DATA_DIR, split="val")
                 else:
-                    test_dataset = Subset(self.full_dataset, self.test_indices)
-                test_loader_kwargs = {
+                    val_dataset = Subset(self.full_dataset, self.val_indices)
+                    if len(self.val_indices) <= 0:
+                        raise RuntimeError("val_pool.csv is empty (closed-loop validation split required)")
+                val_loader_kwargs = {
                     "batch_size": self.config.BATCH_SIZE,
                     "shuffle": False,
                     "num_workers": train_num_workers,
@@ -1197,8 +1261,8 @@ class ActiveLearningPipeline:
                     "pin_memory": bool(getattr(self.config, "PIN_MEMORY", False)),
                 }
                 if train_num_workers > 0:
-                    test_loader_kwargs["prefetch_factor"] = int(getattr(self.config, "PREFETCH_FACTOR", 2) or 2)
-                test_loader = DataLoader(test_dataset, **test_loader_kwargs)
+                    val_loader_kwargs["prefetch_factor"] = int(getattr(self.config, "PREFETCH_FACTOR", 2) or 2)
+                val_loader = DataLoader(val_dataset, **val_loader_kwargs)
 
                 best_miou = 0.0
                 best_f1 = 0.0
@@ -1206,17 +1270,14 @@ class ActiveLearningPipeline:
                 grad_tvc_values = []
                 for epoch in range(self.config.EPOCHS_PER_ROUND):
                     grad = None
-                    try:
-                        out = trainer.train_one_epoch(
-                            labeled_loader,
-                            grad_probe_loader=(
-                                test_loader
-                                if getattr(self.config, "GRAD_LOG_VAL_ALIGNMENT", False)
-                                else None
-                            ),
-                        )
-                    except TypeError:
-                        out = trainer.train_one_epoch(labeled_loader)
+                    out = trainer.train_one_epoch(
+                        labeled_loader,
+                        grad_probe_loader=(
+                            val_loader
+                            if getattr(self.config, "GRAD_LOG_VAL_ALIGNMENT", False)
+                            else None
+                        ),
+                    )
 
                     if isinstance(out, tuple) and len(out) == 2:
                         loss, grad = out
@@ -1224,15 +1285,9 @@ class ActiveLearningPipeline:
                         loss = out
 
                     if isinstance(grad, dict) and grad.get("train_val_cos") is not None:
-                        try:
-                            grad_tvc_values.append(float(grad.get("train_val_cos")))
-                        except Exception:
-                            pass
-                    metrics = trainer.evaluate(test_loader)
-                    try:
-                        epoch_mious.append(float(metrics.get("mIoU", 0.0)))
-                    except Exception:
-                        pass
+                        grad_tvc_values.append(float(grad.get("train_val_cos")))
+                    metrics = trainer.evaluate(val_loader)
+                    epoch_mious.append(float(metrics.get("mIoU", 0.0)))
                     logger.info(
                         f"Epoch {epoch + 1}: Loss={loss:.4f}, mIoU={metrics['mIoU']:.4f}, F1={metrics['f1_score']:.4f}"
                     )
@@ -1245,17 +1300,14 @@ class ActiveLearningPipeline:
                         best_f1 = metrics["f1_score"]
 
                     warnings = []
-                    try:
-                        import math
+                    import math
 
-                        if not math.isfinite(float(loss)):
-                            warnings.append("loss_not_finite")
-                        if not math.isfinite(float(metrics.get("mIoU", 0.0))):
-                            warnings.append("miou_not_finite")
-                        if not math.isfinite(float(metrics.get("f1_score", 0.0))):
-                            warnings.append("f1_not_finite")
-                    except Exception:
-                        pass
+                    if not math.isfinite(float(loss)):
+                        warnings.append("loss_not_finite")
+                    if not math.isfinite(float(metrics.get("mIoU", 0.0))):
+                        warnings.append("miou_not_finite")
+                    if not math.isfinite(float(metrics.get("f1_score", 0.0))):
+                        warnings.append("f1_not_finite")
 
                     self._write_status(
                         {
@@ -1494,6 +1546,33 @@ class ActiveLearningPipeline:
                 if self.use_agent and self.agent_manager:
                     self.toolbox.set_training_state(training_state)
 
+                report_metrics = None
+                report_split = str(getattr(self.config, "REPORT_SPLIT", "") or "").strip().lower()
+                if report_split in ("none", "off", "disabled", "null"):
+                    report_split = ""
+                if report_split and report_split not in ("internal_test", "test"):
+                    raise RuntimeError(f"Unsupported REPORT_SPLIT for Route A: {report_split}")
+                no_test_guard = bool(getattr(self.config, "NO_TEST_DURING_TRAINING", False))
+                if report_split and no_test_guard and round_idx != self.config.N_ROUNDS - 1:
+                    raise RuntimeError("REPORT_SPLIT is only allowed on the final round")
+                if report_split and round_idx == self.config.N_ROUNDS - 1:
+                    report_dataset = None
+                    if report_split in ("internal_test", "test"):
+                        report_dataset = Subset(self.full_dataset, self.test_indices)
+                    if report_dataset is not None:
+                        report_loader = DataLoader(report_dataset, **val_loader_kwargs)
+                        report_metrics = trainer.evaluate(report_loader)
+                        final_report = dict(report_metrics) if isinstance(report_metrics, dict) else report_metrics
+                        final_report_split = report_split
+                        self._append_trace(
+                            {
+                                "type": "report_eval",
+                                "round": int(round_idx + 1),
+                                "report_split": report_split,
+                                "metrics": dict(report_metrics) if isinstance(report_metrics, dict) else report_metrics,
+                            }
+                        )
+
                 if round_idx < self.config.N_ROUNDS - 1:
                     new_indices = self._query_samples(trainer.model)
                     if new_indices is not None:
@@ -1620,7 +1699,8 @@ class ActiveLearningPipeline:
                     labeled_loader=labeled_loader
                     if "labeled_loader" in locals()
                     else None,
-                    test_loader=test_loader if "test_loader" in locals() else None,
+                    val_loader=val_loader if "val_loader" in locals() else None,
+                    report_loader=report_loader if "report_loader" in locals() else None,
                     trainer=trainer if "trainer" in locals() else None,
                     model=model if "model" in locals() else None,
                 )
@@ -1637,10 +1717,12 @@ class ActiveLearningPipeline:
             "alc": float(alc),
             "final_miou": float(performance_history[-1]["mIoU"]),
             "final_f1": float(performance_history[-1]["f1_score"]),
+            "final_report_split": final_report_split,
+            "final_report": final_report,
         }
         self._append_md(
             log_path,
-            f"\n## 实验汇总\n\n预算历史: {budget_history}\nALC: {result['alc']:.4f}\n最终 mIoU: {result['final_miou']:.4f}\n最终 F1: {result['final_f1']:.4f}\n",
+            f"\n## 实验汇总\n\n预算历史: {budget_history}\nALC: {result['alc']:.4f}\n最终 mIoU: {result['final_miou']:.4f}\n最终 F1: {result['final_f1']:.4f}\n最终 Report Split: {result['final_report_split']}\n最终 Report: {result['final_report']}\n",
         )
         self._write_status(
             {
@@ -1672,12 +1754,13 @@ class ActiveLearningPipeline:
             del loader
 
     def _cleanup_resources(
-        self, labeled_loader=None, test_loader=None, trainer=None, model=None
+        self, labeled_loader=None, val_loader=None, report_loader=None, trainer=None, model=None
     ):
         """统一资源清理入口"""
         # 1. Cleanup Loaders
         self._cleanup_loader(labeled_loader)
-        self._cleanup_loader(test_loader)
+        self._cleanup_loader(val_loader)
+        self._cleanup_loader(report_loader)
 
         # 2. Cleanup Trainer
         if trainer is not None:
@@ -1875,15 +1958,11 @@ class ActiveLearningPipeline:
             or self.sampler.__class__.__name__ == "ADKUCSSampler"
         ):
             unlabeled_info, labeled_features = self._prepare_unlabeled_info(model)
-            lambda_override = (
-                self.lambda_provider.get(self.current_round)
-                if hasattr(self, "lambda_provider") and self.lambda_provider is not None
-                else None
-            )
+            lambda_override, lambda_source = self._resolve_lambda_override(self.current_round)
 
             # Explicitly log lambda usage for debugging
             logger.info(
-                f"ADKUCSSampler: Preparing rank. lambda_override={lambda_override}"
+                f"ADKUCSSampler: Preparing rank. lambda_override={lambda_override} source={lambda_source}"
             )
             current_iteration = len(self.labeled_indices)
             total_iterations = self.config.TOTAL_BUDGET
@@ -1891,6 +1970,10 @@ class ActiveLearningPipeline:
                 self.sampler._get_adaptive_weight(
                     current_iteration, total_iterations, override=lambda_override
                 )
+            )
+            lambda_effective = float(lambda_used)
+            lambda_effective_source = (
+                "sampler_adaptive" if lambda_override is None else str(lambda_source)
             )
 
             if not unlabeled_info:
@@ -1914,14 +1997,15 @@ class ActiveLearningPipeline:
                     np.mean([r["knowledge_gain"] for r in ranked[:top_k]])
                 )
                 self._last_ranking_metadata = {
-                    "lambda_t": top_item.get("lambda_t"),
+                    "lambda_effective": float(lambda_effective),
+                    "lambda_source": str(lambda_effective_source),
                     "avg_uncertainty": avg_uncertainty,
                     "avg_knowledge_gain": avg_knowledge_gain,
                     "uncertainty_type": "pixel_mean_entropy_log2",
                     "uncertainty_definition": "U(I)=mean_i H(p_i), H(p_i)=-sum_c p_{i,c} log2(p_{i,c}+1e-10)",
                 }
                 logger.info(
-                    f"AD-KUCS Strategy: lambda_t={top_item.get('lambda_t'):.4f} (Top Sample: {top_item.get('sample_id')}) "
+                    f"AD-KUCS Strategy: lambda_effective={lambda_effective:.4f} source={lambda_effective_source} (Top Sample: {top_item.get('sample_id')}) "
                     f"avg_uncertainty(top{top_k})={avg_uncertainty:.6f} avg_knowledge_gain(top{top_k})={avg_knowledge_gain:.6f} "
                     f"U_def=pixel_mean_entropy_log2"
                 )
@@ -2197,16 +2281,23 @@ class ActiveLearningPipeline:
 
         labeled_path = os.path.join(pools_dir, "labeled_pool.csv")
         unlabeled_path = os.path.join(pools_dir, "unlabeled_pool.csv")
+        val_path = os.path.join(pools_dir, "val_pool.csv")
         test_path = os.path.join(pools_dir, "test_pool.csv")
 
-        if not os.path.exists(labeled_path) or not os.path.exists(unlabeled_path):
-            raise FileNotFoundError(f"Pool state files not found in {pools_dir}")
+        if (
+            (not os.path.exists(labeled_path))
+            or (not os.path.exists(unlabeled_path))
+            or (not os.path.exists(val_path))
+            or (not os.path.exists(test_path))
+        ):
+            raise FileNotFoundError(
+                f"Pool state files not found in {pools_dir} (required: labeled/unlabeled/val/test)"
+            )
 
         self.labeled_df = pd.read_csv(labeled_path)
         self.unlabeled_df = pd.read_csv(unlabeled_path)
-
-        if os.path.exists(test_path):
-            self.test_df = pd.read_csv(test_path)
+        self.val_df = pd.read_csv(val_path)
+        self.test_df = pd.read_csv(test_path)
 
         self.labeled_indices = self._map_filenames_to_indices(
             self.full_dataset, self.labeled_df["sample_id"].tolist()
@@ -2215,13 +2306,15 @@ class ActiveLearningPipeline:
             self.full_dataset, self.unlabeled_df["sample_id"].tolist()
         )
 
-        if hasattr(self, "test_df"):
-            self.test_indices = self._map_filenames_to_indices(
-                self.full_dataset, self.test_df["sample_id"].tolist()
-            )
+        self.val_indices = self._map_filenames_to_indices(
+            self.full_dataset, self.val_df["sample_id"].tolist()
+        )
+        self.test_indices = self._map_filenames_to_indices(
+            self.full_dataset, self.test_df["sample_id"].tolist()
+        ) if (hasattr(self, "test_df") and (not self.test_df.empty)) else []
 
         logger.info(
-            f"Loaded pool states: Labeled={len(self.labeled_indices)}, Unlabeled={len(self.unlabeled_indices)}, Test={len(self.test_indices)}"
+            f"Loaded pool states: Labeled={len(self.labeled_indices)}, Unlabeled={len(self.unlabeled_indices)}, Val={len(self.val_indices)}, Test={len(self.test_indices)}"
         )
         self._assert_pool_integrity()
         return True
@@ -2328,7 +2421,7 @@ class ActiveLearningPipeline:
         self.labeled_df = valid_labeled_df
 
         # 2. Reconstruct Unlabeled Pool
-        # Unlabeled = Full Dataset - Labeled - Test
+        # Unlabeled = Full Dataset - Labeled - Val - Test
         # We rely on indices logic for this.
         # But here we need to write the CSV.
 
@@ -2338,10 +2431,19 @@ class ActiveLearningPipeline:
             for x in getattr(self.full_dataset, "images", [])
         ]
         labeled_ids = set(valid_labeled_df["sample_id"].tolist())
-        test_ids = set(self.test_df["sample_id"].tolist())
+        val_ids = (
+            set(self.val_df["sample_id"].tolist()) if hasattr(self, "val_df") else set()
+        )
+        test_ids = (
+            set(self.test_df["sample_id"].tolist())
+            if hasattr(self, "test_df")
+            else set()
+        )
 
         unlabeled_ids = [
-            s for s in all_samples if s not in labeled_ids and s not in test_ids
+            s
+            for s in all_samples
+            if s not in labeled_ids and s not in val_ids and s not in test_ids
         ]
 
         # Create unlabeled DataFrame

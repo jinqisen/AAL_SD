@@ -48,6 +48,7 @@ class TestArchitectureFix(unittest.TestCase):
         # Create a temporary directory for pools
         self.test_dir = tempfile.mkdtemp()
         self.config = Config()
+        self.config.REQUIRE_LLM_FOR_AGENT = False
         self.config.POOLS_DIR = os.path.join(self.test_dir, 'pools')
         self.config.DATA_DIR = os.path.join(self.test_dir, 'data')
         self.config.RESULTS_DIR = os.path.join(self.test_dir, 'results')
@@ -57,6 +58,12 @@ class TestArchitectureFix(unittest.TestCase):
         os.makedirs(self.config.DATA_DIR, exist_ok=True)
         os.makedirs(self.config.RESULTS_DIR, exist_ok=True)
         os.makedirs(self.config.CHECKPOINT_DIR, exist_ok=True)
+        base_dir = os.path.join(self.config.POOLS_DIR, "unit_test", "_base")
+        os.makedirs(base_dir, exist_ok=True)
+        pd.DataFrame({"sample_id": []}).to_csv(os.path.join(base_dir, "labeled_pool.csv"), index=False)
+        pd.DataFrame({"sample_id": []}).to_csv(os.path.join(base_dir, "unlabeled_pool.csv"), index=False)
+        pd.DataFrame({"sample_id": []}).to_csv(os.path.join(base_dir, "val_pool.csv"), index=False)
+        pd.DataFrame({"sample_id": ["dummy"]}).to_csv(os.path.join(base_dir, "test_pool.csv"), index=False)
 
     def tearDown(self):
         shutil.rmtree(self.test_dir)
@@ -113,28 +120,15 @@ class TestArchitectureFix(unittest.TestCase):
         mock_dataset_instance = MockDataset.return_value
         mock_dataset_instance.images = [] # Empty dataset
         MockPreprocessor.return_value.create_data_pools.return_value = None
-        
-        # Mock pandas reading to avoid file not found errors during init
-        with patch('pandas.read_csv') as mock_read_csv:
-             # Mock empty DataFrames
-             mock_read_csv.return_value = pd.DataFrame({'sample_id': []})
-             
-             # Mock ABLATION_SETTINGS to ensure 'test_exp' exists and has use_agent=True
-             with patch('main.ABLATION_SETTINGS', {'test_exp': {'description': 'test', 'sampler_type': 'ad_kucs', 'use_agent': True, 'control_permissions': {}}}):
-                 pipeline = ActiveLearningPipeline(self.config, 'test_exp', run_id='unit_test')
-                 
-                 # Verify history is empty
-                 self.assertEqual(pipeline.agent_manager.history, [])
-                 
-                 # Verify Toolbox state is empty
-                 self.assertEqual(pipeline.toolbox.candidates_cache, [])
-                 
-                 # Verify we can manually dirty and reset it
-                 pipeline.agent_manager.history.append('dirty')
-                 pipeline.agent_manager.reset()
-                 self.assertEqual(pipeline.agent_manager.history, [])
-                 
-                 print("✅ Pipeline initializes with clean Agent state.")
+
+        with patch('main.ABLATION_SETTINGS', {'test_exp': {'description': 'test', 'sampler_type': 'ad_kucs', 'use_agent': True, 'control_permissions': {}}}):
+            pipeline = ActiveLearningPipeline(self.config, 'test_exp', run_id='unit_test')
+            self.assertEqual(pipeline.agent_manager.history, [])
+            self.assertEqual(pipeline.toolbox.candidates_cache, [])
+            pipeline.agent_manager.history.append('dirty')
+            pipeline.agent_manager.reset()
+            self.assertEqual(pipeline.agent_manager.history, [])
+            print("✅ Pipeline initializes with clean Agent state.")
 
     @patch('main.Landslide4SenseDataset')
     @patch('main.DataPreprocessor')
@@ -147,6 +141,7 @@ class TestArchitectureFix(unittest.TestCase):
         # Create dummy pool files
         pd.DataFrame({'sample_id': ['img1', 'img2']}).to_csv(os.path.join(exp_dir, 'labeled_pool.csv'), index=False)
         pd.DataFrame({'sample_id': ['img3']}).to_csv(os.path.join(exp_dir, 'unlabeled_pool.csv'), index=False)
+        pd.DataFrame({'sample_id': []}).to_csv(os.path.join(exp_dir, 'val_pool.csv'), index=False)
         pd.DataFrame({'sample_id': ['img4']}).to_csv(os.path.join(exp_dir, 'test_pool.csv'), index=False) # Added test_pool.csv
         
         # Mock dataset to have these images
@@ -399,9 +394,11 @@ class TestArchitectureFix(unittest.TestCase):
             if filename == "labeled_pool.csv":
                 return pd.DataFrame({"sample_id": ["s0"]})
             if filename == "unlabeled_pool.csv":
-                return pd.DataFrame({"sample_id": ["s1", "s2"]})
-            if filename == "test_pool.csv":
+                return pd.DataFrame({"sample_id": ["s1"]})
+            if filename == "val_pool.csv":
                 return pd.DataFrame({"sample_id": []})
+            if filename == "test_pool.csv":
+                return pd.DataFrame({"sample_id": ["s2"]})
             return pd.DataFrame({"sample_id": []})
 
         with patch("pandas.read_csv", side_effect=fake_read_csv):
@@ -523,6 +520,63 @@ class TestArchitectureFix(unittest.TestCase):
             unlabeled_info, None, current_iteration=10, total_iterations=100, lambda_override=lam_alt
         )
         self.assertNotEqual(ranked_full[0]["sample_id"], ranked_alt[0]["sample_id"])
+
+    def test_resolve_lambda_override_precedence_and_strictness(self):
+        pipeline = ActiveLearningPipeline.__new__(ActiveLearningPipeline)
+        pipeline.current_round = 3
+
+        class DummyToolbox:
+            def __init__(self, control_state, applied):
+                self.control_state = dict(control_state or {})
+                self._applied = applied
+
+            def apply_round_lambda_policy(self):
+                return self._applied
+
+        pipeline.use_agent = True
+        pipeline.exp_config = {"lambda_override": 0.11, "lambda_policy": {"mode": "warmup_risk_closed_loop"}}
+        pipeline.toolbox = DummyToolbox({"lambda_override_round": 0.22}, applied=0.33)
+        value, source = pipeline._resolve_lambda_override(pipeline.current_round)
+        self.assertAlmostEqual(value, 0.11, places=6)
+        self.assertEqual(source, "exp_override")
+
+        pipeline.exp_config = {"lambda_policy": {"mode": "warmup_risk_closed_loop"}}
+        pipeline.toolbox = DummyToolbox({"lambda_override_round": 0.22}, applied=0.33)
+        value, source = pipeline._resolve_lambda_override(pipeline.current_round)
+        self.assertAlmostEqual(value, 0.22, places=6)
+        self.assertEqual(source, "agent_override")
+
+        pipeline.exp_config = {"lambda_policy": {"mode": "warmup_risk_closed_loop"}}
+        pipeline.toolbox = DummyToolbox({}, applied=0.33)
+        value, source = pipeline._resolve_lambda_override(pipeline.current_round)
+        self.assertAlmostEqual(value, 0.33, places=6)
+        self.assertEqual(source, "lambda_policy")
+
+        pipeline.exp_config = {"lambda_policy": {"mode": "warmup_risk_closed_loop"}}
+        pipeline.toolbox = DummyToolbox({}, applied=None)
+        with self.assertRaises(RuntimeError):
+            pipeline._resolve_lambda_override(pipeline.current_round)
+
+        pipeline.use_agent = False
+        pipeline.exp_config = {"lambda_controller": {"mode": "rule_based", "rule": "r1", "lambda_min": 0.0, "lambda_max": 1.0}}
+        pipeline._apply_lambda_controller = lambda round_idx: 0.44
+        value, source = pipeline._resolve_lambda_override(pipeline.current_round)
+        self.assertAlmostEqual(value, 0.44, places=6)
+        self.assertEqual(source, "lambda_controller")
+
+    def test_sampler_audit_uses_lambda_effective(self):
+        pipeline = ActiveLearningPipeline.__new__(ActiveLearningPipeline)
+        pipeline.rollback_config = {"mode": "adaptive_threshold", "threshold": 0.1, "std_factor": 1.5}
+        pipeline.exp_config = {}
+        pipeline.sampler_type = "ad_kucs"
+        pipeline.k_definition = "coreset_to_labeled"
+        pipeline.score_normalization = True
+        pipeline.sampler = MagicMock()
+        pipeline._last_ranking_metadata = {"lambda_effective": 0.55, "lambda_source": "lambda_policy"}
+
+        audit = pipeline._sampler_audit()
+        self.assertAlmostEqual(audit.get("lambda_effective"), 0.55, places=6)
+        self.assertEqual(audit.get("lambda_source"), "lambda_policy")
 
 if __name__ == '__main__':
     unittest.main()
