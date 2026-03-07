@@ -278,7 +278,14 @@ class AgentManager:
                 pass
         try:
             exp_cfg = getattr(controller, "exp_config", None) if controller is not None else None
-            if isinstance(exp_cfg, dict) and bool(exp_cfg.get("enable_l3_logging")):
+            if isinstance(exp_cfg, dict) and bool(exp_cfg.get("enable_agent_prompt_logging")):
+                return True
+        except Exception:
+            pass
+        try:
+            runtime = getattr(controller, "experiment_runtime", None) if controller is not None else None
+            opts = getattr(runtime, "trace_options", None) if runtime is not None else None
+            if opts is not None and bool(getattr(opts, "enable_agent_prompt_logging", False)):
                 return True
         except Exception:
             pass
@@ -295,7 +302,14 @@ class AgentManager:
                 pass
         try:
             exp_cfg = getattr(controller, "exp_config", None) if controller is not None else None
-            if isinstance(exp_cfg, dict) and bool(exp_cfg.get("enable_l3_logging")):
+            if isinstance(exp_cfg, dict) and bool(exp_cfg.get("enable_agent_prompt_logging")):
+                return True
+        except Exception:
+            pass
+        try:
+            runtime = getattr(controller, "experiment_runtime", None) if controller is not None else None
+            opts = getattr(runtime, "trace_options", None) if runtime is not None else None
+            if opts is not None and bool(getattr(opts, "enable_agent_prompt_logging", False)):
                 return True
         except Exception:
             pass

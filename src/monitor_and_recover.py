@@ -170,12 +170,37 @@ class TrainingMonitor:
         except Exception:
             return []
 
+    def _is_multi_seed_group_dir(self, run_dir: str) -> bool:
+        try:
+            return bool(run_dir) and os.path.exists(os.path.join(run_dir, "multi_seed_manifest.json"))
+        except Exception:
+            return False
+
+    def _load_multi_seed_run_ids(self, group_dir: str) -> List[str]:
+        manifest_path = os.path.join(group_dir, "multi_seed_manifest.json")
+        if not os.path.exists(manifest_path):
+            return []
+        try:
+            with open(manifest_path, "r", encoding="utf-8") as f:
+                payload = json.load(f)
+            run_ids = payload.get("run_ids") if isinstance(payload, dict) else None
+            if not isinstance(run_ids, list):
+                return []
+            out: List[str] = []
+            for rid in run_ids:
+                s = str(rid).strip()
+                if s:
+                    out.append(s)
+            return out
+        except Exception:
+            return []
+
     def _resolve_run_dir(self, token: str) -> Optional[str]:
         raw = str(token).strip()
         if not raw:
             return None
 
-        if os.path.isabs(raw) and os.path.isdir(raw):
+        if os.path.isabs(raw):
             return os.path.normpath(raw)
 
         candidates: List[str] = []
@@ -188,7 +213,7 @@ class TrainingMonitor:
         for c in candidates:
             if os.path.isdir(c):
                 return c
-        return None
+        return candidates[0] if candidates else None
 
     def _run_label(self) -> str:
         if self.run_id:
@@ -205,11 +230,7 @@ class TrainingMonitor:
                     candidate = self._resolve_run_dir(rid)
                     if not candidate:
                         continue
-                    expanded = self._expand_multi_seed_group(candidate)
-                    if expanded:
-                        dirs.extend(expanded)
-                    else:
-                        dirs.append(candidate)
+                    dirs.append(candidate)
                 seen = set()
                 unique_dirs = []
                 for d in sorted(dirs, key=lambda p: os.path.basename(p)):
@@ -330,7 +351,15 @@ class TrainingMonitor:
             for r in failed:
                 name = str(r.get('name') or '-')
                 updated = str(r.get('updated') or '-')
-                print(f"- {name} (updated_at {updated})")
+                err = str(r.get("error") or "").strip()
+                if not err:
+                    anomalies = r.get("anomalies")
+                    if isinstance(anomalies, list) and anomalies:
+                        err = str(anomalies[0])
+                if err:
+                    print(f"- {name} (updated_at {updated}) | {err}")
+                else:
+                    print(f"- {name} (updated_at {updated})")
 
         if unknown:
             print(f"\n未知状态（{len(unknown)} 个）")
@@ -344,6 +373,78 @@ class TrainingMonitor:
             print(f"\n尚未开始/未生成 status（{len(not_started)} 个）")
             if not_started:
                 print("- " + " / ".join(not_started))
+
+    def _read_experiment_results_table(self, run_dir: str) -> List[Dict[str, Any]]:
+        results_path = os.path.join(run_dir, "experiment_results.json")
+        payload: Dict[str, Any] = {}
+        if os.path.exists(results_path):
+            try:
+                with open(results_path, "r", encoding="utf-8") as f:
+                    obj = json.load(f)
+                if isinstance(obj, dict):
+                    payload = obj
+            except Exception:
+                payload = {}
+        if not payload:
+            try:
+                for p in sorted(glob.glob(os.path.join(run_dir, "result_*.json"))):
+                    with open(p, "r", encoding="utf-8") as f:
+                        obj = json.load(f)
+                    if isinstance(obj, dict):
+                        payload.update(obj)
+            except Exception:
+                payload = {}
+
+        rows: List[Dict[str, Any]] = []
+        for exp_name, r in payload.items():
+            if not isinstance(r, dict):
+                continue
+            status = str(r.get("status") or "unknown")
+            err = r.get("error")
+            ts = r.get("timestamp")
+            updated_str = "-"
+            try:
+                if isinstance(ts, str) and ts.strip():
+                    dt = datetime.fromisoformat(ts.strip())
+                    updated_str = dt.strftime("%H:%M:%S")
+            except Exception:
+                updated_str = "-"
+
+            last_round = r.get("last_round") if isinstance(r.get("last_round"), dict) else {}
+            round_num = last_round.get("round", "-") if isinstance(last_round, dict) else "-"
+            round_miou = (
+                last_round.get("mIoU", last_round.get("miou", "-"))
+                if isinstance(last_round, dict)
+                else "-"
+            )
+            round_f1 = (
+                last_round.get("F1", last_round.get("f1", "-"))
+                if isinstance(last_round, dict)
+                else "-"
+            )
+
+            anomalies: List[str] = []
+            if status == "failed" and err is not None:
+                anomalies.append(str(err))
+
+            rows.append(
+                {
+                    "name": str(exp_name),
+                    "round": round_num if round_num is not None else "-",
+                    "epoch": "-",
+                    "loss": "-",
+                    "mIoU": "-",
+                    "round_mIoU": round_miou if round_miou is not None else "-",
+                    "round_F1": round_f1 if round_f1 is not None else "-",
+                    "status": status,
+                    "updated": updated_str,
+                    "anomalies": anomalies,
+                    "error": str(err).strip() if err is not None else "",
+                }
+            )
+
+        rows.sort(key=lambda x: str(x.get("name") or ""))
+        return rows
 
     def parse_experiment_history(self, filepath: str, trace_path: Optional[str] = None) -> Dict[str, Any]:
         history: Dict[str, Any] = {
@@ -603,66 +704,115 @@ class TrainingMonitor:
 
         by_run: List[Dict[str, Any]] = []
 
-        for current_run_dir in run_dirs:
-            run_id = os.path.basename(current_run_dir)
+        expanded_dirs: List[Dict[str, Any]] = []
+        for token_dir in run_dirs:
+            if self._is_multi_seed_group_dir(token_dir):
+                group_id = os.path.basename(token_dir.rstrip(os.sep))
+                run_ids = self._load_multi_seed_run_ids(token_dir)
+                for rid in run_ids:
+                    expanded_dirs.append(
+                        {
+                            "run_dir": os.path.join(self.runs_dir, rid),
+                            "run_id": rid,
+                            "group_id": group_id,
+                        }
+                    )
+            else:
+                expanded_dirs.append(
+                    {"run_dir": token_dir, "run_id": os.path.basename(token_dir.rstrip(os.sep)), "group_id": None}
+                )
+
+        planned_cache: Optional[List[str]] = None
+        for item in expanded_dirs:
+            run_dir = str(item.get("run_dir") or "")
+            if os.path.isdir(run_dir):
+                planned_cache = self._read_planned_experiments(run_dir)
+                if planned_cache:
+                    break
+
+        for item in expanded_dirs:
+            current_run_dir = str(item.get("run_dir") or "")
+            run_id = str(item.get("run_id") or os.path.basename(current_run_dir))
+            group_id = item.get("group_id")
             reports_dir = os.path.join(current_run_dir, "reports")
-            status_files = sorted(glob.glob(os.path.join(current_run_dir, "*_status.json")))
-            planned_experiments = self._read_planned_experiments(current_run_dir)
+            planned_experiments = self._read_planned_experiments(current_run_dir) if os.path.isdir(current_run_dir) else None
+            if not planned_experiments:
+                planned_experiments = planned_cache
 
             status_table: List[Dict[str, Any]] = []
+            missing = not os.path.isdir(current_run_dir)
 
-            for status_path in status_files:
-                exp_name = os.path.basename(status_path).replace("_status.json", "")
-                trace_path = os.path.join(current_run_dir, f"{exp_name}_trace.jsonl")
-                history = self.parse_experiment_history(status_path, trace_path)
-                anomalies = self.detect_anomalies(exp_name, history)
+            if not missing:
+                status_files = sorted(glob.glob(os.path.join(current_run_dir, "*_status.json")))
+                if status_files:
+                    for status_path in status_files:
+                        exp_name = os.path.basename(status_path).replace("_status.json", "")
+                        trace_path = os.path.join(current_run_dir, f"{exp_name}_trace.jsonl")
+                        history = self.parse_experiment_history(status_path, trace_path)
+                        anomalies = self.detect_anomalies(exp_name, history)
 
-                progress_epoch = history.get("progress", {}).get("epoch")
-                if progress_epoch == "finished" or history.get("status") in ("completed", "failed"):
-                    self.generate_stage_report(exp_name, history, reports_dir=reports_dir)
+                        progress_epoch = history.get("progress", {}).get("epoch")
+                        if progress_epoch == "finished" or history.get("status") in ("completed", "failed"):
+                            self.generate_stage_report(exp_name, history, reports_dir=reports_dir)
 
-                last_epoch = history["epochs"][-1] if history["epochs"] else {"round": "-", "epoch": "-", "loss": "-", "mIoU": "-"}
-                last_round_metric = history["rounds"][-1]["mIoU"] if history["rounds"] else "-"
-                last_f1_metric = history["rounds"][-1]["F1"] if history["rounds"] else "-"
-                updated = history.get("last_update")
-                updated_str = updated.strftime("%H:%M:%S") if isinstance(updated, datetime) else "-"
+                        last_epoch = (
+                            history["epochs"][-1]
+                            if history["epochs"]
+                            else {"round": "-", "epoch": "-", "loss": "-", "mIoU": "-"}
+                        )
+                        last_round_metric = history["rounds"][-1]["mIoU"] if history["rounds"] else "-"
+                        last_f1_metric = history["rounds"][-1]["F1"] if history["rounds"] else "-"
+                        updated = history.get("last_update")
+                        updated_str = updated.strftime("%H:%M:%S") if isinstance(updated, datetime) else "-"
 
-                status_table.append({
-                    "name": exp_name,
-                    "round": last_epoch["round"],
-                    "epoch": last_epoch["epoch"],
-                    "loss": last_epoch["loss"],
-                    "mIoU": last_epoch["mIoU"],
-                    "round_mIoU": last_round_metric,
-                    "round_F1": last_f1_metric,
-                    "status": history["status"],
-                    "updated": updated_str,
-                    "anomalies": anomalies
-                })
+                        status_table.append(
+                            {
+                                "name": exp_name,
+                                "round": last_epoch["round"],
+                                "epoch": last_epoch["epoch"],
+                                "loss": last_epoch["loss"],
+                                "mIoU": last_epoch["mIoU"],
+                                "round_mIoU": last_round_metric,
+                                "round_F1": last_f1_metric,
+                                "status": history["status"],
+                                "updated": updated_str,
+                                "anomalies": anomalies,
+                                "error": "",
+                            }
+                        )
 
-                if anomalies:
-                    last_report = self.last_report_time.get(exp_name, datetime.min)
-                    if (datetime.now() - last_report).total_seconds() > 3600:
-                        print(f"  > Analyzing anomalies for {exp_name}...")
-                        report = self.generate_llm_report(exp_name, history, anomalies)
+                        if anomalies:
+                            last_report = self.last_report_time.get(exp_name, datetime.min)
+                            if (datetime.now() - last_report).total_seconds() > 3600:
+                                print(f"  > Analyzing anomalies for {exp_name}...")
+                                report = self.generate_llm_report(exp_name, history, anomalies)
 
-                        os.makedirs(reports_dir, exist_ok=True)
-                        report_path = os.path.join(reports_dir, f"{exp_name}_anomaly_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.md")
-                        with open(report_path, 'w', encoding='utf-8') as f:
-                            f.write(f"# Anomaly Analysis: {exp_name}\n\n")
-                            f.write(f"## Anomalies\n{json.dumps(anomalies, indent=2)}\n\n")
-                            f.write(f"## LLM Insight\n{report}\n")
+                                os.makedirs(reports_dir, exist_ok=True)
+                                report_path = os.path.join(
+                                    reports_dir,
+                                    f"{exp_name}_anomaly_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.md",
+                                )
+                                with open(report_path, 'w', encoding='utf-8') as f:
+                                    f.write(f"# Anomaly Analysis: {exp_name}\n\n")
+                                    f.write(f"## Anomalies\n{json.dumps(anomalies, indent=2)}\n\n")
+                                    f.write(f"## LLM Insight\n{report}\n")
 
-                        print(f"  > Anomaly report saved to {os.path.basename(report_path)}")
-                        self.last_report_time[exp_name] = datetime.now()
+                                print(f"  > Anomaly report saved to {os.path.basename(report_path)}")
+                                self.last_report_time[exp_name] = datetime.now()
+                else:
+                    status_table = self._read_experiment_results_table(current_run_dir)
 
-            by_run.append({
-                "run_id": run_id,
-                "run_dir": current_run_dir,
-                "reports_dir": reports_dir,
-                "planned_experiments": planned_experiments,
-                "status_table": status_table,
-            })
+            by_run.append(
+                {
+                    "run_id": run_id,
+                    "run_dir": current_run_dir,
+                    "reports_dir": reports_dir if not missing else "-",
+                    "planned_experiments": planned_experiments,
+                    "status_table": status_table,
+                    "missing": missing,
+                    "group_id": group_id,
+                }
+            )
 
         if len(by_run) > 1:
             print(f"\n[{datetime.now().strftime('%H:%M:%S')}] Multi-Run Overview")
@@ -673,6 +823,14 @@ class TrainingMonitor:
                 status_table = r.get("status_table") if isinstance(r.get("status_table"), list) else []
                 counts = {"completed": 0, "finished": 0, "running": 0, "stalled": 0, "failed": 0, "unknown": 0}
                 latest = "-"
+                if bool(r.get("missing")):
+                    planned = r.get("planned_experiments")
+                    planned_n = len(planned) if isinstance(planned, list) else 0
+                    print(
+                        f"{str(r.get('run_id') or '-'):<42} | {0:<4} | {0:<4} | {0:<4} | "
+                        f"{0:<4} | {planned_n:<4} | {'MISSING':<8}"
+                    )
+                    continue
                 try:
                     times = []
                     for row in status_table:
@@ -699,6 +857,13 @@ class TrainingMonitor:
             reports_dir = str(r.get("reports_dir") or "-")
             planned_experiments = r.get("planned_experiments")
             status_table = r.get("status_table") if isinstance(r.get("status_table"), list) else []
+            if bool(r.get("missing")):
+                print(f"\n[{datetime.now().strftime('%H:%M:%S')}] Monitoring Run: {run_id}")
+                print("=" * 100)
+                print(f"Run dir not found yet: {current_run_dir}")
+                if self.enable_summary:
+                    self._print_stage_summary([], planned_experiments if isinstance(planned_experiments, list) else None)
+                continue
 
             print(f"\n[{datetime.now().strftime('%H:%M:%S')}] Monitoring Run: {run_id}")
             print("=" * 100)
@@ -751,7 +916,7 @@ class TrainingMonitor:
                 if "python" in cmd:
                     total_python_rss_kb += rss
 
-            main_markers = ("run_parallel_strict.py", "src/main.py")
+            main_markers = ("run_parallel_strict.py", "src/main.py", "run_multi_seed.py")
             main_pids = {r["pid"] for r in rows if any(m in r["cmd"] for m in main_markers)}
             python_pids = {r["pid"] for r in rows if "python" in r["cmd"]}
             torch_shm = [r for r in rows if "torch_shm_manager" in r["cmd"]]

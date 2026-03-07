@@ -38,6 +38,16 @@ def _default_worker_count():
     cpu_count = os.cpu_count() or 2
     return max(1, min(4, cpu_count // 2))
 
+def _looks_like_dataset_root(path: str | None) -> bool:
+    if not path:
+        return False
+    if not os.path.isdir(path):
+        return False
+    for rel in ("TrainData/img", "images"):
+        if os.path.isdir(os.path.join(path, rel)):
+            return True
+    return False
+
 class Config:
     # 路径配置
     # config.py is in src/, so project root is one level up
@@ -47,19 +57,32 @@ class Config:
     _DEFAULT_DATA_DIR = os.path.join(ROOT_DIR, 'data', 'landslide4sense')
     _CAS_DATA_DIR = os.path.join(ROOT_DIR, 'data', 'CAS_Landslide')
     _CAS_DATA_DIR_ALT = os.path.join(ROOT_DIR, 'data', 'Data', 'CAS_Landslide')
+    _HOME_AAL_SD_DIR = os.path.join(os.path.expanduser("~"), "AAL_SD")
+    _HOME_L4S_DATA_DIR = os.path.join(_HOME_AAL_SD_DIR, "data", "Landslide4Sense")
+    _HOME_DEFAULT_DATA_DIR = os.path.join(_HOME_AAL_SD_DIR, "data", "landslide4sense")
 
     _DATA_DIR_CANDIDATES = (
         _L4S_DATA_DIR,
         _DEFAULT_DATA_DIR,
         _CAS_DATA_DIR,
         _CAS_DATA_DIR_ALT,
+        _HOME_L4S_DATA_DIR,
+        _HOME_DEFAULT_DATA_DIR,
     )
 
     DATA_DIR = None
-    for _candidate in _DATA_DIR_CANDIDATES:
-        if os.path.exists(_candidate):
-            DATA_DIR = _candidate
-            break
+    _ENV_DATA_DIR = os.getenv("AAL_SD_DATA_DIR") or os.getenv("DATA_DIR")
+    if _ENV_DATA_DIR is not None and str(_ENV_DATA_DIR).strip() != "":
+        if not _looks_like_dataset_root(_ENV_DATA_DIR):
+            raise RuntimeError(
+                f"AAL_SD_DATA_DIR/DATA_DIR is set but not a valid dataset root: {_ENV_DATA_DIR}"
+            )
+        DATA_DIR = str(_ENV_DATA_DIR)
+    else:
+        for _candidate in _DATA_DIR_CANDIDATES:
+            if _looks_like_dataset_root(_candidate):
+                DATA_DIR = _candidate
+                break
     if DATA_DIR is None:
         DATA_DIR = _L4S_DATA_DIR
         
@@ -87,10 +110,23 @@ class Config:
     # 因此，5% (约 190 张) 是一个兼顾 "挑战性" (仍然很少) 和 "稳定性" (足以启动) 的平衡点。
     INITIAL_LABELED_SIZE = 0.05  # 初始标注比例 5%
     ESTIMATED_TOTAL_SAMPLES = 3799 # 实际训练集总大小
-    TEST_SIZE = 0.2              # 测试集比例 20%
     NUM_CLASSES = 2
     IN_CHANNELS = 14
-    EVAL_SPLIT = os.getenv("AAL_SD_EVAL_SPLIT", "internal")
+    CLOSED_LOOP_SPLIT = os.getenv("AAL_SD_CLOSED_LOOP_SPLIT", "internal_val")
+    REPORT_SPLIT = os.getenv("AAL_SD_REPORT_SPLIT", "internal_test")
+    NO_TEST_DURING_TRAINING = _coerce_bool(os.getenv("AAL_SD_NO_TEST_DURING_TRAINING"), default=True)
+    _INTERNAL_VAL_SIZE_ENV = os.getenv("AAL_SD_INTERNAL_VAL_SIZE")
+    INTERNAL_VAL_SIZE = (
+        float(_INTERNAL_VAL_SIZE_ENV)
+        if _INTERNAL_VAL_SIZE_ENV is not None and str(_INTERNAL_VAL_SIZE_ENV).strip() != ""
+        else 0.1
+    )
+    _INTERNAL_TEST_SIZE_ENV = os.getenv("AAL_SD_INTERNAL_TEST_SIZE")
+    INTERNAL_TEST_SIZE = (
+        float(_INTERNAL_TEST_SIZE_ENV)
+        if _INTERNAL_TEST_SIZE_ENV is not None and str(_INTERNAL_TEST_SIZE_ENV).strip() != ""
+        else 0.1
+    )
 
     RANDOM_SEED = int(os.getenv("AAL_SD_RANDOM_SEED", "42"))
     DETERMINISTIC = _coerce_bool(os.getenv("AAL_SD_DETERMINISTIC"), default=True)

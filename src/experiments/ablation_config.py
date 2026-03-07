@@ -22,7 +22,8 @@ ABLATION_SETTINGS = {
             "OVERFIT_RISK_EMA_ALPHA": 0.6,
             "LAMBDA_DOWN_COOLING_ROUNDS": 2
         },
-        "enable_l3_logging": True,
+        "enable_l3_selection_logging": True,
+        "enable_agent_prompt_logging": True,
         "l3_topk": 256,
         "l3_max_selected": 256,
         "lambda_policy": {
@@ -76,7 +77,8 @@ ABLATION_SETTINGS = {
             "LAMBDA_DOWN_COOLING_ROUNDS": 2,
             "LAMBDA_ADJUST_RANGE": 0.10
         },
-        "enable_l3_logging": True,
+        "enable_l3_selection_logging": True,
+        "enable_agent_prompt_logging": True,
         "l3_topk": 256,
         "l3_max_selected": 256,
         "lambda_policy": {
@@ -118,7 +120,8 @@ ABLATION_SETTINGS = {
             "OVERFIT_RISK_HI": 0.9,
             "OVERFIT_TVC_MIN_HI": 0.6
         },
-        "enable_l3_logging": True,
+        "enable_l3_selection_logging": True,
+        "enable_agent_prompt_logging": True,
         "l3_topk": 256,
         "l3_max_selected": 256,
         "lambda_policy": {
@@ -152,7 +155,8 @@ ABLATION_SETTINGS = {
             "OVERFIT_RISK_HI": 0.9,
             "OVERFIT_TVC_MIN_HI": 0.6
         },
-        "enable_l3_logging": True,
+        "enable_l3_selection_logging": True,
+        "enable_agent_prompt_logging": True,
         "l3_topk": 256,
         "l3_max_selected": 256,
         "lambda_policy": {
@@ -198,7 +202,7 @@ ABLATION_SETTINGS = {
         "use_agent": False,
         "sampler_type": "ad_kucs",
         "lambda_override": None,
-        "enable_l3_logging": True,
+        "enable_l3_selection_logging": True,
         "l3_topk": 256,
         "l3_max_selected": 256,
         "lambda_controller": {
@@ -217,7 +221,7 @@ ABLATION_SETTINGS = {
         "use_agent": False,
         "sampler_type": "ad_kucs",
         "lambda_override": None,
-        "enable_l3_logging": True,
+        "enable_l3_selection_logging": True,
         "l3_topk": 256,
         "l3_max_selected": 256,
         "lambda_controller": {
@@ -237,7 +241,7 @@ ABLATION_SETTINGS = {
         "use_agent": False,
         "sampler_type": "ad_kucs",
         "lambda_override": None,
-        "enable_l3_logging": True,
+        "enable_l3_selection_logging": True,
         "l3_topk": 256,
         "l3_max_selected": 256,
         "lambda_controller": {
@@ -283,7 +287,8 @@ ABLATION_SETTINGS = {
             "OVERFIT_RISK_HI": 0.9,
             "OVERFIT_TVC_MIN_HI": 0.6
         },
-        "enable_l3_logging": True,
+        "enable_l3_selection_logging": True,
+        "enable_agent_prompt_logging": True,
         "l3_topk": 256,
         "l3_max_selected": 256,
         "lambda_policy": {
@@ -337,7 +342,7 @@ ABLATION_SETTINGS = {
         "use_agent": False,
         "sampler_type": "dial",
         "lambda_override": None,
-        "enable_l3_logging": True,
+        "enable_l3_selection_logging": True,
         "l3_topk": 256,
         "l3_max_selected": 256
     },
@@ -346,7 +351,7 @@ ABLATION_SETTINGS = {
         "use_agent": False,
         "sampler_type": "wang",
         "lambda_override": None,
-        "enable_l3_logging": True,
+        "enable_l3_selection_logging": True,
         "l3_topk": 256,
         "l3_max_selected": 256
     },
@@ -359,7 +364,8 @@ ABLATION_SETTINGS = {
             "OVERFIT_RISK_HI": 0.9,
             "OVERFIT_TVC_MIN_HI": 0.6
         },
-        "enable_l3_logging": True,
+        "enable_l3_selection_logging": True,
+        "enable_agent_prompt_logging": True,
         "l3_topk": 256,
         "l3_max_selected": 256,
         "uncertainty_method": "bald",
@@ -402,6 +408,10 @@ ABLATION_SETTINGS = {
         "use_agent": True,
         "sampler_type": "ad_kucs",
         "lambda_override": None,
+        "enable_l3_selection_logging": True,
+        "enable_agent_prompt_logging": True,
+        "l3_topk": 256,
+        "l3_max_selected": 256,
         "control_permissions": {
             "set_lambda": True,
             "set_query_size": False,

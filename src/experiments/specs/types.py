@@ -7,7 +7,8 @@ from typing import Any, Mapping, Optional, Protocol
 @dataclass(frozen=True)
 class TraceOptions:
     schema_version: int = 2
-    enable_l3_logging: bool = False
+    enable_l3_selection_logging: bool = False
+    enable_agent_prompt_logging: bool = False
     l3_topk: int = 256
     l3_max_selected: Optional[int] = None
 
@@ -34,13 +35,20 @@ class LegacyExperimentSpec:
     legacy_config: Mapping[str, Any]
 
     def build(self, config: Any) -> ExperimentRuntime:
-        enable_l3 = bool(self.legacy_config.get("enable_l3_logging", False))
+        use_agent = bool(self.legacy_config.get("use_agent", False))
+        enable_l3_selection = bool(
+            self.legacy_config.get("enable_l3_selection_logging", use_agent)
+        )
+        enable_agent_prompt = bool(
+            self.legacy_config.get("enable_agent_prompt_logging", use_agent)
+        )
         topk = int(self.legacy_config.get("l3_topk", 256) or 256)
         max_selected = self.legacy_config.get("l3_max_selected")
         max_selected_i = None if max_selected is None else int(max_selected)
         trace_options = TraceOptions(
             schema_version=2,
-            enable_l3_logging=enable_l3,
+            enable_l3_selection_logging=enable_l3_selection,
+            enable_agent_prompt_logging=enable_agent_prompt,
             l3_topk=topk,
             l3_max_selected=max_selected_i,
         )
@@ -50,4 +58,3 @@ class LegacyExperimentSpec:
             legacy_config=self.legacy_config,
             trace_options=trace_options,
         )
-

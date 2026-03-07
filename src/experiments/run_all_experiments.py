@@ -219,7 +219,11 @@ class ExperimentRunner:
             "experiments": [],
             "config": {
                 "INITIAL_LABELED_SIZE": getattr(self.config, "INITIAL_LABELED_SIZE", None),
-                "TEST_SIZE": getattr(self.config, "TEST_SIZE", None),
+                "INTERNAL_VAL_SIZE": getattr(self.config, "INTERNAL_VAL_SIZE", None),
+                "INTERNAL_TEST_SIZE": getattr(self.config, "INTERNAL_TEST_SIZE", None),
+                "CLOSED_LOOP_SPLIT": getattr(self.config, "CLOSED_LOOP_SPLIT", None),
+                "REPORT_SPLIT": getattr(self.config, "REPORT_SPLIT", None),
+                "NO_TEST_DURING_TRAINING": getattr(self.config, "NO_TEST_DURING_TRAINING", None),
                 "N_ROUNDS": getattr(self.config, "N_ROUNDS", None),
                 "QUERY_SIZE": getattr(self.config, "QUERY_SIZE", None),
                 "TOTAL_BUDGET": getattr(self.config, "TOTAL_BUDGET", None),
