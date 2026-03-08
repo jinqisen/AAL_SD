@@ -223,6 +223,7 @@ class TestArchitectureFix(unittest.TestCase):
                 "score_normalization": cfg.get("score_normalization", True),
                 "uncertainty_method": cfg.get("uncertainty_method"),
                 "n_mc_samples": cfg.get("n_mc_samples"),
+                "acquisition_protocol": cfg.get("acquisition_protocol"),
                 "lambda_override": cfg.get("lambda_override"),
                 "lambda_controller": cfg.get("lambda_controller"),
                 "lambda_policy": cfg.get("lambda_policy"),

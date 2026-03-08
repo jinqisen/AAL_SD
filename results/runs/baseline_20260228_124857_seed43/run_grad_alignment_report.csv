@@ -1,9 +1,0 @@
-experiment_name,n_rounds,lambda_corr_tvc_mean,lambda_corr_tvc_last,lambda_corr_tvc_neg_rate,tvc_mean_all_rounds,tvc_neg_rate_all_rounds_mean,tvc_min_any,tvc_max_any
-baseline_bald,15,,,,,,,
-baseline_coreset,15,,,,,,,
-baseline_dial_style,15,,,,,,,
-baseline_entropy,15,,,,,,,
-baseline_random,15,,,,,,,
-baseline_wang_style,15,,,,,,,
-full_model_A_lambda_policy,15,,,,,,,
-full_model_B_lambda_agent,15,,,,,,,

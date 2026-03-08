@@ -30,6 +30,8 @@ class ADKUCSSampler:
         self.uncertainty_calibration = None
         self.uncertainty_method = "entropy"
         self.n_mc_samples = 10
+        self.uncertainty_aggregation = "mean"
+        self.entropy_threshold = 0.5
         self.feature_num_workers = int(feature_num_workers or 0)
         self.feature_persistent_workers = bool(feature_persistent_workers)
         self.feature_prefetch_factor = int(feature_prefetch_factor or 2)
@@ -44,6 +46,15 @@ class ADKUCSSampler:
                 self.uncertainty_method = "entropy"
             else:
                 self.uncertainty_method = str(um).strip().lower() or "entropy"
+            protocol = exp_config.get("acquisition_protocol")
+            protocol = protocol if isinstance(protocol, dict) else {}
+            self.uncertainty_aggregation = str(
+                protocol.get("uncertainty_aggregation", self.uncertainty_aggregation) or self.uncertainty_aggregation
+            ).strip().lower()
+            try:
+                self.entropy_threshold = float(protocol.get("entropy_threshold", self.entropy_threshold) or self.entropy_threshold)
+            except Exception:
+                self.entropy_threshold = float(self.entropy_threshold or 0.5)
             try:
                 self.n_mc_samples = int(exp_config.get("n_mc_samples") or 10)
             except Exception:
@@ -52,6 +63,8 @@ class ADKUCSSampler:
             self.uncertainty_calibration = None
             self.uncertainty_method = "entropy"
             self.n_mc_samples = 10
+            self.uncertainty_aggregation = "mean"
+            self.entropy_threshold = 0.5
 
     def set_round(self, round_idx: int | None) -> None:
         self.current_round = int(round_idx) if round_idx is not None else None
@@ -161,10 +174,24 @@ class ADKUCSSampler:
             return np.zeros_like(scores)
         return (scores - min_val) / (max_val - min_val)
 
+    def _aggregate_uncertainty_map(self, u_map: np.ndarray) -> float:
+        arr = np.asarray(u_map, dtype=np.float32)
+        if arr.size == 0:
+            return 0.0
+        arr = np.where(np.isfinite(arr), arr, 0.0).astype(np.float32, copy=False)
+        mode = str(getattr(self, "uncertainty_aggregation", "mean") or "mean").strip().lower()
+        if mode in ("mean", "full_mean", "none", ""):
+            return float(np.mean(arr))
+        tau = float(getattr(self, "entropy_threshold", 0.5) or 0.5)
+        mask = arr > float(tau)
+        if int(np.sum(mask)) <= 0:
+            return float(np.mean(arr))
+        return float(np.mean(arr[mask]))
+
     def _calculate_uncertainty(self, prob_map: np.ndarray) -> float:
         eps = 1e-10
         entropy = -np.sum(prob_map * np.log2(prob_map + eps), axis=0)
-        return float(np.mean(entropy))
+        return self._aggregate_uncertainty_map(entropy)
 
     def _calculate_bald_score(self, mc_predictions: np.ndarray) -> float:
         """
@@ -185,8 +212,7 @@ class ADKUCSSampler:
         )
         expected_entropy = np.mean(sample_entropies, axis=0)
         mutual_info = predictive_entropy - expected_entropy
-
-        return float(np.mean(mutual_info))
+        return self._aggregate_uncertainty_map(mutual_info)
 
     def _enable_mc_dropout(self, model: torch.nn.Module) -> None:
         model.eval()
@@ -458,13 +484,28 @@ class ADKUCSSampler:
                         else:
                             sum_probs = sum_probs + probs
                         ent = -torch.sum(probs * torch.log2(probs + eps), dim=1)
-                        sum_ent = sum_ent + ent.mean(dim=(1, 2))
+                        mode = str(getattr(self, "uncertainty_aggregation", "mean") or "mean").strip().lower()
+                        if mode in ("mean", "full_mean", "none", ""):
+                            sum_ent = sum_ent + ent.mean(dim=(1, 2))
+                        else:
+                            tau = float(getattr(self, "entropy_threshold", 0.5) or 0.5)
+                            ent_mask = ent > tau
+                            ent_sum_masked = (ent * ent_mask).sum(dim=(1, 2))
+                            mask_count = ent_mask.sum(dim=(1, 2)) + 1e-10
+                            sum_ent = sum_ent + (ent_sum_masked / mask_count)
 
                     mean_probs = sum_probs / float(int(getattr(self, "n_mc_samples", 10) or 10))
                     pred_ent = -torch.sum(
                         mean_probs * torch.log2(mean_probs + eps), dim=1
                     )
-                    mi = pred_ent.mean(dim=(1, 2)) - (sum_ent / float(int(getattr(self, "n_mc_samples", 10) or 10)))
+                    mode = str(getattr(self, "uncertainty_aggregation", "mean") or "mean").strip().lower()
+                    if mode in ("mean", "full_mean", "none", ""):
+                        pred_ent_scalar = pred_ent.mean(dim=(1, 2))
+                    else:
+                        tau = float(getattr(self, "entropy_threshold", 0.5) or 0.5)
+                        pred_ent_mask = pred_ent > tau
+                        pred_ent_scalar = (pred_ent * pred_ent_mask).sum(dim=(1, 2)) / (pred_ent_mask.sum(dim=(1, 2)) + 1e-10)
+                    mi = pred_ent_scalar - (sum_ent / float(int(getattr(self, "n_mc_samples", 10) or 10)))
                     uncertainties.extend([float(x) for x in mi.detach().cpu().tolist()])
                     if pos_areas is not None:
                         channel = mean_probs[:, int(pos_class), :, :]
@@ -526,7 +567,13 @@ class ADKUCSSampler:
                 probs = F.softmax(logits, dim=1)
 
                 ent = -torch.sum(probs * torch.log2(probs + eps), dim=1)
-                ent_mean = ent.mean(dim=(1, 2))
+                mode = str(getattr(self, "uncertainty_aggregation", "mean") or "mean").strip().lower()
+                if mode in ("mean", "full_mean", "none", ""):
+                    ent_mean = ent.mean(dim=(1, 2))
+                else:
+                    tau = float(getattr(self, "entropy_threshold", 0.5) or 0.5)
+                    ent_mask = ent > tau
+                    ent_mean = (ent * ent_mask).sum(dim=(1, 2)) / (ent_mask.sum(dim=(1, 2)) + 1e-10)
                 uncertainties.extend(
                     [float(x) for x in ent_mean.detach().cpu().tolist()]
                 )

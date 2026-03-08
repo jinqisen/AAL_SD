@@ -1671,6 +1671,15 @@ class ActiveLearningPipeline:
                     None if prev_miou is None else float(miou_signal) - float(prev_miou)
                 )
 
+                if miou_delta is not None:
+                    low_gain_thresh = float(getattr(AgentThresholds, "MIOU_LOW_GAIN_THRESH", 0.001))
+                    if float(miou_delta) < low_gain_thresh:
+                        self._main_miou_low_gain_streak = getattr(self, "_main_miou_low_gain_streak", 0) + 1
+                    else:
+                        self._main_miou_low_gain_streak = 0
+                else:
+                    self._main_miou_low_gain_streak = 0
+
                 rollback_cfg = getattr(self, "rollback_config", None)
                 if not isinstance(rollback_cfg, dict):
                     rollback_cfg = {}
@@ -1848,6 +1857,11 @@ class ActiveLearningPipeline:
                             and int(self._last_query_selected_count) < expected
                         ):
                             early_stop = True
+                            
+                    if getattr(self, "_main_miou_low_gain_streak", 0) >= 3 and round_idx >= self.config.N_ROUNDS // 2:
+                        logger.info(f"Early stopping triggered: mIoU low gain (<{getattr(AgentThresholds, 'MIOU_LOW_GAIN_THRESH', 0.001)}) for 3 consecutive rounds.")
+                        early_stop = True
+
                     self._append_round_summary(
                         int(round_idx + 1),
                         float(selected_miou),
@@ -2200,6 +2214,39 @@ class ActiveLearningPipeline:
         if hasattr(self.sampler, "set_round"):
             self.sampler.set_round(self.current_round)
         if isinstance(self.sampler, BALDSampler):
+            protocol = None
+            if isinstance(getattr(self, "exp_config", None), dict):
+                protocol = self.exp_config.get("acquisition_protocol")
+            protocol = protocol if isinstance(protocol, dict) else {}
+            u_agg = str(protocol.get("uncertainty_aggregation", "mean") or "mean").strip().lower()
+            needs_post = bool(
+                hasattr(self, "selection_postprocessor") and self.selection_postprocessor is not None
+            )
+            use_pipeline_bald = needs_post or (u_agg not in ("mean", "full_mean", "none", ""))
+
+            if use_pipeline_bald:
+                unlabeled_info, _ = self._prepare_unlabeled_info(model, mc_dropout=True)
+                ranked = [
+                    {"sample_id": sid, "final_score": float((info or {}).get("uncertainty_score") or 0.0)}
+                    for sid, info in unlabeled_info.items()
+                ]
+                ranked.sort(key=lambda x: float(x.get("final_score") or 0.0), reverse=True)
+                self._last_ranked_items = list(ranked or [])
+                self._last_ranking_metadata = (
+                    self._compute_ranking_metadata(ranked, int(self.config.QUERY_SIZE))
+                    or None
+                )
+                if needs_post:
+                    ranked_ids, post_meta = self.selection_postprocessor.apply(
+                        ranked, unlabeled_info, int(self.config.QUERY_SIZE)
+                    )
+                    if not isinstance(self._last_ranking_metadata, dict):
+                        self._last_ranking_metadata = {}
+                    if isinstance(post_meta, dict):
+                        self._last_ranking_metadata["postprocess"] = post_meta
+                    return ranked_ids
+                return [item["sample_id"] for item in ranked]
+
             subset_u = Subset(self.query_dataset, self.unlabeled_indices)
             feature_workers = int(getattr(self.config, "FEATURE_NUM_WORKERS", 0) or 0)
             seed_base = int(self.seed) + int(self.current_round or 0)
@@ -2280,18 +2327,34 @@ class ActiveLearningPipeline:
                 avg_knowledge_gain = float(
                     np.mean([r["knowledge_gain"] for r in ranked[:top_k]])
                 )
+                protocol = None
+                if isinstance(getattr(self, "exp_config", None), dict):
+                    protocol = self.exp_config.get("acquisition_protocol")
+                protocol = protocol if isinstance(protocol, dict) else {}
+                u_agg = str(protocol.get("uncertainty_aggregation", "mean") or "mean").strip().lower()
+                if u_agg in ("mean", "full_mean", "none", ""):
+                    u_type = "pixel_mean_entropy_log2"
+                    u_def = "U(I)=mean_i H(p_i), H(p_i)=-sum_c p_{i,c} log2(p_{i,c}+1e-10)"
+                else:
+                    tau = float(protocol.get("entropy_threshold", 0.5) or 0.5)
+                    u_type = "pixel_high_entropy_mean_log2"
+                    u_def = (
+                        "U(I)=mean_{i: H(p_i)>tau} H(p_i) else mean_i H(p_i), "
+                        "H(p_i)=-sum_c p_{i,c} log2(p_{i,c}+1e-10), "
+                        f"tau={tau}"
+                    )
                 self._last_ranking_metadata = {
                     "lambda_effective": float(lambda_effective),
                     "lambda_source": str(lambda_effective_source),
                     "avg_uncertainty": avg_uncertainty,
                     "avg_knowledge_gain": avg_knowledge_gain,
-                    "uncertainty_type": "pixel_mean_entropy_log2",
-                    "uncertainty_definition": "U(I)=mean_i H(p_i), H(p_i)=-sum_c p_{i,c} log2(p_{i,c}+1e-10)",
+                    "uncertainty_type": str(u_type),
+                    "uncertainty_definition": str(u_def),
                 }
                 logger.info(
                     f"AD-KUCS Strategy: lambda_effective={lambda_effective:.4f} source={lambda_effective_source} (Top Sample: {top_item.get('sample_id')}) "
                     f"avg_uncertainty(top{top_k})={avg_uncertainty:.6f} avg_knowledge_gain(top{top_k})={avg_knowledge_gain:.6f} "
-                    f"U_def=pixel_mean_entropy_log2"
+                    f"U_def={u_type}"
                 )
             if (
                 hasattr(self, "selection_postprocessor")
@@ -2315,6 +2378,18 @@ class ActiveLearningPipeline:
                 self._compute_ranking_metadata(ranked, int(self.config.QUERY_SIZE))
                 or None
             )
+            if (
+                hasattr(self, "selection_postprocessor")
+                and self.selection_postprocessor is not None
+            ):
+                ranked_ids, post_meta = self.selection_postprocessor.apply(
+                    ranked, unlabeled_info, int(self.config.QUERY_SIZE)
+                )
+                if not isinstance(self._last_ranking_metadata, dict):
+                    self._last_ranking_metadata = {}
+                if isinstance(post_meta, dict):
+                    self._last_ranking_metadata["postprocess"] = post_meta
+                return ranked_ids
         return [item["sample_id"] for item in ranked]
 
     def _select_diverse_items(self, items, unlabeled_info, k, post_cfg):
@@ -2760,6 +2835,27 @@ class ActiveLearningPipeline:
     ):
         method = str(method or "entropy").strip().lower()
         eps = 1e-10
+        protocol = None
+        if isinstance(getattr(self, "exp_config", None), dict):
+            protocol = self.exp_config.get("acquisition_protocol")
+        protocol = protocol if isinstance(protocol, dict) else {}
+        u_agg = str(protocol.get("uncertainty_aggregation", "mean") or "mean").strip().lower()
+        tau = float(protocol.get("entropy_threshold", 0.5) or 0.5)
+        min_frac = float(protocol.get("entropy_min_frac", 0.01) or 0.01)
+
+        def _aggregate_uncertainty(ent_map: torch.Tensor) -> torch.Tensor:
+            if ent_map.numel() == 0:
+                return torch.zeros((int(ent_map.shape[0]),), device=ent_map.device)
+            if u_agg in ("mean", "full_mean", "none", ""):
+                return ent_map.mean(dim=(1, 2))
+            mask = ent_map > float(tau)
+            min_keep = max(1, int(float(min_frac) * float(ent_map.shape[1] * ent_map.shape[2])))
+            keep = mask.view(mask.shape[0], -1).sum(dim=1)
+            fallback = ent_map.mean(dim=(1, 2))
+            masked_sum = (ent_map * mask).view(ent_map.shape[0], -1).sum(dim=1)
+            denom = keep.clamp_min(1).to(ent_map.dtype)
+            masked_mean = masked_sum / denom
+            return torch.where(keep >= int(min_keep), masked_mean, fallback)
 
         if method == "bald":
             uncertainties = []
@@ -2782,10 +2878,10 @@ class ActiveLearningPipeline:
                         probs = torch.softmax(logits, dim=1)
                         sum_probs = probs if sum_probs is None else (sum_probs + probs)
                         ent = -torch.sum(probs * torch.log2(probs + eps), dim=1)
-                        sum_ent = sum_ent + ent.mean(dim=(1, 2))
+                        sum_ent = sum_ent + _aggregate_uncertainty(ent)
                     mean_probs = sum_probs / float(int(n_mc_samples or 10))
                     pred_ent = -torch.sum(mean_probs * torch.log2(mean_probs + eps), dim=1)
-                    mi = pred_ent.mean(dim=(1, 2)) - (sum_ent / float(int(n_mc_samples or 10)))
+                    mi = _aggregate_uncertainty(pred_ent) - (sum_ent / float(int(n_mc_samples or 10)))
                     uncertainties.extend([float(x) for x in mi.detach().cpu().tolist()])
                     if pos_areas is not None:
                         channel = mean_probs[:, int(pos_class), :, :]
@@ -2819,7 +2915,7 @@ class ActiveLearningPipeline:
                 logits = model(images)
                 probs = torch.softmax(logits, dim=1)
                 ent = -torch.sum(probs * torch.log2(probs + eps), dim=1)
-                ent_mean = ent.mean(dim=(1, 2))
+                ent_mean = _aggregate_uncertainty(ent)
                 uncertainties.extend([float(x) for x in ent_mean.detach().cpu().tolist()])
                 if pos_areas is not None:
                     channel = probs[:, int(pos_class), :, :]

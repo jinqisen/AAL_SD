@@ -1,4 +1,0 @@
-LLM agent acts as a constrained controller in active learning rounds.
-AD-KUCS fuses uncertainty and knowledge gain for query selection.
-Fixed 10-epoch protocol removes training-budget confounding across methods.
-AAL-SD remains competitive with strong baselines on Landslide4Sense.

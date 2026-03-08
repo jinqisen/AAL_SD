@@ -239,28 +239,17 @@ def build_selection_postprocessor(pipeline: Any) -> LegacySelectionPostprocessor
     exp_config = getattr(pipeline, "exp_config", None)
     if not isinstance(exp_config, dict):
         return None
-
-    post_cfg = exp_config.get("selection_postprocess")
-    if not isinstance(post_cfg, dict):
+    protocol = exp_config.get("acquisition_protocol")
+    protocol = protocol if isinstance(protocol, dict) else {}
+    mode = str(protocol.get("diversity_postprocess", "none") or "none").strip().lower()
+    if mode != "fps_feature":
         return None
-
+    candidate_multiplier = int(protocol.get("candidate_multiplier", 5) or 5)
     constraints = exp_config.get("candidate_constraints")
-
-    mode = str(post_cfg.get("mode", "none")).strip().lower() or "none"
-
-    def _build_none() -> LegacySelectionPostprocessor | None:
-        return None
-
-    def _build_fps_feature() -> LegacySelectionPostprocessor | None:
-        return LegacySelectionPostprocessor(
-            post_cfg=post_cfg,
-            constraints=constraints if isinstance(constraints, dict) else None,
-            select_diverse=pipeline._select_diverse_items,
-            get_round=lambda: getattr(pipeline, "current_round", None),
-        )
-
-    builders: Final[dict[str, Callable[[], LegacySelectionPostprocessor | None]]] = {
-        "none": _build_none,
-        "fps_feature": _build_fps_feature,
-    }
-    return builders.get(mode, _build_none)()
+    post_cfg = {"mode": "fps_feature", "candidate_multiplier": candidate_multiplier}
+    return LegacySelectionPostprocessor(
+        post_cfg=post_cfg,
+        constraints=constraints if isinstance(constraints, dict) else None,
+        select_diverse=pipeline._select_diverse_items,
+        get_round=lambda: getattr(pipeline, "current_round", None),
+    )

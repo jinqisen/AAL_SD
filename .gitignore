@@ -5,6 +5,9 @@ __pycache__/
 .mypy_cache/
 .pytest_cache/
 .ruff_cache/
+.trae/
+paper/
+AAL-SD-Doc/survey/
 data/
 results/checkpoints/
 *.pt

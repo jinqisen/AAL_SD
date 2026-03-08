@@ -4,8 +4,7 @@ set -euo pipefail
 AAL_SD_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "${AAL_SD_DIR}"
 
-# Explicitly set dataset path (resolved from data的替身)
-export AAL_SD_DATA_DIR="/Users/anykong/AAL_SD/data/Landslide4Sense"
+export AAL_SD_DATA_DIR="${AAL_SD_DATA_DIR:-/Users/anykong/AAL_SD/data/Landslide4Sense}"
 
 if [[ -z "${PYTHON_BIN:-}" ]]; then
   if command -v python >/dev/null 2>&1 && python -c "import torch" >/dev/null 2>&1; then
@@ -21,15 +20,16 @@ fi
 
 if ! "${PYTHON_BIN}" -c "import torch" >/dev/null 2>&1; then
   echo "错误：当前 PYTHON_BIN=${PYTHON_BIN} 无法 import torch" 1>&2
-  echo "建议：" 1>&2
-  echo "  1) 在已安装 torch 的环境中运行（例如 conda env），并指定 PYTHON_BIN=python" 1>&2
-  echo "  2) 或者为该解释器安装 torch（pip/conda 安装对应版本）" 1>&2
   exit 1
 fi
 
 RESULTS_DIR="${RESULTS_DIR:-results}"
-START_MODE="${START_MODE:-fresh}"
-BASE_RUN_ID="${BASE_RUN_ID:-baseline_$(date +%Y%m%d_%H%M%S)}"
+START_MODE="${START_MODE:-resume}"
+if [[ -z "${BASE_RUN_ID:-}" ]]; then
+  echo "错误：该脚本需要指定已有的 BASE_RUN_ID（与主结果相同）" 1>&2
+  echo "示例：BASE_RUN_ID=baseline_20260309_123456 ./run_multiseed_protocol_robustness_p4_resume.sh" 1>&2
+  exit 2
+fi
 SEEDS="${SEEDS:-42 43 44 45}"
 WORKERS="${WORKERS:-1}"
 EXP_WORKERS="${EXP_WORKERS:-4}"
@@ -40,25 +40,22 @@ MONITOR_STALL_THRESHOLD="${MONITOR_STALL_THRESHOLD:-600}"
 MONITOR_PROC_LOG="${MONITOR_PROC_LOG:-0}"
 MONITOR_SUMMARY="${MONITOR_SUMMARY:-1}"
 RUN_GROUP_DIR="${RESULTS_DIR}/runs/${BASE_RUN_ID}"
-MONITOR_LOG="${MONITOR_LOG:-${RUN_GROUP_DIR}/reports/monitor.log}"
+MONITOR_LOG="${MONITOR_LOG:-${RUN_GROUP_DIR}/reports/monitor_protocol_robustness.log}"
 
 EXPERIMENTS=(
-  full_model_A_lambda_policy
-  full_model_B_lambda_agent
-  baseline_random
-  baseline_entropy
-  baseline_coreset
-  baseline_bald
-  baseline_dial_style
-  baseline_wang_style
+  protocol_aligned_full_model_A
+  protocol_aligned_full_model_B
+  protocol_aligned_baseline_entropy
+  protocol_aligned_baseline_bald
+  protocol_aligned_baseline_wang_style
+  protocol_aligned_baseline_dial_style
 )
 
 HAS_LLM_KEY="$("${PYTHON_BIN}" -c "import sys; sys.path.insert(0,'src'); from config import Config; print('1' if bool(getattr(Config, 'LLM_API_KEY', None)) else '0')" 2>/dev/null || echo '0')"
 if [[ "${HAS_LLM_KEY}" != "1" ]]; then
-  echo "错误：未检测到 LLM_API_KEY，但本脚本包含 agent 实验 full_model_A_lambda_policy。" 1>&2
+  echo "错误：未检测到 LLM_API_KEY，但本脚本包含 agent 协议实验（protocol_aligned_full_model_*）。" 1>&2
   echo "请配置 src/llm_config.json（或设置对应 API key 环境变量，例如 SILICONFLOW_API_KEY）后重试。" 1>&2
-  echo "如果只想跑 baselines，请从 EXPERIMENTS 列表中移除 full_model_A_lambda_policy。" 1>&2
-  exit 2
+  exit 3
 fi
 
 if [[ "${MONITOR_ENABLE}" == "1" ]]; then
