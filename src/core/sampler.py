@@ -124,11 +124,19 @@ class ADKUCSSampler:
         if x.ndim != 2 or len(x) < 2:
             return 0.0
         x = x.astype(np.float32, copy=False)
+        n = int(len(x))
         norms2 = np.einsum("ij,ij->i", x, x)
-        gram = x @ x.T
-        dist2 = norms2[:, None] + norms2[None, :] - 2.0 * gram
-        dist2 = np.maximum(dist2, 0.0)
-        max_dist2 = float(np.max(dist2))
+        max_dist2 = 0.0
+        chunk = int(min(256, n))
+        for start in range(0, n, chunk):
+            end = min(start + chunk, n)
+            gram_chunk = x[start:end] @ x.T
+            dist2_chunk = norms2[start:end, None] + norms2[None, :]
+            dist2_chunk = dist2_chunk - 2.0 * gram_chunk
+            dist2_chunk = np.maximum(dist2_chunk, 0.0)
+            cur = float(np.max(dist2_chunk))
+            if cur > max_dist2:
+                max_dist2 = cur
         if not np.isfinite(max_dist2) or max_dist2 <= 0.0:
             return 0.0
         return float(np.sqrt(max_dist2))
@@ -157,10 +165,16 @@ class ADKUCSSampler:
 
         lf_norms2 = np.einsum("ij,ij->i", lf, lf)
         x_norms2 = np.einsum("ij,ij->i", x, x)
-        dot = lf @ x.T
-        dist2 = lf_norms2[:, None] + x_norms2[None, :] - 2.0 * dot
-        dist2 = np.maximum(dist2, 0.0)
-        min_dist2 = np.min(dist2, axis=0)
+        min_dist2 = np.full((len(x),), np.inf, dtype=np.float32)
+        lf_n = int(len(lf))
+        chunk = int(min(256, lf_n))
+        for start in range(0, lf_n, chunk):
+            end = min(start + chunk, lf_n)
+            dot = lf[start:end] @ x.T
+            dist2 = lf_norms2[start:end, None] + x_norms2[None, :]
+            dist2 = dist2 - 2.0 * dot
+            dist2 = np.maximum(dist2, 0.0)
+            min_dist2 = np.minimum(min_dist2, np.min(dist2, axis=0))
         min_dist = np.sqrt(min_dist2)
         scores = min_dist / float(max_dist)
         scores = np.where(np.isfinite(scores), scores, 0.0)
@@ -256,31 +270,55 @@ class ADKUCSSampler:
         if self.feature_num_workers > 0:
             loader_kwargs["prefetch_factor"] = self.feature_prefetch_factor
         loader_u = DataLoader(subset_u, **loader_kwargs)
+        eps = 1e-10
+        bald_scores: list[float] = []
+        sample_ids: list[int] = []
 
-        mc_probs_dict, _ = self.get_predictions_and_features(
-            model, loader_u, mc_dropout=True, n_mc_samples=n_mc_samples
-        )
+        model.eval()
+        self._enable_mc_dropout(model)
+        cursor = 0
+        with torch.no_grad():
+            for batch in tqdm(loader_u, desc="MC Dropout Sampling"):
+                images = self._unpack_images(batch)
+                if images is None:
+                    continue
+                images = images.to(self.device)
+                batch_size = int(images.shape[0])
+                sum_probs = None
+                sum_ent = torch.zeros((batch_size,), device=self.device)
+                for _ in range(int(n_mc_samples or 10)):
+                    logits = model(images)
+                    probs = torch.softmax(logits, dim=1)
+                    sum_probs = probs if sum_probs is None else (sum_probs + probs)
+                    ent = -torch.sum(probs * torch.log2(probs + eps), dim=1)
+                    mode = str(getattr(self, "uncertainty_aggregation", "mean") or "mean").strip().lower()
+                    if mode in ("mean", "full_mean", "none", ""):
+                        sum_ent = sum_ent + ent.mean(dim=(1, 2))
+                    else:
+                        tau = float(getattr(self, "entropy_threshold", 0.5) or 0.5)
+                        ent_mask = ent > tau
+                        ent_sum_masked = (ent * ent_mask).sum(dim=(1, 2))
+                        mask_count = ent_mask.sum(dim=(1, 2)) + 1e-10
+                        sum_ent = sum_ent + (ent_sum_masked / mask_count)
 
-        if mc_probs_dict is None or len(mc_probs_dict) == 0:
-            raise RuntimeError(
-                "MC Dropout sampling failed. Ensure model has Dropout layers "
-                "and n_mc_samples >= 1."
-            )
+                mean_probs = sum_probs / float(int(n_mc_samples or 10))
+                pred_ent = -torch.sum(mean_probs * torch.log2(mean_probs + eps), dim=1)
+                mode = str(getattr(self, "uncertainty_aggregation", "mean") or "mean").strip().lower()
+                if mode in ("mean", "full_mean", "none", ""):
+                    pred_ent_scalar = pred_ent.mean(dim=(1, 2))
+                else:
+                    tau = float(getattr(self, "entropy_threshold", 0.5) or 0.5)
+                    pred_ent_mask = pred_ent > tau
+                    pred_ent_scalar = (pred_ent * pred_ent_mask).sum(dim=(1, 2)) / (pred_ent_mask.sum(dim=(1, 2)) + 1e-10)
+                mi = pred_ent_scalar - (sum_ent / float(int(n_mc_samples or 10)))
+                bald_scores.extend(mi.detach().cpu().tolist())
+                batch_ids = unlabeled_indices[cursor:cursor + batch_size]
+                sample_ids.extend(batch_ids)
+                cursor += batch_size
 
-        bald_scores = []
-        sample_ids = []
-
-        for i, idx in enumerate(unlabeled_indices):
-            # mc_probs_dict keys are 0..N-1 (subset indices), corresponding to the order of unlabeled_indices
-            if i in mc_probs_dict:
-                mc_pred = np.array(mc_probs_dict[i])
-                bald_score = self._calculate_bald_score(mc_pred)
-            else:
-                raise RuntimeError(f"Missing MC predictions for subset index {i} (sample index {idx})")
-
-            bald_scores.append(bald_score)
-            sample_ids.append(idx)
-
+        model.eval()
+        if int(len(bald_scores)) != int(len(sample_ids)) or int(len(sample_ids)) != int(len(unlabeled_indices)):
+            raise RuntimeError("BALD score extraction failed: output size mismatch")
         return bald_scores, sample_ids
 
     def _cluster_features(self, features: np.ndarray, n_clusters: int = 10) -> tuple:
@@ -312,15 +350,33 @@ class ADKUCSSampler:
         distance_to_center = float(dists[assigned])
         if len(cluster_centers) == 1:
             return 0.0
-        max_distance = 0.0
-        for i in range(len(cluster_centers)):
-            for j in range(i + 1, len(cluster_centers)):
-                dij = float(np.linalg.norm(cluster_centers[i] - cluster_centers[j]))
-                if dij > max_distance:
-                    max_distance = dij
+        max_distance = self._max_pairwise_distance(cluster_centers)
         if max_distance < 1e-10:
             return 0.0
         return float(distance_to_center / max_distance)
+
+    def _resolve_feature_layer(self, model):
+        layer = None
+        if hasattr(model, "backbone"):
+            layer = getattr(model.backbone, "layer4", None)
+        if (
+            layer is None
+            and hasattr(model, "model")
+            and hasattr(model.model, "encoder")
+        ):
+            layer = getattr(model.model, "encoder", None)
+            if layer is not None:
+                layer = getattr(layer, "layer4", None)
+        if layer is None:
+            candidates = ["features", "avgpool", "layer4", "layer3", "mixed_7c"]
+            for name in candidates:
+                if hasattr(model, name):
+                    layer = getattr(model, name)
+                    break
+                if hasattr(model, "module") and hasattr(model.module, name):
+                    layer = getattr(model.module, name)
+                    break
+        return layer
 
     def _calculate_knowledge_gain(
         self, sample_feature: np.ndarray, labeled_features: np.ndarray
@@ -370,35 +426,17 @@ class ADKUCSSampler:
                 mc_probs_dict: {sample_idx: (n_mc_samples, C, H, W)}
         """
         model.eval()
-        probs_list = []
+        probs_list: list[torch.Tensor] = []
+        probs_tensor = None
+        total_len = None
+        try:
+            total_len = int(len(getattr(data_loader, "dataset", [])))
+        except Exception:
+            total_len = None
+        write_offset = 0
 
         if mc_dropout:
-            mc_probs_dict: dict[int, np.ndarray] = {}
-            sample_idx = 0
-            self._enable_mc_dropout(model)
-            with torch.no_grad():
-                for batch in tqdm(data_loader, desc="MC Dropout Sampling"):
-                    images = self._unpack_images(batch)
-                    if images is None:
-                        continue
-
-                    images = images.to(self.device)
-                    batch_size = int(images.shape[0])
-
-                    mc_batch_probs = []
-                    for _ in range(int(n_mc_samples)):
-                        logits = model(images)
-                        probs = F.softmax(logits, dim=1)
-                        mc_batch_probs.append(probs.detach().cpu().numpy())
-
-                    mc_batch_probs = np.stack(mc_batch_probs, axis=0)
-                    for i in range(batch_size):
-                        mc_probs_dict[sample_idx + i] = mc_batch_probs[:, i, :, :, :]
-                    sample_idx += batch_size
-
-            model.eval()
-            features_tensor = self.get_features_only(model, data_loader)
-            return mc_probs_dict, features_tensor
+            raise RuntimeError("get_predictions_and_features(mc_dropout=True) is disabled; use get_uncertainty_and_features(method='bald') instead.")
 
         features_list: list[torch.Tensor] = []
 
@@ -406,27 +444,7 @@ class ADKUCSSampler:
             gap = F.adaptive_avg_pool2d(output, (1, 1)).flatten(1)
             features_list.append(gap.detach().cpu())
 
-        layer = None
-        if hasattr(model, "backbone"):
-            layer = getattr(model.backbone, "layer4", None)
-        if (
-            layer is None
-            and hasattr(model, "model")
-            and hasattr(model.model, "encoder")
-        ):
-            layer = getattr(model.model, "encoder", None)
-            if layer is not None:
-                layer = getattr(layer, "layer4", None)
-
-        if layer is None:
-            candidates = ["features", "avgpool", "layer4", "layer3", "mixed_7c"]
-            for name in candidates:
-                if hasattr(model, name):
-                    layer = getattr(model, name)
-                    break
-                if hasattr(model, "module") and hasattr(model.module, name):
-                    layer = getattr(model.module, name)
-                    break
+        layer = self._resolve_feature_layer(model)
 
         handle = None
         if layer is not None:
@@ -441,12 +459,23 @@ class ADKUCSSampler:
                 images = images.to(self.device)
                 logits = model(images)
                 probs = F.softmax(logits, dim=1)
-                probs_list.append(probs.cpu())
+                probs_cpu = probs.detach().cpu()
+                batch_size = int(probs_cpu.shape[0])
+                if probs_tensor is None and total_len is not None:
+                    probs_tensor = torch.empty((total_len, *probs_cpu.shape[1:]), dtype=probs_cpu.dtype)
+                if probs_tensor is not None:
+                    probs_tensor[write_offset:write_offset + batch_size] = probs_cpu
+                else:
+                    probs_list.append(probs_cpu)
+                write_offset += batch_size
 
         if handle is not None:
             handle.remove()
 
         features_tensor = torch.cat(features_list) if features_list else None
+        if probs_tensor is not None:
+            probs_tensor = probs_tensor[:write_offset]
+            return probs_tensor, features_tensor
         if not probs_list:
             return None, features_tensor
         probs_tensor = torch.cat(probs_list)
@@ -464,6 +493,18 @@ class ADKUCSSampler:
             eps = 1e-10
             uncertainties: list[float] = []
             pos_areas: list[float] | None = [] if pos_class is not None else None
+            features_list: list[torch.Tensor] = []
+
+            capture = {"on": False}
+
+            def hook_fn(module, input, output):
+                if not capture["on"]:
+                    return
+                gap = F.adaptive_avg_pool2d(output, (1, 1)).flatten(1)
+                features_list.append(gap.detach().cpu())
+
+            layer = self._resolve_feature_layer(model)
+            handle = layer.register_forward_hook(hook_fn) if layer is not None else None
             model.eval()
             self._enable_mc_dropout(model)
             with torch.no_grad():
@@ -506,14 +547,22 @@ class ADKUCSSampler:
                         pred_ent_mask = pred_ent > tau
                         pred_ent_scalar = (pred_ent * pred_ent_mask).sum(dim=(1, 2)) / (pred_ent_mask.sum(dim=(1, 2)) + 1e-10)
                     mi = pred_ent_scalar - (sum_ent / float(int(getattr(self, "n_mc_samples", 10) or 10)))
-                    uncertainties.extend([float(x) for x in mi.detach().cpu().tolist()])
+                    uncertainties.extend(mi.detach().cpu().tolist())
                     if pos_areas is not None:
                         channel = mean_probs[:, int(pos_class), :, :]
                         area = (channel > float(pos_threshold)).float().mean(dim=(1, 2))
-                        pos_areas.extend([float(x) for x in area.detach().cpu().tolist()])
+                        pos_areas.extend(area.detach().cpu().tolist())
+
+                    model.eval()
+                    capture["on"] = True
+                    _ = model(images)
+                    capture["on"] = False
+                    self._enable_mc_dropout(model)
 
             model.eval()
-            features_tensor = self.get_features_only(model, data_loader)
+            if handle is not None:
+                handle.remove()
+            features_tensor = torch.cat(features_list) if features_list else None
             unc_arr = np.asarray(uncertainties, dtype=np.float32)
             pos_arr = (
                 np.asarray(pos_areas, dtype=np.float32) if pos_areas is not None else None
@@ -529,27 +578,7 @@ class ADKUCSSampler:
             gap = F.adaptive_avg_pool2d(output, (1, 1)).flatten(1)
             features_list.append(gap.detach().cpu())
 
-        layer = None
-        if hasattr(model, "backbone"):
-            layer = getattr(model.backbone, "layer4", None)
-        if (
-            layer is None
-            and hasattr(model, "model")
-            and hasattr(model.model, "encoder")
-        ):
-            layer = getattr(model.model, "encoder", None)
-            if layer is not None:
-                layer = getattr(layer, "layer4", None)
-
-        if layer is None:
-            candidates = ["features", "avgpool", "layer4", "layer3", "mixed_7c"]
-            for name in candidates:
-                if hasattr(model, name):
-                    layer = getattr(model, name)
-                    break
-                if hasattr(model, "module") and hasattr(model.module, name):
-                    layer = getattr(model.module, name)
-                    break
+        layer = self._resolve_feature_layer(model)
 
         handle = None
         if layer is not None:
@@ -574,14 +603,12 @@ class ADKUCSSampler:
                     tau = float(getattr(self, "entropy_threshold", 0.5) or 0.5)
                     ent_mask = ent > tau
                     ent_mean = (ent * ent_mask).sum(dim=(1, 2)) / (ent_mask.sum(dim=(1, 2)) + 1e-10)
-                uncertainties.extend(
-                    [float(x) for x in ent_mean.detach().cpu().tolist()]
-                )
+                uncertainties.extend(ent_mean.detach().cpu().tolist())
 
                 if pos_areas is not None:
                     channel = probs[:, int(pos_class), :, :]
                     area = (channel > float(pos_threshold)).float().mean(dim=(1, 2))
-                    pos_areas.extend([float(x) for x in area.detach().cpu().tolist()])
+                    pos_areas.extend(area.detach().cpu().tolist())
 
         if handle is not None:
             handle.remove()
@@ -601,27 +628,7 @@ class ADKUCSSampler:
             gap = F.adaptive_avg_pool2d(output, (1, 1)).flatten(1)
             features_list.append(gap.detach().cpu())
 
-        layer = None
-        if hasattr(model, "backbone"):
-            layer = getattr(model.backbone, "layer4", None)
-        if (
-            layer is None
-            and hasattr(model, "model")
-            and hasattr(model.model, "encoder")
-        ):
-            layer = getattr(model.model, "encoder", None)
-            if layer is not None:
-                layer = getattr(layer, "layer4", None)
-
-        if layer is None:
-            candidates = ["features", "avgpool", "layer4", "layer3", "mixed_7c"]
-            for name in candidates:
-                if hasattr(model, name):
-                    layer = getattr(model, name)
-                    break
-                if hasattr(model, "module") and hasattr(model.module, name):
-                    layer = getattr(model.module, name)
-                    break
+        layer = self._resolve_feature_layer(model)
 
         handle = None
         if layer is not None:

@@ -2,6 +2,7 @@ import unittest
 import numpy as np
 import sys
 import os
+import torch
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
@@ -392,6 +393,58 @@ class TestADKUCSSCoresetToLabeled(unittest.TestCase):
         self.assertGreaterEqual(max(norm_scores), 0.0)
         self.assertLessEqual(max(norm_scores), 1.0)
         self.assertGreater(max(raw_scores), 1.0)
+
+
+class TestADKUCSSBaldScores(unittest.TestCase):
+    def test_calculate_bald_scores_matches_uncertainty_pipeline(self):
+        from torch.utils.data import Dataset, DataLoader, Subset
+
+        class TinySegDataset(Dataset):
+            def __init__(self, n: int):
+                self.n = int(n)
+
+            def __len__(self):
+                return self.n
+
+            def __getitem__(self, idx: int):
+                base = torch.arange(3 * 4 * 4, dtype=torch.float32).reshape(3, 4, 4)
+                return {"image": base * float(idx + 1)}
+
+        class TinyDropoutModel(torch.nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.drop = torch.nn.Dropout2d(p=0.5)
+
+            def forward(self, x):
+                logits = x[:, :2, :, :]
+                return self.drop(logits)
+
+        dataset = TinySegDataset(16)
+        model = TinyDropoutModel()
+        sampler = ADKUCSSampler(device="cpu")
+        sampler.uncertainty_method = "bald"
+        sampler.n_mc_samples = 5
+
+        unlabeled_indices = list(range(len(dataset)))
+
+        torch.manual_seed(0)
+        scores, ids = sampler.calculate_bald_scores(
+            model, dataset, unlabeled_indices, n_mc_samples=5
+        )
+        self.assertEqual(ids, unlabeled_indices)
+
+        subset = Subset(dataset, unlabeled_indices)
+        loader = DataLoader(subset, batch_size=8, shuffle=False, num_workers=0)
+        torch.manual_seed(0)
+        unc_arr, _, _ = sampler.get_uncertainty_and_features(model, loader)
+        self.assertTrue(
+            np.allclose(
+                np.asarray(scores, dtype=np.float32),
+                np.asarray(unc_arr, dtype=np.float32),
+                rtol=1e-6,
+                atol=1e-6,
+            )
+        )
 
 if __name__ == '__main__':
     unittest.main()
