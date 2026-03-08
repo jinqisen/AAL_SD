@@ -74,6 +74,9 @@ class ActiveLearningPipeline:
         self.trace_path = os.path.join(
             self.run_reports_dir, f"{self.experiment_name}_trace.jsonl"
         )
+        self.round_model_dir = os.path.join(
+            self.run_reports_dir, f"{self.experiment_name}_round_models"
+        )
 
         # 1. Data Preprocessing
         start_mode = getattr(self.config, "START_MODE", "resume")
@@ -81,50 +84,59 @@ class ActiveLearningPipeline:
             if os.path.exists(self.checkpoint_manager.checkpoint_path):
                 try:
                     os.remove(self.checkpoint_manager.checkpoint_path)
-                except Exception:
-                    pass
+                except Exception as e:
+                    raise RuntimeError(
+                        f"Failed to remove checkpoint for fresh start: {self.checkpoint_manager.checkpoint_path} ({e})"
+                    ) from e
             if os.path.exists(self.status_path):
                 try:
                     os.remove(self.status_path)
-                except Exception:
-                    pass
+                except Exception as e:
+                    raise RuntimeError(
+                        f"Failed to remove status for fresh start: {self.status_path} ({e})"
+                    ) from e
             if os.path.exists(self.trace_path):
                 try:
                     os.remove(self.trace_path)
-                except Exception:
-                    pass
+                except Exception as e:
+                    raise RuntimeError(
+                        f"Failed to remove trace for fresh start: {self.trace_path} ({e})"
+                    ) from e
+            if os.path.isdir(self.round_model_dir):
+                try:
+                    import shutil
 
-        legacy_mode = bool(
-            getattr(self.config, "ALLOW_LEGACY_POOLS", False)
-            and self.run_id == "default"
-        )
-        if legacy_mode:
-            pools_subdir = os.path.relpath(self.pools_dir, config.POOLS_DIR)
-            preprocessor = DataPreprocessor(config, experiment_name=pools_subdir)
-            preprocessor.create_data_pools(force=(start_mode == "fresh"))
-        else:
-            import shutil
+                    shutil.rmtree(self.round_model_dir)
+                except Exception as e:
+                    raise RuntimeError(
+                        f"Failed to remove round model dir for fresh start: {self.round_model_dir} ({e})"
+                    ) from e
 
-            base_subdir = os.path.join(self.run_id, "_base")
-            base_preprocessor = DataPreprocessor(config, experiment_name=base_subdir)
-            base_preprocessor.create_data_pools(force=(start_mode == "fresh"))
+        os.makedirs(self.round_model_dir, exist_ok=True)
 
-            base_dir = os.path.join(config.POOLS_DIR, base_subdir)
-            os.makedirs(self.pools_dir, exist_ok=True)
-            for name in (
-                "labeled_pool.csv",
-                "unlabeled_pool.csv",
-                "val_pool.csv",
-                "test_pool.csv",
-            ):
-                src = os.path.join(base_dir, name)
-                dst = os.path.join(self.pools_dir, name)
-                if not os.path.exists(src):
-                    raise FileNotFoundError(f"Missing base pool file: {src}")
-                if start_mode == "fresh" or (not os.path.exists(dst)):
-                    tmp = dst + ".tmp"
-                    shutil.copy2(src, tmp)
-                    os.replace(tmp, dst)
+        import shutil
+
+        base_subdir = os.path.join(self.run_id, "_base")
+        base_preprocessor = DataPreprocessor(config, experiment_name=base_subdir)
+        base_preprocessor.create_data_pools(force=(start_mode == "fresh"))
+
+        base_dir = os.path.join(config.POOLS_DIR, base_subdir)
+        os.makedirs(self.pools_dir, exist_ok=True)
+        for name in (
+            "labeled_pool.csv",
+            "unlabeled_pool.csv",
+            "pools_manifest.json",
+        ):
+            src = os.path.join(base_dir, name)
+            dst = os.path.join(self.pools_dir, name)
+            if not os.path.exists(src):
+                raise FileNotFoundError(f"Missing base pool file: {src}")
+            if start_mode == "fresh" or (not os.path.exists(dst)):
+                tmp = dst + ".tmp"
+                shutil.copy2(src, tmp)
+                os.replace(tmp, dst)
+
+        self._validate_pools_manifest()
 
         # 2. Load Data Pools
         import pandas as pd
@@ -133,14 +145,6 @@ class ActiveLearningPipeline:
         self.unlabeled_df = pd.read_csv(
             os.path.join(self.pools_dir, "unlabeled_pool.csv")
         )
-        val_path = os.path.join(self.pools_dir, "val_pool.csv")
-        test_path = os.path.join(self.pools_dir, "test_pool.csv")
-        if not os.path.exists(val_path):
-            raise FileNotFoundError(f"Missing val_pool.csv: {val_path}")
-        if not os.path.exists(test_path):
-            raise FileNotFoundError(f"Missing test_pool.csv: {test_path}")
-        self.val_df = pd.read_csv(val_path)
-        self.test_df = pd.read_csv(test_path)
 
         # Map sample_id to indices in the full dataset is tricky if we don't load full dataset.
         # But Dataset class loads by directory.
@@ -149,7 +153,11 @@ class ActiveLearningPipeline:
         # NOTE: Landslide4SenseDataset loads all files in a dir.
         # We need to construct indices based on file names.
 
-        self.full_dataset = Landslide4SenseDataset(config.DATA_DIR, split="train")
+        train_split = str(getattr(config, "TRAIN_SPLIT", "train") or "train").strip().lower()
+        self.full_dataset = Landslide4SenseDataset(config.DATA_DIR, split=train_split)
+        self.query_dataset = Landslide4SenseDataset(
+            config.DATA_DIR, split=train_split, with_mask=False
+        )
         self.dataset = self.full_dataset
         # Assuming 'train' split in dataset class points to the folder containing all training candidates
 
@@ -160,17 +168,9 @@ class ActiveLearningPipeline:
         self.unlabeled_indices = self._map_filenames_to_indices(
             self.full_dataset, self.unlabeled_df["sample_id"].tolist()
         )
-        self.val_indices = self._map_filenames_to_indices(
-            self.full_dataset, self.val_df["sample_id"].tolist()
-        )
-        if self.test_df.empty:
-            raise RuntimeError("test_pool.csv is empty (internal test split required)")
-        self.test_indices = self._map_filenames_to_indices(
-            self.full_dataset, self.test_df["sample_id"].tolist()
-        )
 
         logger.info(
-            f"Initial Labeled: {len(self.labeled_indices)}, Unlabeled: {len(self.unlabeled_indices)}, Val: {len(self.val_indices)}, Test: {len(self.test_indices)}"
+            f"Initial Labeled: {len(self.labeled_indices)}, Unlabeled: {len(self.unlabeled_indices)}"
         )
 
         self._assert_pool_integrity()
@@ -290,6 +290,9 @@ class ActiveLearningPipeline:
             getattr(self.config, "EPOCHS_PER_ROUND", 0) or 0
         )
         self._pending_round_controls = {}
+        self.train_split = str(getattr(self.config, "TRAIN_SPLIT", "train") or "train").strip().lower()
+        self.val_split = str(getattr(self.config, "VAL_SPLIT", "val") or "val").strip().lower()
+        self.test_split = str(getattr(self.config, "TEST_SPLIT", "test") or "test").strip().lower()
 
         self._write_status(
             {
@@ -299,8 +302,6 @@ class ActiveLearningPipeline:
                 "initial": {
                     "labeled": int(len(self.labeled_indices)),
                     "unlabeled": int(len(self.unlabeled_indices)),
-                    "val": int(len(self.val_indices)),
-                    "test": int(len(self.test_indices)),
                 },
             }
         )
@@ -370,12 +371,13 @@ class ActiveLearningPipeline:
                     "n_rounds": int(getattr(self.config, "N_ROUNDS", 0) or 0),
                     "random_seed": int(getattr(self.config, "RANDOM_SEED", 0) or 0),
                     "deterministic": bool(getattr(self.config, "DETERMINISTIC", True)),
+                    "train_split": self.train_split,
+                    "val_split": self.val_split,
+                    "test_split": self.test_split,
                 },
                 "counts": {
                     "labeled": int(len(self.labeled_indices)),
                     "unlabeled": int(len(self.unlabeled_indices)),
-                    "val": int(len(self.val_indices)),
-                    "test": int(len(self.test_indices)),
                 },
             }
         )
@@ -434,22 +436,6 @@ class ActiveLearningPipeline:
             f.write(line + "\n")
 
     def _resolve_pools_dir(self):
-        if (
-            getattr(self.config, "ALLOW_LEGACY_POOLS", False)
-            and self.run_id == "default"
-        ):
-            legacy = os.path.join(self.config.POOLS_DIR, self.experiment_name)
-            labeled = os.path.join(legacy, "labeled_pool.csv")
-            unlabeled = os.path.join(legacy, "unlabeled_pool.csv")
-            val = os.path.join(legacy, "val_pool.csv")
-            test = os.path.join(legacy, "test_pool.csv")
-            if (
-                os.path.exists(labeled)
-                or os.path.exists(unlabeled)
-                or os.path.exists(val)
-                or os.path.exists(test)
-            ):
-                return legacy
         return os.path.join(self.config.POOLS_DIR, self.run_id, self.experiment_name)
 
     def _map_filenames_to_indices(self, dataset, filenames):
@@ -473,39 +459,17 @@ class ActiveLearningPipeline:
             if hasattr(self, "unlabeled_df")
             else set()
         )
-        val_ids = (
-            set(self.val_df["sample_id"].tolist())
-            if hasattr(self, "val_df")
-            else set()
-        )
-        test_ids = (
-            set(self.test_df["sample_id"].tolist())
-            if hasattr(self, "test_df")
-            else set()
-        )
         overlap_l_u = len(labeled_ids.intersection(unlabeled_ids))
-        overlap_l_v = len(labeled_ids.intersection(val_ids))
-        overlap_l_t = len(labeled_ids.intersection(test_ids))
-        overlap_u_v = len(unlabeled_ids.intersection(val_ids))
-        overlap_u_t = len(unlabeled_ids.intersection(test_ids))
-        overlap_v_t = len(val_ids.intersection(test_ids))
-        union = labeled_ids.union(unlabeled_ids).union(val_ids).union(test_ids)
+        union = labeled_ids.union(unlabeled_ids)
         return {
             "counts": {
                 "labeled": int(len(labeled_ids)),
                 "unlabeled": int(len(unlabeled_ids)),
-                "val": int(len(val_ids)),
-                "test": int(len(test_ids)),
                 "union": int(len(union)),
                 "dataset": int(len(getattr(self.full_dataset, "images", []) or [])),
             },
             "overlaps": {
                 "labeled_unlabeled": int(overlap_l_u),
-                "labeled_val": int(overlap_l_v),
-                "labeled_test": int(overlap_l_t),
-                "unlabeled_val": int(overlap_u_v),
-                "unlabeled_test": int(overlap_u_t),
-                "val_test": int(overlap_v_t),
             },
         }
 
@@ -516,11 +480,6 @@ class ActiveLearningPipeline:
                 raise RuntimeError(f"Labeled pool is empty: {integrity}")
         ok = (
             integrity["overlaps"]["labeled_unlabeled"] == 0
-            and integrity["overlaps"]["labeled_val"] == 0
-            and integrity["overlaps"]["labeled_test"] == 0
-            and integrity["overlaps"]["unlabeled_val"] == 0
-            and integrity["overlaps"]["unlabeled_test"] == 0
-            and integrity["overlaps"]["val_test"] == 0
             and integrity["counts"]["union"] == integrity["counts"]["dataset"]
         )
         self._write_status({"pool_integrity": integrity, "pool_integrity_ok": bool(ok)})
@@ -538,6 +497,83 @@ class ActiveLearningPipeline:
             h.update(name.encode("utf-8", errors="ignore"))
             h.update(b"\n")
         return {"count": int(len(names)), "sha256": h.hexdigest()}
+
+    def _validate_pools_manifest(self):
+        import json
+        import hashlib
+
+        manifest_path = os.path.join(self.pools_dir, "pools_manifest.json")
+        if not os.path.exists(manifest_path):
+            raise RuntimeError(f"Pool manifest missing: {manifest_path}")
+        try:
+            with open(manifest_path, "r", encoding="utf-8") as f:
+                manifest = json.load(f)
+        except Exception as e:
+            raise RuntimeError(f"Failed to read pool manifest: {manifest_path} ({e})") from e
+
+        if not isinstance(manifest, dict) or int(manifest.get("schema_version") or 0) != 1:
+            raise RuntimeError(f"Unsupported pool manifest schema: {manifest_path}")
+
+        def _fingerprint_dir(img_dir: str, mask_dir: str | None) -> dict:
+            h = hashlib.sha256()
+            img_names = sorted([f for f in os.listdir(img_dir) if str(f).lower().endswith(".h5")])
+            for name in img_names:
+                h.update(str(name).encode("utf-8", errors="ignore"))
+                h.update(b"\n")
+            img_fp = {"count": int(len(img_names)), "sha256": str(h.hexdigest())}
+            if mask_dir is None:
+                return {"images": img_fp, "masks": None}
+            mh = hashlib.sha256()
+            mask_names = sorted([f for f in os.listdir(mask_dir) if str(f).lower().endswith(".h5")])
+            for name in mask_names:
+                mh.update(str(name).encode("utf-8", errors="ignore"))
+                mh.update(b"\n")
+            return {
+                "images": img_fp,
+                "masks": {"count": int(len(mask_names)), "sha256": str(mh.hexdigest())},
+            }
+
+        def _split_paths(split: str) -> tuple[str, str | None]:
+            s = str(split).strip().lower()
+            if s == "train":
+                return (
+                    os.path.join(self.config.DATA_DIR, "TrainData", "img"),
+                    os.path.join(self.config.DATA_DIR, "TrainData", "mask"),
+                )
+            if s == "val":
+                return (
+                    os.path.join(self.config.DATA_DIR, "ValidData", "img"),
+                    os.path.join(self.config.DATA_DIR, "ValidData", "mask"),
+                )
+            if s == "test":
+                return (
+                    os.path.join(self.config.DATA_DIR, "TestData", "img"),
+                    os.path.join(self.config.DATA_DIR, "TestData", "mask"),
+                )
+            raise RuntimeError(f"Unknown split for manifest validation: {split}")
+
+        splits = manifest.get("splits") if isinstance(manifest.get("splits"), dict) else {}
+        for s in ("train", "val"):
+            img_dir, mask_dir = _split_paths(s)
+            if not os.path.isdir(img_dir) or not os.path.isdir(mask_dir or ""):
+                raise RuntimeError(f"Missing required split directories for {s}: {img_dir} {mask_dir}")
+            actual = _fingerprint_dir(img_dir, mask_dir)
+            expected = splits.get(s)
+            if expected != actual:
+                raise RuntimeError(
+                    f"Pool manifest mismatch for split={s}: expected={expected} actual={actual} manifest={manifest_path}"
+                )
+
+        expected_test = splits.get("test")
+        if expected_test is not None:
+            img_dir, mask_dir = _split_paths("test")
+            if not os.path.isdir(img_dir) or not os.path.isdir(mask_dir or ""):
+                raise RuntimeError(f"Pool manifest expects test split but directories missing: {img_dir} {mask_dir}")
+            actual_test = _fingerprint_dir(img_dir, mask_dir)
+            if expected_test != actual_test:
+                raise RuntimeError(
+                    f"Pool manifest mismatch for split=test: expected={expected_test} actual={actual_test} manifest={manifest_path}"
+                )
 
     def _classify_error(self, message):
         text = (message or "").lower()
@@ -896,6 +932,20 @@ class ActiveLearningPipeline:
         with open(log_path, "a", encoding="utf-8") as f:
             f.write(content)
 
+    def _round_checkpoint_path(self, round_idx: int):
+        return os.path.join(self.round_model_dir, f"round_{int(round_idx):02d}_best_val.pt")
+
+    def _save_round_best_val_model(self, round_idx: int, state_dict: dict, metadata: dict):
+        path = self._round_checkpoint_path(round_idx)
+        tmp_path = f"{path}.tmp"
+        payload = {
+            "state_dict": state_dict,
+            "metadata": dict(metadata or {}),
+        }
+        torch.save(payload, tmp_path)
+        os.replace(tmp_path, path)
+        return path
+
     def _parse_log_resume_state(self, log_path):
         if not log_path or not os.path.exists(log_path):
             return None, None, None
@@ -944,7 +994,7 @@ class ActiveLearningPipeline:
         budget_history = []
         best_miou_so_far = 0.0
         final_report = None
-        final_report_split = None
+        test_split = None
 
         start_mode = getattr(self.config, "START_MODE", "resume")
 
@@ -994,11 +1044,10 @@ class ActiveLearningPipeline:
                             "BUDGET_RATIO",
                             "TOTAL_BUDGET",
                             "INITIAL_LABELED_SIZE",
-                            "INTERNAL_VAL_SIZE",
-                            "INTERNAL_TEST_SIZE",
-                            "CLOSED_LOOP_SPLIT",
-                            "REPORT_SPLIT",
-                            "NO_TEST_DURING_TRAINING",
+                            "TRAIN_SPLIT",
+                            "VAL_SPLIT",
+                            "TEST_SPLIT",
+                            "MODEL_SELECTION",
                             "N_ROUNDS",
                             "QUERY_SIZE",
                             "EPOCHS_PER_ROUND",
@@ -1229,129 +1278,270 @@ class ActiveLearningPipeline:
                 labeled_subset = Subset(self.full_dataset, self.labeled_indices)
 
                 train_num_workers = int(getattr(self.config, "NUM_WORKERS", 0) or 0)
-                train_loader_kwargs = {
-                    "batch_size": self.config.BATCH_SIZE,
-                    "shuffle": True,
-                    "num_workers": train_num_workers,
-                    "persistent_workers": bool(train_num_workers > 0 and getattr(self.config, "PERSISTENT_WORKERS", False)),
-                    "drop_last": True,
-                    "generator": g,
-                    "worker_init_fn": worker_init_fn,
-                    "pin_memory": bool(getattr(self.config, "PIN_MEMORY", False)),
-                }
-                if train_num_workers > 0:
-                    train_loader_kwargs["prefetch_factor"] = int(getattr(self.config, "PREFETCH_FACTOR", 2) or 2)
+                train_loader_kwargs = self._build_loader_kwargs(
+                    batch_size=self.config.BATCH_SIZE,
+                    shuffle=True,
+                    num_workers=train_num_workers,
+                    generator=g,
+                    worker_init_fn=worker_init_fn,
+                    drop_last=True,
+                    pin_memory=bool(getattr(self.config, "PIN_MEMORY", False)),
+                    persistent_workers=bool(getattr(self.config, "PERSISTENT_WORKERS", False)),
+                    prefetch_factor=int(getattr(self.config, "PREFETCH_FACTOR", 2) or 2),
+                )
                 labeled_loader = DataLoader(labeled_subset, **train_loader_kwargs)
 
-                closed_loop_split = str(getattr(self.config, "CLOSED_LOOP_SPLIT", "internal_val") or "internal_val").strip().lower()
-                use_official_val = closed_loop_split in ("val", "valid", "official_val", "l4s_val")
-                if use_official_val:
-                    val_dataset = Landslide4SenseDataset(self.config.DATA_DIR, split="val")
-                else:
-                    val_dataset = Subset(self.full_dataset, self.val_indices)
-                    if len(self.val_indices) <= 0:
-                        raise RuntimeError("val_pool.csv is empty (closed-loop validation split required)")
-                val_loader_kwargs = {
-                    "batch_size": self.config.BATCH_SIZE,
-                    "shuffle": False,
-                    "num_workers": train_num_workers,
-                    "persistent_workers": bool(train_num_workers > 0 and getattr(self.config, "PERSISTENT_WORKERS", False)),
-                    "generator": g,
-                    "worker_init_fn": worker_init_fn,
-                    "pin_memory": bool(getattr(self.config, "PIN_MEMORY", False)),
-                }
-                if train_num_workers > 0:
-                    val_loader_kwargs["prefetch_factor"] = int(getattr(self.config, "PREFETCH_FACTOR", 2) or 2)
+                val_dataset = Landslide4SenseDataset(self.config.DATA_DIR, split=self.val_split)
+                val_loader_kwargs = self._build_loader_kwargs(
+                    batch_size=self.config.BATCH_SIZE,
+                    shuffle=False,
+                    num_workers=train_num_workers,
+                    generator=g,
+                    worker_init_fn=worker_init_fn,
+                    drop_last=False,
+                    pin_memory=bool(getattr(self.config, "PIN_MEMORY", False)),
+                    persistent_workers=bool(getattr(self.config, "PERSISTENT_WORKERS", False)),
+                    prefetch_factor=int(getattr(self.config, "PREFETCH_FACTOR", 2) or 2),
+                )
                 val_loader = DataLoader(val_dataset, **val_loader_kwargs)
+                val_eval_source = "official_val" if str(self.val_split) == "val" else "val"
+
+                model_selection = str(
+                    getattr(self.config, "MODEL_SELECTION", "last_epoch") or "last_epoch"
+                ).strip().lower()
+                if model_selection not in ("last_epoch", "best_val"):
+                    raise ValueError(
+                        f"Unsupported MODEL_SELECTION={model_selection}. Expected 'last_epoch' or 'best_val'."
+                    )
+                is_test_only_round = bool(round_idx == self.config.N_ROUNDS - 1)
+                selected_from_round = int(round_idx + 1)
 
                 best_miou = 0.0
                 best_f1 = 0.0
+                best_epoch = None
+                best_state_dict = None
+                last_miou_epoch = 0.0
+                last_f1_epoch = 0.0
                 epoch_mious = []
                 grad_tvc_values = []
-                for epoch in range(self.config.EPOCHS_PER_ROUND):
-                    grad = None
-                    out = trainer.train_one_epoch(
-                        labeled_loader,
-                        grad_probe_loader=(
-                            val_loader
-                            if getattr(self.config, "GRAD_LOG_VAL_ALIGNMENT", False)
-                            else None
-                        ),
-                    )
+                if not is_test_only_round:
+                    for epoch in range(self.config.EPOCHS_PER_ROUND):
+                        grad = None
+                        out = trainer.train_one_epoch(
+                            labeled_loader,
+                            grad_probe_loader=(
+                                val_loader
+                                if getattr(self.config, "GRAD_LOG_VAL_ALIGNMENT", False)
+                                else None
+                            ),
+                        )
 
-                    if isinstance(out, tuple) and len(out) == 2:
-                        loss, grad = out
-                    else:
-                        loss = out
+                        if isinstance(out, tuple) and len(out) == 2:
+                            loss, grad = out
+                        else:
+                            loss = out
 
-                    if isinstance(grad, dict) and grad.get("train_val_cos") is not None:
-                        grad_tvc_values.append(float(grad.get("train_val_cos")))
-                    metrics = trainer.evaluate(val_loader)
-                    epoch_mious.append(float(metrics.get("mIoU", 0.0)))
-                    logger.info(
-                        f"Epoch {epoch + 1}: Loss={loss:.4f}, mIoU={metrics['mIoU']:.4f}, F1={metrics['f1_score']:.4f}"
-                    )
-                    self._append_md(
-                        log_path,
-                        f"- Epoch {epoch + 1}: Loss={loss:.4f}, mIoU={metrics['mIoU']:.4f}, F1={metrics['f1_score']:.4f}\n",
-                    )
-                    if metrics["mIoU"] > best_miou:
-                        best_miou = metrics["mIoU"]
-                        best_f1 = metrics["f1_score"]
+                        if isinstance(grad, dict) and grad.get("train_val_cos") is not None:
+                            grad_tvc_values.append(float(grad.get("train_val_cos")))
+                        metrics = trainer.evaluate(val_loader)
+                        last_miou_epoch = float(metrics.get("mIoU", 0.0))
+                        last_f1_epoch = float(metrics.get("f1_score", 0.0))
+                        epoch_mious.append(float(last_miou_epoch))
+                        logger.info(
+                            f"Epoch {epoch + 1}: Loss={loss:.4f}, mIoU={metrics['mIoU']:.4f}, F1={metrics['f1_score']:.4f}"
+                        )
+                        self._append_md(
+                            log_path,
+                            f"- Epoch {epoch + 1}: Loss={loss:.4f}, mIoU={metrics['mIoU']:.4f}, F1={metrics['f1_score']:.4f}\n",
+                        )
+                        if metrics["mIoU"] > best_miou:
+                            best_miou = metrics["mIoU"]
+                            best_f1 = metrics["f1_score"]
+                            best_epoch = int(epoch + 1)
+                            best_state_dict = {
+                                k: v.detach().cpu().clone()
+                                for k, v in trainer.model.state_dict().items()
+                            }
 
-                    warnings = []
-                    import math
+                        warnings = []
+                        import math
 
-                    if not math.isfinite(float(loss)):
-                        warnings.append("loss_not_finite")
-                    if not math.isfinite(float(metrics.get("mIoU", 0.0))):
-                        warnings.append("miou_not_finite")
-                    if not math.isfinite(float(metrics.get("f1_score", 0.0))):
-                        warnings.append("f1_not_finite")
+                        if not math.isfinite(float(loss)):
+                            warnings.append("loss_not_finite")
+                        if not math.isfinite(float(metrics.get("mIoU", 0.0))):
+                            warnings.append("miou_not_finite")
+                        if not math.isfinite(float(metrics.get("f1_score", 0.0))):
+                            warnings.append("f1_not_finite")
+                        if warnings and bool(getattr(self.config, "FAIL_ON_NONFINITE", True)):
+                            raise RuntimeError(
+                                f"Non-finite metrics detected at round={int(round_idx + 1)} epoch={int(epoch + 1)} warnings={warnings}"
+                            )
 
-                    self._write_status(
-                        {
-                            "status": "running",
-                            "progress": {
+                        self._write_status(
+                            {
+                                "status": "running",
+                                "progress": {
+                                    "round": int(round_idx + 1),
+                                    "epoch": int(epoch + 1),
+                                    "labeled_size": int(len(self.labeled_indices)),
+                                    "loss": float(loss),
+                                    "mIoU": float(metrics["mIoU"]),
+                                    "f1": float(metrics["f1_score"]),
+                                    "best_mIoU_round": float(best_miou),
+                                    "warnings": warnings,
+                                },
+                            }
+                        )
+                        self._append_trace(
+                            {
+                                "type": "epoch_end",
                                 "round": int(round_idx + 1),
                                 "epoch": int(epoch + 1),
                                 "labeled_size": int(len(self.labeled_indices)),
                                 "loss": float(loss),
                                 "mIoU": float(metrics["mIoU"]),
                                 "f1": float(metrics["f1_score"]),
-                                "best_mIoU_round": float(best_miou),
+                                "eval_source": str(val_eval_source),
+                                "eval_split": str(self.val_split),
+                                "eval_img_dir": getattr(val_dataset, "img_dir", None),
+                                "eval_mask_dir": getattr(val_dataset, "mask_dir", None),
                                 "warnings": warnings,
-                            },
-                        }
+                                "grad": grad,
+                            }
+                        )
+
+                    selected_epoch = int(self.config.EPOCHS_PER_ROUND)
+                    selected_miou = float(last_miou_epoch)
+                    selected_f1 = float(last_f1_epoch)
+                    if best_state_dict is None or best_epoch is None:
+                        raise RuntimeError("No best validation checkpoint was captured in this round")
+                    if model_selection == "best_val":
+                        trainer.model.load_state_dict(best_state_dict, strict=True)
+                        selected_epoch = int(best_epoch)
+                        selected_miou = float(best_miou)
+                        selected_f1 = float(best_f1)
+
+                    round_best_ckpt_path = self._save_round_best_val_model(
+                        int(round_idx + 1),
+                        best_state_dict,
+                        {
+                            "run_id": str(self.run_id),
+                            "experiment_name": str(self.experiment_name),
+                            "round": int(round_idx + 1),
+                            "labeled_size": int(len(self.labeled_indices)),
+                            "best_epoch": int(best_epoch),
+                            "best_miou": float(best_miou),
+                            "best_f1": float(best_f1),
+                            "selected_epoch": int(selected_epoch),
+                            "selected_miou": float(selected_miou),
+                            "selected_f1": float(selected_f1),
+                            "model_selection": str(model_selection),
+                            "eval_source": str(val_eval_source),
+                            "eval_split": str(self.val_split),
+                        },
                     )
                     self._append_trace(
                         {
-                            "type": "epoch_end",
+                            "type": "round_best_val_checkpoint",
                             "round": int(round_idx + 1),
-                            "epoch": int(epoch + 1),
-                            "labeled_size": int(len(self.labeled_indices)),
-                            "loss": float(loss),
-                            "mIoU": float(metrics["mIoU"]),
-                            "f1": float(metrics["f1_score"]),
-                            "warnings": warnings,
-                            "grad": grad,
+                            "path": str(round_best_ckpt_path),
+                            "best_epoch": int(best_epoch),
+                            "best_miou": float(best_miou),
+                            "best_f1": float(best_f1),
+                        }
+                    )
+                else:
+                    previous_round = int(round_idx)
+                    if previous_round <= 0:
+                        raise RuntimeError("Final test-only round requires previous training round")
+                    previous_round_path = self._round_checkpoint_path(previous_round)
+                    if not os.path.exists(previous_round_path):
+                        raise RuntimeError(
+                            f"Missing previous round best checkpoint for final test-only round: {previous_round_path}"
+                        )
+                    payload = torch.load(previous_round_path, map_location="cpu")
+                    if not isinstance(payload, dict) or "state_dict" not in payload:
+                        raise RuntimeError(
+                            f"Invalid previous round checkpoint payload: {previous_round_path}"
+                        )
+                    previous_state = payload.get("state_dict")
+                    if not isinstance(previous_state, dict):
+                        raise RuntimeError(
+                            f"Invalid state_dict in previous round checkpoint: {previous_round_path}"
+                        )
+                    trainer.model.load_state_dict(previous_state, strict=True)
+                    meta = payload.get("metadata")
+                    if not isinstance(meta, dict):
+                        meta = {}
+                    selected_from_round = int(previous_round)
+                    model_selection = "prev_round_best_val"
+                    selected_epoch = int(
+                        meta.get("best_epoch")
+                        or meta.get("selected_epoch")
+                        or int(getattr(self.config, "EPOCHS_PER_ROUND", 0) or 0)
+                    )
+                    selected_miou = float(
+                        meta.get("best_miou")
+                        if meta.get("best_miou") is not None
+                        else meta.get("selected_miou", 0.0)
+                    )
+                    selected_f1 = float(
+                        meta.get("best_f1")
+                        if meta.get("best_f1") is not None
+                        else meta.get("selected_f1", 0.0)
+                    )
+                    best_epoch = int(selected_epoch)
+                    best_miou = float(selected_miou)
+                    best_f1 = float(selected_f1)
+                    best_state_dict = previous_state
+                    round_best_ckpt_path = str(previous_round_path)
+                    logger.info(
+                        f"Round {round_idx + 1} uses test-only mode: load Round {selected_from_round} best_val checkpoint "
+                        f"(epoch={selected_epoch}, val_mIoU={selected_miou:.4f}, val_F1={selected_f1:.4f})"
+                    )
+                    self._append_md(
+                        log_path,
+                        f"- Test-only mode: Round {round_idx + 1} loads Round {selected_from_round} best_val checkpoint "
+                        f"(epoch={selected_epoch}, val_mIoU={selected_miou:.4f}, val_F1={selected_f1:.4f})\n",
+                    )
+                    self._append_trace(
+                        {
+                            "type": "final_round_test_only_load",
+                            "round": int(round_idx + 1),
+                            "selected_from_round": int(selected_from_round),
+                            "path": str(previous_round_path),
+                            "selected_epoch": int(selected_epoch),
+                            "selected_miou": float(selected_miou),
+                            "selected_f1": float(selected_f1),
                         }
                     )
 
                 performance_history.append(
                     {
                         "round": round_idx + 1,
-                        "mIoU": float(best_miou),
-                        "f1_score": float(best_f1),
+                        "mIoU": float(selected_miou),
+                        "f1_score": float(selected_f1),
                         "labeled_size": len(self.labeled_indices),
+                        "model_selection": str(model_selection),
+                        "selected_epoch": int(selected_epoch),
+                        "selected_from_round": int(selected_from_round),
+                        "best_val_epoch": int(best_epoch),
+                        "best_val_mIoU": float(best_miou),
+                        "best_val_f1": float(best_f1),
+                        "best_val_checkpoint": str(round_best_ckpt_path),
                     }
                 )
-                if best_miou > best_miou_so_far:
-                    best_miou_so_far = float(best_miou)
+                if float(selected_miou) > best_miou_so_far:
+                    best_miou_so_far = float(selected_miou)
                 budget_history.append(len(self.labeled_indices))
+                selection_audit = (
+                    f"{model_selection} (source_round={selected_from_round}, epoch={selected_epoch})"
+                    if int(selected_from_round) != int(round_idx + 1)
+                    else f"{model_selection} (epoch={selected_epoch})"
+                )
                 self._append_md(
                     log_path,
-                    f"\n当前轮次最佳结果: Round={round_idx + 1}, Labeled={len(self.labeled_indices)}, mIoU={best_miou:.4f}, F1={best_f1:.4f}\n\n",
+                    f"\n本轮结果: Round={round_idx + 1}, Labeled={len(self.labeled_indices)}, Selection={selection_audit}, mIoU={selected_miou:.4f}, F1={selected_f1:.4f}, peak_mIoU={best_miou:.4f}\n\nRound={round_idx + 1}, Labeled={len(self.labeled_indices)}, mIoU={selected_miou:.4f}, F1={selected_f1:.4f}\n\n",
                 )
 
                 # --- 基础设施增强: 无论是否使用 Agent，都计算并记录过拟合信号 (TVC) ---
@@ -1429,9 +1619,16 @@ class ActiveLearningPipeline:
                         )
 
                 raw_signal_key = (
-                    str(miou_policy.get("miou_signal", "peak")).strip().lower()
+                    str(
+                        miou_policy.get(
+                            "miou_signal",
+                            "last_epoch" if model_selection == "last_epoch" else "peak",
+                        )
+                    )
+                    .strip()
+                    .lower()
                     if miou_policy
-                    else "peak"
+                    else ("last" if model_selection == "last_epoch" else "peak")
                 )
                 signal_alias = {
                     "miou_ema": "ema",
@@ -1524,6 +1721,10 @@ class ActiveLearningPipeline:
                     "miou_last_epoch": float(miou_last_epoch),
                     "miou_last_k_mean": float(miou_last_k_mean),
                     "miou_ema": float(miou_ema) if miou_ema is not None else None,
+                    "model_selection": str(model_selection),
+                    "selected_epoch": int(selected_epoch),
+                    "selected_miou": float(selected_miou),
+                    "selected_f1": float(selected_f1),
                     "rollback_flag": bool(rollback_flag),
                     "rollback_mode": rollback_mode,
                     "rollback_threshold": float(rollback_threshold_used)
@@ -1547,31 +1748,69 @@ class ActiveLearningPipeline:
                     self.toolbox.set_training_state(training_state)
 
                 report_metrics = None
-                report_split = str(getattr(self.config, "REPORT_SPLIT", "") or "").strip().lower()
-                if report_split in ("none", "off", "disabled", "null"):
-                    report_split = ""
-                if report_split and report_split not in ("internal_test", "test"):
-                    raise RuntimeError(f"Unsupported REPORT_SPLIT for Route A: {report_split}")
-                no_test_guard = bool(getattr(self.config, "NO_TEST_DURING_TRAINING", False))
-                if report_split and no_test_guard and round_idx != self.config.N_ROUNDS - 1:
-                    raise RuntimeError("REPORT_SPLIT is only allowed on the final round")
-                if report_split and round_idx == self.config.N_ROUNDS - 1:
-                    report_dataset = None
-                    if report_split in ("internal_test", "test"):
-                        report_dataset = Subset(self.full_dataset, self.test_indices)
-                    if report_dataset is not None:
-                        report_loader = DataLoader(report_dataset, **val_loader_kwargs)
-                        report_metrics = trainer.evaluate(report_loader)
-                        final_report = dict(report_metrics) if isinstance(report_metrics, dict) else report_metrics
-                        final_report_split = report_split
-                        self._append_trace(
-                            {
-                                "type": "report_eval",
-                                "round": int(round_idx + 1),
-                                "report_split": report_split,
-                                "metrics": dict(report_metrics) if isinstance(report_metrics, dict) else report_metrics,
-                            }
+                report_miou = None
+                report_f1 = None
+                is_final_round = round_idx == self.config.N_ROUNDS - 1
+                if is_final_round:
+                    report_dataset = Landslide4SenseDataset(self.config.DATA_DIR, split=self.test_split)
+                    mask_dir = getattr(report_dataset, "mask_dir", None)
+                    mask_map = getattr(report_dataset, "_mask_by_id", None)
+                    if (
+                        mask_dir is None
+                        or not isinstance(mask_map, dict)
+                        or int(len(mask_map)) <= 0
+                    ):
+                        raise RuntimeError(
+                            "TestData/mask is missing; cannot run final report evaluation"
                         )
+                    missing_mask_ids = []
+                    for image_name in getattr(report_dataset, "images", []) or []:
+                        sid = os.path.splitext(str(image_name))[0]
+                        if sid not in mask_map:
+                            missing_mask_ids.append(sid)
+                            if len(missing_mask_ids) >= 3:
+                                break
+                    if missing_mask_ids:
+                        raise RuntimeError(
+                            f"TestData/mask is incomplete; missing mask for sample_ids={missing_mask_ids}"
+                        )
+                    report_loader = DataLoader(report_dataset, **val_loader_kwargs)
+                    report_metrics = trainer.evaluate(report_loader)
+                    if isinstance(report_metrics, dict):
+                        try:
+                            report_miou = float(report_metrics.get("mIoU", 0.0))
+                        except Exception:
+                            report_miou = None
+                        try:
+                            report_f1 = float(report_metrics.get("f1_score", 0.0))
+                        except Exception:
+                            report_f1 = None
+                    final_report = dict(report_metrics) if isinstance(report_metrics, dict) else report_metrics
+                    test_split = str(self.test_split)
+                    if isinstance(self._last_training_state, dict) and report_miou is not None and report_f1 is not None:
+                        training_state_with_report = dict(self._last_training_state)
+                        training_state_with_report["report_split"] = "test"
+                        training_state_with_report["report_eval_source"] = (
+                            "official_test" if str(self.test_split) == "test" else "test"
+                        )
+                        training_state_with_report["report_miou"] = float(report_miou)
+                        training_state_with_report["report_f1"] = float(report_f1)
+                        self._last_training_state = training_state_with_report
+                    self._append_trace(
+                        {
+                            "type": "report_eval",
+                            "round": int(round_idx + 1),
+                            "report_split": "test",
+                            "eval_source": "official_test" if str(self.test_split) == "test" else "test",
+                            "eval_split": str(self.test_split),
+                            "eval_img_dir": getattr(report_dataset, "img_dir", None),
+                            "eval_mask_dir": getattr(report_dataset, "mask_dir", None),
+                            "model_selection": str(model_selection),
+                            "selected_epoch": int(selected_epoch),
+                            "selected_from_round": int(selected_from_round),
+                            "metrics": dict(report_metrics) if isinstance(report_metrics, dict) else report_metrics,
+                        }
+                    )
 
                 if round_idx < self.config.N_ROUNDS - 1:
                     new_indices = self._query_samples(trainer.model)
@@ -1611,15 +1850,15 @@ class ActiveLearningPipeline:
                             early_stop = True
                     self._append_round_summary(
                         int(round_idx + 1),
-                        float(best_miou),
-                        float(best_f1),
+                        float(selected_miou),
+                        float(selected_f1),
                         int(len(self.labeled_indices)),
                     )
                 else:
                     self._append_round_summary(
                         int(round_idx + 1),
-                        float(best_miou),
-                        float(best_f1),
+                        float(report_miou) if report_miou is not None else float(selected_miou),
+                        float(report_f1) if report_f1 is not None else float(selected_f1),
                         int(len(self.labeled_indices)),
                     )
 
@@ -1636,6 +1875,12 @@ class ActiveLearningPipeline:
                     ),  # Crucial for rollback
                     "unlabeled_size": int(len(self.unlabeled_indices)),
                     "rng_states": self._get_rng_states(),  # Reproducibility
+                    "model_selection": str(model_selection),
+                    "selected_epoch": int(selected_epoch),
+                    "selected_from_round": int(selected_from_round),
+                    "best_val_epoch": int(best_epoch),
+                    "best_val_miou": float(best_miou),
+                    "best_val_checkpoint": str(round_best_ckpt_path),
                 }
                 if self.use_agent and self.agent_manager:
                     state_dict["pending_round_controls"] = dict(
@@ -1711,18 +1956,33 @@ class ActiveLearningPipeline:
             total_budget=int(getattr(self.config, "TOTAL_BUDGET", 0) or 0),
             pad_to_total_budget=True,
         )
+        final_report_miou = None
+        final_report_f1 = None
+        if isinstance(final_report, dict):
+            try:
+                final_report_miou = float(final_report.get("mIoU", 0.0))
+            except Exception:
+                final_report_miou = None
+            try:
+                final_report_f1 = float(final_report.get("f1_score", 0.0))
+            except Exception:
+                final_report_f1 = None
         result = {
             "performance_history": performance_history,
             "budget_history": budget_history,
             "alc": float(alc),
-            "final_miou": float(performance_history[-1]["mIoU"]),
-            "final_f1": float(performance_history[-1]["f1_score"]),
-            "final_report_split": final_report_split,
+            "final_miou": float(final_report_miou)
+            if final_report_miou is not None
+            else float(performance_history[-1]["mIoU"]),
+            "final_f1": float(final_report_f1)
+            if final_report_f1 is not None
+            else float(performance_history[-1]["f1_score"]),
+            "test_split": test_split,
             "final_report": final_report,
         }
         self._append_md(
             log_path,
-            f"\n## 实验汇总\n\n预算历史: {budget_history}\nALC: {result['alc']:.4f}\n最终 mIoU: {result['final_miou']:.4f}\n最终 F1: {result['final_f1']:.4f}\n最终 Report Split: {result['final_report_split']}\n最终 Report: {result['final_report']}\n",
+            f"\n## 实验汇总\n\n预算历史: {budget_history}\nALC: {result['alc']:.4f}\n最终 mIoU: {result['final_miou']:.4f}\n最终 F1: {result['final_f1']:.4f}\n最终 Test Split: {result['test_split']}\n最终 Report: {result['final_report']}\n",
         )
         self._write_status(
             {
@@ -1736,6 +1996,33 @@ class ActiveLearningPipeline:
             }
         )
         return result
+
+    def _build_loader_kwargs(
+        self,
+        *,
+        batch_size,
+        shuffle,
+        num_workers,
+        generator,
+        worker_init_fn,
+        drop_last=False,
+        pin_memory=False,
+        persistent_workers=False,
+        prefetch_factor=2,
+    ):
+        kwargs = {
+            "batch_size": batch_size,
+            "shuffle": bool(shuffle),
+            "num_workers": int(num_workers),
+            "persistent_workers": bool(int(num_workers) > 0 and bool(persistent_workers)),
+            "drop_last": bool(drop_last),
+            "generator": generator,
+            "worker_init_fn": worker_init_fn,
+            "pin_memory": bool(pin_memory),
+        }
+        if int(num_workers) > 0:
+            kwargs["prefetch_factor"] = int(prefetch_factor or 2)
+        return kwargs
 
     def _cleanup_loader(self, loader):
         """显式清理 DataLoader 资源"""
@@ -1913,27 +2200,24 @@ class ActiveLearningPipeline:
         if hasattr(self.sampler, "set_round"):
             self.sampler.set_round(self.current_round)
         if isinstance(self.sampler, BALDSampler):
-            subset_u = Subset(self.full_dataset, self.unlabeled_indices)
+            subset_u = Subset(self.query_dataset, self.unlabeled_indices)
             feature_workers = int(getattr(self.config, "FEATURE_NUM_WORKERS", 0) or 0)
-            loader_kwargs = {
-                "batch_size": self.config.BATCH_SIZE,
-                "shuffle": False,
-                "num_workers": feature_workers,
-                "persistent_workers": bool(
-                    feature_workers > 0
-                    and getattr(self.config, "FEATURE_PERSISTENT_WORKERS", False)
-                ),
-                "pin_memory": bool(getattr(self.config, "FEATURE_PIN_MEMORY", False)),
-            }
-            if feature_workers > 0:
-                loader_kwargs["prefetch_factor"] = int(
-                    getattr(self.config, "FEATURE_PREFETCH_FACTOR", 2) or 2
-                )
             seed_base = int(self.seed) + int(self.current_round or 0)
             g = torch.Generator()
             g.manual_seed(seed_base)
-            loader_kwargs["generator"] = g
-            loader_kwargs["worker_init_fn"] = worker_init_fn
+            loader_kwargs = self._build_loader_kwargs(
+                batch_size=self.config.BATCH_SIZE,
+                shuffle=False,
+                num_workers=feature_workers,
+                generator=g,
+                worker_init_fn=worker_init_fn,
+                drop_last=False,
+                pin_memory=bool(getattr(self.config, "FEATURE_PIN_MEMORY", False)),
+                persistent_workers=bool(
+                    getattr(self.config, "FEATURE_PERSISTENT_WORKERS", False)
+                ),
+                prefetch_factor=int(getattr(self.config, "FEATURE_PREFETCH_FACTOR", 2) or 2),
+            )
             loader_u = DataLoader(subset_u, **loader_kwargs)
             sample_indices = list(self.unlabeled_indices)
             try:
@@ -2032,108 +2316,6 @@ class ActiveLearningPipeline:
                 or None
             )
         return [item["sample_id"] for item in ranked]
-
-    def _postprocess_ranked_ids(self, ranked, unlabeled_info):
-        if not ranked:
-            return [], {"applied": False, "reason": "empty_ranked"}
-        post_cfg = (
-            self.exp_config.get("selection_postprocess")
-            if isinstance(self.exp_config, dict)
-            else None
-        )
-        if not isinstance(post_cfg, dict):
-            return [item["sample_id"] for item in ranked], {"applied": False}
-        mode = str(post_cfg.get("mode", "none")).strip().lower()
-        if mode in ("none", ""):
-            return [item["sample_id"] for item in ranked], {"applied": False}
-        n_samples = int(self.config.QUERY_SIZE)
-        candidate_multiplier = int(post_cfg.get("candidate_multiplier", 5))
-        top_m = max(int(n_samples), int(candidate_multiplier) * int(n_samples))
-        ranked = list(ranked[:top_m])
-        constraints = (
-            self.exp_config.get("candidate_constraints")
-            if isinstance(self.exp_config, dict)
-            else None
-        )
-        pos_selected = 0
-        neg_selected = 0
-        selected_items = []
-        if isinstance(constraints, dict) and bool(constraints.get("use_pred_pos_area", False)):
-            pos_class = int(constraints.get("pos_class", 1))
-            pos_threshold = float(constraints.get("pos_threshold", 0.5))
-            pos_area_min = float(constraints.get("pos_area_min", 0.001))
-            pos_ratio = float(constraints.get("pos_quota_ratio", 0.5))
-            pos_items = []
-            neg_items = []
-            for item in ranked:
-                sid = item.get("sample_id")
-                pos_area = 0.0
-                info = (
-                    unlabeled_info.get(sid, {}) if isinstance(unlabeled_info, dict) else {}
-                )
-                if isinstance(info, dict) and info.get("pos_area") is not None:
-                    try:
-                        pos_area = float(info.get("pos_area") or 0.0)
-                    except Exception:
-                        pos_area = 0.0
-                else:
-                    prob_map = info.get("prob_map") if isinstance(info, dict) else None
-                    if prob_map is not None:
-                        try:
-                            channel = prob_map[pos_class]
-                            pos_area = float(np.mean(channel > pos_threshold))
-                        except Exception:
-                            pos_area = 0.0
-                if pos_area >= pos_area_min:
-                    pos_items.append(item)
-                else:
-                    neg_items.append(item)
-            quota = int(round(float(n_samples) * float(pos_ratio)))
-            quota = max(0, min(int(n_samples), quota))
-            selected_items = self._select_diverse_items(
-                pos_items, unlabeled_info, quota, post_cfg
-            )
-            pos_selected = len(selected_items)
-            remaining = int(n_samples) - len(selected_items)
-            if remaining > 0:
-                rest_pool = neg_items + [i for i in pos_items if i not in selected_items]
-                rest_selected = self._select_diverse_items(
-                    rest_pool, unlabeled_info, remaining, post_cfg
-                )
-                neg_selected = len(rest_selected)
-                selected_items.extend(rest_selected)
-        else:
-            selected_items = self._select_diverse_items(
-                ranked, unlabeled_info, int(n_samples), post_cfg
-            )
-        selected_ids = [item["sample_id"] for item in selected_items]
-        if len(selected_ids) < int(n_samples):
-            seen = set(selected_ids)
-            for item in ranked:
-                sid = item["sample_id"]
-                if sid not in seen:
-                    selected_ids.append(sid)
-                    seen.add(sid)
-                if len(selected_ids) >= int(n_samples):
-                    break
-        remaining_ids = [item["sample_id"] for item in ranked if item["sample_id"] not in set(selected_ids)]
-        meta = {
-            "applied": True,
-            "mode": mode,
-            "candidate_multiplier": int(candidate_multiplier),
-            "candidate_size": int(len(ranked)),
-        }
-        if isinstance(constraints, dict) and bool(constraints.get("use_pred_pos_area", False)):
-            meta.update(
-                {
-                    "pos_quota_ratio": float(constraints.get("pos_quota_ratio", 0.5)),
-                    "pos_selected": int(pos_selected),
-                    "neg_selected": int(neg_selected),
-                    "pos_area_min": float(constraints.get("pos_area_min", 0.001)),
-                    "pos_threshold": float(constraints.get("pos_threshold", 0.5)),
-                }
-            )
-        return list(selected_ids) + list(remaining_ids), meta
 
     def _select_diverse_items(self, items, unlabeled_info, k, post_cfg):
         if not items or int(k) <= 0:
@@ -2281,23 +2463,14 @@ class ActiveLearningPipeline:
 
         labeled_path = os.path.join(pools_dir, "labeled_pool.csv")
         unlabeled_path = os.path.join(pools_dir, "unlabeled_pool.csv")
-        val_path = os.path.join(pools_dir, "val_pool.csv")
-        test_path = os.path.join(pools_dir, "test_pool.csv")
 
-        if (
-            (not os.path.exists(labeled_path))
-            or (not os.path.exists(unlabeled_path))
-            or (not os.path.exists(val_path))
-            or (not os.path.exists(test_path))
-        ):
+        if (not os.path.exists(labeled_path)) or (not os.path.exists(unlabeled_path)):
             raise FileNotFoundError(
-                f"Pool state files not found in {pools_dir} (required: labeled/unlabeled/val/test)"
+                f"Pool state files not found in {pools_dir} (required: labeled/unlabeled)"
             )
 
         self.labeled_df = pd.read_csv(labeled_path)
         self.unlabeled_df = pd.read_csv(unlabeled_path)
-        self.val_df = pd.read_csv(val_path)
-        self.test_df = pd.read_csv(test_path)
 
         self.labeled_indices = self._map_filenames_to_indices(
             self.full_dataset, self.labeled_df["sample_id"].tolist()
@@ -2306,15 +2479,8 @@ class ActiveLearningPipeline:
             self.full_dataset, self.unlabeled_df["sample_id"].tolist()
         )
 
-        self.val_indices = self._map_filenames_to_indices(
-            self.full_dataset, self.val_df["sample_id"].tolist()
-        )
-        self.test_indices = self._map_filenames_to_indices(
-            self.full_dataset, self.test_df["sample_id"].tolist()
-        ) if (hasattr(self, "test_df") and (not self.test_df.empty)) else []
-
         logger.info(
-            f"Loaded pool states: Labeled={len(self.labeled_indices)}, Unlabeled={len(self.unlabeled_indices)}, Val={len(self.val_indices)}, Test={len(self.test_indices)}"
+            f"Loaded pool states: Labeled={len(self.labeled_indices)}, Unlabeled={len(self.unlabeled_indices)}"
         )
         self._assert_pool_integrity()
         return True
@@ -2421,9 +2587,7 @@ class ActiveLearningPipeline:
         self.labeled_df = valid_labeled_df
 
         # 2. Reconstruct Unlabeled Pool
-        # Unlabeled = Full Dataset - Labeled - Val - Test
-        # We rely on indices logic for this.
-        # But here we need to write the CSV.
+        # Unlabeled = Full Dataset - Labeled
 
         # Get all sample IDs from full dataset
         all_samples = [
@@ -2431,19 +2595,9 @@ class ActiveLearningPipeline:
             for x in getattr(self.full_dataset, "images", [])
         ]
         labeled_ids = set(valid_labeled_df["sample_id"].tolist())
-        val_ids = (
-            set(self.val_df["sample_id"].tolist()) if hasattr(self, "val_df") else set()
-        )
-        test_ids = (
-            set(self.test_df["sample_id"].tolist())
-            if hasattr(self, "test_df")
-            else set()
-        )
 
         unlabeled_ids = [
-            s
-            for s in all_samples
-            if s not in labeled_ids and s not in val_ids and s not in test_ids
+            s for s in all_samples if s not in labeled_ids
         ]
 
         # Create unlabeled DataFrame
@@ -2545,24 +2699,160 @@ class ActiveLearningPipeline:
         os.replace(labeled_tmp, labeled_path)
         os.replace(unlabeled_tmp, unlabeled_path)
 
+    def _unpack_images(self, batch):
+        if isinstance(batch, dict):
+            return batch.get("image")
+        if isinstance(batch, (list, tuple)):
+            return batch[0] if len(batch) >= 1 else None
+        return batch
+
+    def _resolve_feature_layer(self, model):
+        layer = None
+        if hasattr(model, "backbone"):
+            layer = getattr(model.backbone, "layer4", None)
+        if layer is None and hasattr(model, "model") and hasattr(model.model, "encoder"):
+            layer = getattr(model.model, "encoder", None)
+            if layer is not None:
+                layer = getattr(layer, "layer4", None)
+        if layer is None:
+            candidates = ["features", "avgpool", "layer4", "layer3", "mixed_7c"]
+            for name in candidates:
+                if hasattr(model, name):
+                    layer = getattr(model, name)
+                    break
+                if hasattr(model, "module") and hasattr(model.module, name):
+                    layer = getattr(model.module, name)
+                    break
+        return layer
+
+    def _extract_features_only(self, model, data_loader):
+        model.eval()
+        features_list = []
+
+        def hook_fn(module, input, output):
+            gap = nn.functional.adaptive_avg_pool2d(output, (1, 1)).flatten(1)
+            features_list.append(gap.detach().cpu())
+
+        layer = self._resolve_feature_layer(model)
+        handle = layer.register_forward_hook(hook_fn) if layer is not None else None
+
+        with torch.no_grad():
+            for batch in data_loader:
+                images = self._unpack_images(batch)
+                if images is None:
+                    continue
+                images = images.to(self.config.DEVICE)
+                _ = model(images)
+
+        if handle is not None:
+            handle.remove()
+
+        return torch.cat(features_list) if features_list else None
+
+    def _extract_uncertainty_and_features(
+        self,
+        model,
+        data_loader,
+        method: str = "entropy",
+        n_mc_samples: int = 10,
+        pos_class: int | None = None,
+        pos_threshold: float = 0.5,
+    ):
+        method = str(method or "entropy").strip().lower()
+        eps = 1e-10
+
+        if method == "bald":
+            uncertainties = []
+            pos_areas = [] if pos_class is not None else None
+            model.eval()
+            for module in model.modules():
+                if isinstance(module, (torch.nn.Dropout, torch.nn.Dropout2d)):
+                    module.train()
+            with torch.no_grad():
+                for batch in data_loader:
+                    images = self._unpack_images(batch)
+                    if images is None:
+                        continue
+                    images = images.to(self.config.DEVICE)
+                    batch_size = int(images.shape[0])
+                    sum_probs = None
+                    sum_ent = torch.zeros((batch_size,), device=self.config.DEVICE)
+                    for _ in range(int(n_mc_samples or 10)):
+                        logits = model(images)
+                        probs = torch.softmax(logits, dim=1)
+                        sum_probs = probs if sum_probs is None else (sum_probs + probs)
+                        ent = -torch.sum(probs * torch.log2(probs + eps), dim=1)
+                        sum_ent = sum_ent + ent.mean(dim=(1, 2))
+                    mean_probs = sum_probs / float(int(n_mc_samples or 10))
+                    pred_ent = -torch.sum(mean_probs * torch.log2(mean_probs + eps), dim=1)
+                    mi = pred_ent.mean(dim=(1, 2)) - (sum_ent / float(int(n_mc_samples or 10)))
+                    uncertainties.extend([float(x) for x in mi.detach().cpu().tolist()])
+                    if pos_areas is not None:
+                        channel = mean_probs[:, int(pos_class), :, :]
+                        area = (channel > float(pos_threshold)).float().mean(dim=(1, 2))
+                        pos_areas.extend([float(x) for x in area.detach().cpu().tolist()])
+
+            model.eval()
+            features_tensor = self._extract_features_only(model, data_loader)
+            unc_arr = np.asarray(uncertainties, dtype=np.float32)
+            pos_arr = np.asarray(pos_areas, dtype=np.float32) if pos_areas is not None else None
+            return unc_arr, features_tensor, pos_arr
+
+        model.eval()
+        uncertainties = []
+        pos_areas = [] if pos_class is not None else None
+        features_list = []
+
+        def hook_fn(module, input, output):
+            gap = nn.functional.adaptive_avg_pool2d(output, (1, 1)).flatten(1)
+            features_list.append(gap.detach().cpu())
+
+        layer = self._resolve_feature_layer(model)
+        handle = layer.register_forward_hook(hook_fn) if layer is not None else None
+
+        with torch.no_grad():
+            for batch in data_loader:
+                images = self._unpack_images(batch)
+                if images is None:
+                    continue
+                images = images.to(self.config.DEVICE)
+                logits = model(images)
+                probs = torch.softmax(logits, dim=1)
+                ent = -torch.sum(probs * torch.log2(probs + eps), dim=1)
+                ent_mean = ent.mean(dim=(1, 2))
+                uncertainties.extend([float(x) for x in ent_mean.detach().cpu().tolist()])
+                if pos_areas is not None:
+                    channel = probs[:, int(pos_class), :, :]
+                    area = (channel > float(pos_threshold)).float().mean(dim=(1, 2))
+                    pos_areas.extend([float(x) for x in area.detach().cpu().tolist()])
+
+        if handle is not None:
+            handle.remove()
+
+        features_tensor = torch.cat(features_list) if features_list else None
+        unc_arr = np.asarray(uncertainties, dtype=np.float32)
+        pos_arr = np.asarray(pos_areas, dtype=np.float32) if pos_areas is not None else None
+        return unc_arr, features_tensor, pos_arr
+
     def _prepare_unlabeled_info(self, model, mc_dropout=False, n_mc_samples=10):
-        helper = ADKUCSSampler(self.config.DEVICE, alpha=self.config.ALPHA)
-        subset_u = Subset(self.full_dataset, self.unlabeled_indices)
+        subset_u = Subset(self.query_dataset, self.unlabeled_indices)
         feature_workers = int(getattr(self.config, "FEATURE_NUM_WORKERS", 0) or 0)
-        feature_loader_kwargs = {
-            "batch_size": self.config.BATCH_SIZE,
-            "shuffle": False,
-            "num_workers": feature_workers,
-            "persistent_workers": bool(feature_workers > 0 and getattr(self.config, "FEATURE_PERSISTENT_WORKERS", False)),
-            "pin_memory": bool(getattr(self.config, "FEATURE_PIN_MEMORY", False)),
-        }
-        if feature_workers > 0:
-            feature_loader_kwargs["prefetch_factor"] = int(getattr(self.config, "FEATURE_PREFETCH_FACTOR", 2) or 2)
         seed_base = int(self.seed) + int(self.current_round or 0)
         g = torch.Generator()
         g.manual_seed(seed_base)
-        feature_loader_kwargs["generator"] = g
-        feature_loader_kwargs["worker_init_fn"] = worker_init_fn
+        feature_loader_kwargs = self._build_loader_kwargs(
+            batch_size=self.config.BATCH_SIZE,
+            shuffle=False,
+            num_workers=feature_workers,
+            generator=g,
+            worker_init_fn=worker_init_fn,
+            drop_last=False,
+            pin_memory=bool(getattr(self.config, "FEATURE_PIN_MEMORY", False)),
+            persistent_workers=bool(
+                getattr(self.config, "FEATURE_PERSISTENT_WORKERS", False)
+            ),
+            prefetch_factor=int(getattr(self.config, "FEATURE_PREFETCH_FACTOR", 2) or 2),
+        )
         loader_u = DataLoader(subset_u, **feature_loader_kwargs)
         constraints = (
             self.exp_config.get("candidate_constraints")
@@ -2579,94 +2869,44 @@ class ActiveLearningPipeline:
         )
 
         unlabeled_info = {}
-        if mc_dropout:
-            eps = 1e-10
-            model.eval()
-            for module in model.modules():
-                if isinstance(module, (torch.nn.Dropout, torch.nn.Dropout2d)):
-                    module.train()
+        uncertainty_method = "bald" if bool(mc_dropout) else "entropy"
+        if not mc_dropout:
+            method_from_sampler = getattr(self.sampler, "uncertainty_method", None)
+            if isinstance(method_from_sampler, str) and method_from_sampler.strip():
+                uncertainty_method = method_from_sampler.strip().lower()
+        effective_mc = int(getattr(self.sampler, "n_mc_samples", n_mc_samples) or n_mc_samples)
 
-            unc_list: list[float] = []
-            pos_list: list[float] | None = [] if use_pos_area else None
-            with torch.no_grad():
-                for batch in loader_u:
-                    if isinstance(batch, (list, tuple)):
-                        if len(batch) >= 1:
-                            images = batch[0]
-                        else:
-                            continue
-                    else:
-                        images = batch
+        unc_arr, features_tensor, pos_arr = self._extract_uncertainty_and_features(
+            model,
+            loader_u,
+            method=uncertainty_method,
+            n_mc_samples=effective_mc,
+            pos_class=pos_class,
+            pos_threshold=pos_threshold,
+        )
 
-                    images = images.to(self.config.DEVICE)
-                    batch_size = int(images.shape[0])
-                    sum_probs = None
-                    sum_ent = torch.zeros((batch_size,), device=self.config.DEVICE)
-                    for _ in range(int(n_mc_samples)):
-                        logits = model(images)
-                        probs = torch.softmax(logits, dim=1)
-                        if sum_probs is None:
-                            sum_probs = probs
-                        else:
-                            sum_probs = sum_probs + probs
-                        ent = -torch.sum(probs * torch.log2(probs + eps), dim=1)
-                        sum_ent = sum_ent + ent.mean(dim=(1, 2))
+        if features_tensor is None:
+            raise RuntimeError("_prepare_unlabeled_info failed: features=None")
+        if unc_arr is None or int(len(unc_arr)) != int(len(self.unlabeled_indices)):
+            raise RuntimeError("_prepare_unlabeled_info failed: uncertainty size mismatch")
 
-                    mean_probs = sum_probs / float(n_mc_samples)
-                    pred_ent = -torch.sum(
-                        mean_probs * torch.log2(mean_probs + eps), dim=1
-                    )
-                    mi = pred_ent.mean(dim=(1, 2)) - (sum_ent / float(n_mc_samples))
-                    unc_list.extend([float(x) for x in mi.detach().cpu().tolist()])
-                    if pos_list is not None:
-                        channel = mean_probs[:, int(pos_class), :, :]
-                        area = (channel > float(pos_threshold)).float().mean(dim=(1, 2))
-                        pos_list.extend([float(x) for x in area.detach().cpu().tolist()])
-
-            model.eval()
-            features_tensor = helper.get_features_only(model, loader_u)
-            if features_tensor is None:
-                raise RuntimeError("_prepare_unlabeled_info failed: features=None")
-            for i, idx in enumerate(self.unlabeled_indices):
-                info = {
-                    "feature": features_tensor[i].numpy(),
-                    "uncertainty_score": float(unc_list[i]),
-                }
-                if pos_list is not None:
-                    info["pos_area"] = float(pos_list[i])
-                unlabeled_info[idx] = info
-        else:
-            unc_arr, features_tensor, pos_arr = helper.get_uncertainty_and_features(
-                model,
-                loader_u,
-                pos_class=pos_class,
-                pos_threshold=pos_threshold,
-            )
-
-            if features_tensor is None:
-                raise RuntimeError("_prepare_unlabeled_info failed: features=None")
-            if unc_arr is None or int(len(unc_arr)) != int(len(self.unlabeled_indices)):
-                raise RuntimeError(
-                    "_prepare_unlabeled_info failed: uncertainty size mismatch"
-                )
-
-            for i, idx in enumerate(self.unlabeled_indices):
-                info = {
-                    "feature": features_tensor[i].numpy(),
-                    "uncertainty_score": float(unc_arr[i]),
-                }
-                if pos_arr is not None and i < int(len(pos_arr)):
-                    info["pos_area"] = float(pos_arr[i])
-                unlabeled_info[idx] = info
+        for i, idx in enumerate(self.unlabeled_indices):
+            info = {
+                "feature": features_tensor[i].numpy(),
+                "uncertainty_score": float(unc_arr[i]),
+            }
+            if pos_arr is not None and i < int(len(pos_arr)):
+                info["pos_area"] = float(pos_arr[i])
+            unlabeled_info[idx] = info
 
         labeled_features = None
         labeled_source = self.labeled_indices
         if str(getattr(self, "k_definition", "") or "") == "coreset_to_labeled_fixed":
             labeled_source = getattr(self, "_initial_labeled_indices", []) or []
         if labeled_source:
-            subset_l = Subset(self.full_dataset, labeled_source)
+            subset_l = Subset(self.query_dataset, labeled_source)
             loader_l = DataLoader(subset_l, **feature_loader_kwargs)
-            l_feats = helper.get_features_only(model, loader_l)
+            l_feats = self._extract_features_only(model, loader_l)
             if l_feats is None:
                 raise RuntimeError(
                     "_prepare_unlabeled_info failed: labeled feature extraction returned None"

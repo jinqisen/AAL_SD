@@ -76,7 +76,28 @@ def calculate_metrics(y_true: np.ndarray, y_pred: np.ndarray, num_classes: int =
     iou_denom = tp + fp + fn
     f1_denom = 2.0 * tp + fp + fn
 
-    iou = np.where(iou_denom > 0.0, tp / iou_denom, 1.0)
-    f1 = np.where(f1_denom > 0.0, (2.0 * tp) / f1_denom, 1.0)
+    iou = np.divide(
+        tp,
+        iou_denom,
+        out=np.full_like(tp, np.nan, dtype=np.float64),
+        where=iou_denom > 0.0,
+    )
+    f1 = np.divide(
+        2.0 * tp,
+        f1_denom,
+        out=np.full_like(tp, np.nan, dtype=np.float64),
+        where=f1_denom > 0.0,
+    )
 
-    return {"mIoU": float(np.mean(iou)), "f1_score": float(np.mean(f1))}
+    valid_iou = np.isfinite(iou)
+    valid_f1 = np.isfinite(f1)
+    miou = float(np.nanmean(iou)) if bool(np.any(valid_iou)) else 0.0
+    mean_f1 = float(np.nanmean(f1)) if bool(np.any(valid_f1)) else 0.0
+    return {
+        "mIoU": miou,
+        "f1_score": mean_f1,
+        "per_class_iou": iou.tolist(),
+        "per_class_f1": f1.tolist(),
+        "valid_iou_classes": int(np.sum(valid_iou)),
+        "valid_f1_classes": int(np.sum(valid_f1)),
+    }

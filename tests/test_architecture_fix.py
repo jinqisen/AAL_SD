@@ -12,7 +12,6 @@ sys.modules['torch.utils.data'] = MagicMock()
 sys.modules['torchvision'] = MagicMock()
 sys.modules['torchvision.transforms'] = MagicMock()
 sys.modules['cv2'] = MagicMock()
-sys.modules['h5py'] = MagicMock()
 sys.modules['sklearn'] = MagicMock()
 sys.modules['sklearn.model_selection'] = MagicMock()
 sys.modules['sklearn.metrics'] = MagicMock()
@@ -31,6 +30,7 @@ import tempfile
 import copy
 import pandas as pd
 import json
+import hashlib
 from unittest.mock import patch
 
 # Add src to sys.path
@@ -58,12 +58,45 @@ class TestArchitectureFix(unittest.TestCase):
         os.makedirs(self.config.DATA_DIR, exist_ok=True)
         os.makedirs(self.config.RESULTS_DIR, exist_ok=True)
         os.makedirs(self.config.CHECKPOINT_DIR, exist_ok=True)
+        for rel in (
+            ("TrainData", "img"),
+            ("TrainData", "mask"),
+            ("ValidData", "img"),
+            ("ValidData", "mask"),
+        ):
+            os.makedirs(os.path.join(self.config.DATA_DIR, *rel), exist_ok=True)
         base_dir = os.path.join(self.config.POOLS_DIR, "unit_test", "_base")
         os.makedirs(base_dir, exist_ok=True)
         pd.DataFrame({"sample_id": []}).to_csv(os.path.join(base_dir, "labeled_pool.csv"), index=False)
         pd.DataFrame({"sample_id": []}).to_csv(os.path.join(base_dir, "unlabeled_pool.csv"), index=False)
-        pd.DataFrame({"sample_id": []}).to_csv(os.path.join(base_dir, "val_pool.csv"), index=False)
-        pd.DataFrame({"sample_id": ["dummy"]}).to_csv(os.path.join(base_dir, "test_pool.csv"), index=False)
+        def _sha(names):
+            h = hashlib.sha256()
+            for n in sorted(names):
+                h.update(str(n).encode("utf-8", errors="ignore"))
+                h.update(b"\n")
+            return h.hexdigest()
+
+        empty = {"count": 0, "sha256": _sha([])}
+        manifest = {
+            "schema_version": 1,
+            "created_at": "1970-01-01T00:00:00",
+            "data_root": str(self.config.DATA_DIR),
+            "splits": {
+                "train": {"images": empty, "masks": empty},
+                "val": {"images": empty, "masks": empty},
+                "test": None,
+            },
+            "split_policy": {
+                "name": "unit_test",
+                "initial_labeled_size": 0.0,
+                "random_seed": 0,
+                "stratify_key": "has_positive",
+                "train_counts": {"pos": 0, "neg": 0, "total": 0},
+            },
+            "pools": {"labeled": 0, "unlabeled": 0, "files": {"labeled_pool": "labeled_pool.csv", "unlabeled_pool": "unlabeled_pool.csv"}},
+        }
+        with open(os.path.join(base_dir, "pools_manifest.json"), "w", encoding="utf-8") as f:
+            json.dump(manifest, f, ensure_ascii=False, indent=2)
 
     def tearDown(self):
         shutil.rmtree(self.test_dir)
@@ -141,13 +174,11 @@ class TestArchitectureFix(unittest.TestCase):
         # Create dummy pool files
         pd.DataFrame({'sample_id': ['img1', 'img2']}).to_csv(os.path.join(exp_dir, 'labeled_pool.csv'), index=False)
         pd.DataFrame({'sample_id': ['img3']}).to_csv(os.path.join(exp_dir, 'unlabeled_pool.csv'), index=False)
-        pd.DataFrame({'sample_id': []}).to_csv(os.path.join(exp_dir, 'val_pool.csv'), index=False)
-        pd.DataFrame({'sample_id': ['img4']}).to_csv(os.path.join(exp_dir, 'test_pool.csv'), index=False) # Added test_pool.csv
         
         # Mock dataset to have these images
         mock_dataset_instance = MockDataset.return_value
         # Mock images list for _map_filenames_to_indices
-        mock_dataset_instance.images = ['img1.h5', 'img2.h5', 'img3.h5', 'img4.h5']
+        mock_dataset_instance.images = ['img1.h5', 'img2.h5', 'img3.h5']
         
         # Mock ABLATION_SETTINGS
         with patch('main.ABLATION_SETTINGS', {exp_name: {'description': 'test', 'sampler_type': 'random', 'use_agent': False}}):
@@ -394,11 +425,7 @@ class TestArchitectureFix(unittest.TestCase):
             if filename == "labeled_pool.csv":
                 return pd.DataFrame({"sample_id": ["s0"]})
             if filename == "unlabeled_pool.csv":
-                return pd.DataFrame({"sample_id": ["s1"]})
-            if filename == "val_pool.csv":
-                return pd.DataFrame({"sample_id": []})
-            if filename == "test_pool.csv":
-                return pd.DataFrame({"sample_id": ["s2"]})
+                return pd.DataFrame({"sample_id": ["s1", "s2"]})
             return pd.DataFrame({"sample_id": []})
 
         with patch("pandas.read_csv", side_effect=fake_read_csv):

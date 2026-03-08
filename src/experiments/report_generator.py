@@ -58,10 +58,9 @@ class ReportGenerator:
     def generate_summary_report(self):
         cfg = self._manifest_config()
         initial_ratio = self._fmt_percent(cfg.get("INITIAL_LABELED_SIZE"))
-        internal_val_ratio = self._fmt_percent(cfg.get("INTERNAL_VAL_SIZE"))
-        internal_test_ratio = self._fmt_percent(cfg.get("INTERNAL_TEST_SIZE"))
-        closed_loop_split = cfg.get("CLOSED_LOOP_SPLIT")
-        report_split = cfg.get("REPORT_SPLIT")
+        train_split = cfg.get("TRAIN_SPLIT", "train")
+        val_split = cfg.get("VAL_SPLIT", "val")
+        test_split = cfg.get("TEST_SPLIT", "test")
         n_rounds = cfg.get("N_ROUNDS") or self._get_n_rounds()
         query_size = cfg.get("QUERY_SIZE") or self._get_query_size()
         total_budget = cfg.get("TOTAL_BUDGET")
@@ -82,10 +81,9 @@ class ReportGenerator:
 |-------|-----|
 | 数据集 | Landslide4Sense |
 | 初始标注比例 | {initial_ratio} |
-| 闭环验证集比例 | {internal_val_ratio} |
-| 最终测试集比例 | {internal_test_ratio} |
-| 闭环 split | {closed_loop_split if closed_loop_split is not None else 'N/A'} |
-| 最终报告 split | {report_split if report_split is not None else 'N/A'} |
+| train split | {train_split} |
+| val split | {val_split} |
+| test split | {test_split} |
 | 主动学习轮数 | {n_rounds} |
 | 每轮查询样本数 | {query_size} |
 | 总标注预算 | {total_budget if total_budget is not None else 'N/A'} |

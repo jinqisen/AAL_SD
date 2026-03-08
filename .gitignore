@@ -1,7 +1,11 @@
 src/llm_config.json
+.DS_Store
 __pycache__/
 *.pyc
 .mypy_cache/
 .pytest_cache/
 .ruff_cache/
 data/
+results/checkpoints/
+*.pt
+src.zip

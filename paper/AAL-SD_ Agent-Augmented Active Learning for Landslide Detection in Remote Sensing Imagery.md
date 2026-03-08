@@ -7,7 +7,7 @@ Author A^1, Author B^2, Author C^1,*
 
 ### Abstract
 
-Active learning (AL) is a practical approach for reducing the high annotation cost of remote sensing semantic segmentation, including landslide mapping. Most AL methods rely on fixed acquisition heuristics (e.g., uncertainty or diversity), which may be mismatched to the learning stage and the evolving unlabeled pool. We present Agent-Augmented Active Learning for Landslide Detection (AAL-SD), a framework that integrates an Agent component as a constrained controller interface in the AL loop. The core acquisition strategy is Adaptive Diversity–Knowledge–Uncertainty Sampling (AD-KUCS), which scores each unlabeled sample using a convex combination of uncertainty and a feature-space novelty score defined by coreset-to-labeled distance. In the default setting, the mixing weight is produced by a deterministic warmup + risk-based closed-loop policy driven by training signals and logged for auditing; in separate ablations, the LLM can be granted permission to directly propose control actions (e.g., λ or query size) under explicit constraints. We evaluate AAL-SD on the Landslide4Sense benchmark and compare it with multiple baseline and ablation variants under the same labeled-budget protocol; we further report a 4-seed robustness check (seeds 43/44/45/46) and a cross-split generalization setting (TrainData as the AL pool, ValidData as per-round evaluation). Under a fixed training budget (10 epochs per round), AAL-SD remains in the same performance regime as strong baselines; multi-seed results indicate small gaps but no consistent dominance. This motivates positioning AAL-SD primarily as an auditable, constraint-aware control interface with gradient-level evidence for interpreting learning-curve behavior, rather than claiming large numerical gains under a single fixed budget.
+Active learning (AL) is a practical approach for reducing the high annotation cost of remote sensing semantic segmentation, including landslide mapping. Most AL methods rely on fixed acquisition heuristics (e.g., uncertainty or diversity), which may be mismatched to the learning stage and the evolving unlabeled pool. We present Agent-Augmented Active Learning for Landslide Detection (AAL-SD), a framework that integrates an Agent component as a constrained controller interface in the AL loop. The core acquisition strategy is Adaptive Diversity-Knowledge-Uncertainty Sampling (AD-KUCS), which scores each unlabeled sample using a convex combination of uncertainty and a feature-space novelty score defined by coreset-to-labeled distance. In the default setting, the mixing weight is produced by a deterministic warmup + risk-based closed-loop policy driven by training signals and logged for auditing; in a dedicated variant, the LLM can be granted permission to directly control lambda under explicit constraints. We evaluate AAL-SD on Landslide4Sense using four seeds (42-45) and compare two full-model variants against six strong baselines under the same fixed-budget protocol. The representative seed-42 run shows that the policy-controlled full model attains the strongest final mIoU (0.7651), while the agent-lambda variant is competitive in ALC. Across four seeds, no single method dominates all metrics: Wang-style achieves the highest mean ALC (0.6682+-0.0037 std), the policy-controlled AAL-SD remains close behind (0.6674+-0.0029), and the agent-lambda variant attains the best mean final mIoU (0.7616+-0.0014). These results motivate positioning AAL-SD primarily as an auditable, constraint-aware control interface with optimization-proxy diagnostics, rather than claiming uniform numerical superiority under a single fixed training budget.
 
 ### Keywords
 
@@ -94,7 +94,7 @@ To avoid confounding from “more training” and keep the focus on label effici
 - **Model**: We use DeepLabV3+ implemented by `segmentation_models_pytorch`, with a ResNet-50 encoder initialized from ImageNet pre-training and adapted to 14-channel inputs.
 - **Training Protocol**: To keep training budgets comparable, all methods use 10 epochs per round.
 - **Active Learning Protocol**: We split the 3,799 images into a test pool of 760 images and a training pool of 3,039 images. We initialize AL with 151 labeled images (5% of the training pool) and 2,888 unlabeled images. We run 15 training rounds with a per-round query size of 88 for the first 14 rounds (no acquisition after the final training round), yielding a final labeled size of 1,383. The total labeling budget is set to 1,519 images and is used to normalize ALC.
-- **Cross-split Generalization Protocol**: To better approximate external-domain evaluation (cross-scene validation), we additionally run a cross-split setting where TrainData is used as the AL pool (labeled/unlabeled) and ValidData is used as the per-round evaluation set (run: `run_src_full_model_with_baselines_seed42__eval_val`). In this setting, we report performance at the budget-aligned point |L|=1,383 for fair comparison to the main protocol.
+- **Seeds and Reporting Scope**: The refreshed paper assets are generated from four runs (`baseline_20260228_124857_seed42` to `seed45`). We use seed 42 as the representative single-seed case study and report four-seed statistics for the methods that are complete across all runs.
 - **Reproducibility**: Per-experiment configuration snapshots are stored in the run manifest.
 
 #### 4.2. Evaluation Metric
@@ -109,120 +109,100 @@ where $x_t = n_t / B$ and $m(x)$ is obtained by trapezoidal interpolation over t
 
 #### 4.2.1. Gradient Evidence and a Proxy of the Generalization Trajectory
 
-To make the claim “$\lambda_t$ / query size changes the labeled-data distribution, which in turn changes optimization and the generalization trajectory” empirically testable, we record per-epoch gradient statistics in the trace: the global gradient norm on training batches (with backbone/head breakdown), and gradient direction consistency (cosine similarity between consecutive training batches, and cosine similarity between the mean training gradient and a probed gradient on a sampled test batch). These quantities serve as optimization proxies to help interpret why different acquisition strategies yield different learning-curve shapes (and thus different ALC) under the same fixed training budget.
+To make the claim “the acquisition policy changes the labeled-data distribution, which in turn changes optimization and the generalization trajectory” empirically testable, we record per-epoch gradient statistics in the trace: the global gradient norm on training batches (with backbone/head breakdown), and gradient direction consistency (cosine similarity between consecutive training batches, and cosine similarity between the mean training gradient and a probed gradient on a sampled test batch). These quantities serve as optimization proxies to help interpret why different acquisition strategies yield different learning-curve shapes (and thus different ALC) under the same fixed training budget.
 
 #### 4.3. Baselines and Ablations
 
-We include both standard active learning baselines and structured ablations to isolate each component of AAL-SD.
+We include both strong active learning baselines and two full-model AAL-SD variants.
 
-- **Baselines**: Random, Entropy, Core-set, and BALD. We also report two LLM baselines: an LLM-driven uncertainty sampler (LLM-US) and an LLM-driven random sampler (LLM-RS) that remove our AD-KUCS design while keeping the LLM component.
-- **Ablations**: (i) `no_agent` removes the agent and uses the fixed, non-agent AD-KUCS rule, (ii) `fixed_lambda` fixes `λ=0.5`, (iii) `uncertainty_only (λ=0)` and (iv) `knowledge_only (λ=1)` isolate each score term, (v) `agent_control_lambda` and (vi) `agent_control_budget` test partial control.
+- **Baselines**: Random, Entropy, Core-set, BALD, DIAL-style, and Wang-style.
+- **Full-model variants**: (i) `full_model_A_lambda_policy`, the policy-controlled version used as the primary full model in this paper, and (ii) `full_model_B_lambda_agent`, which exposes direct lambda control to the agent under explicit constraints.
+- **Legacy ablations**: Earlier seed-42-only ablations (e.g., `no_agent`, `fixed_lambda`, `knowledge_only`, query-size-control variants) remain useful for internal diagnosis, but they are not included in the refreshed multi-seed tables because they are not available across all four runs.
 
 #### 4.4. Main Results
 
-Table 1 presents the main results under the fixed 10-epoch protocol (run: `20260207_paper`, seed=42).
+Table 1 presents the refreshed representative single-seed results (seed 42) under the fixed 10-epoch protocol.
 
 **Table 1: Main Experimental Results on Landslide4Sense.**
 
 | Method | Category | ALC | Final mIoU | Final F1 |
 |---|---:|---:|---:|---:|
-| AAL-SD (Full) | Proposed | 0.6654 | 0.7607 | 0.8453 |
-| AAL-SD (λ+query-size control) | Ablation | 0.6677 | 0.7660 | 0.8498 |
-| Agent control λ | Ablation | 0.6701 | 0.7639 | 0.8479 |
-| Agent control query size | Ablation | 0.6680 | 0.7638 | 0.8482 |
-| AD-KUCS (no agent, fixed rule) | Ablation | 0.6692 | 0.7639 | 0.8482 |
-| AD-KUCS (fixed λ=0.5) | Ablation | 0.6684 | 0.7624 | 0.8467 |
-| Uncertainty-only (λ=0) | Ablation | 0.6668 | 0.7613 | 0.8458 |
-| Knowledge-only (λ=1) | Ablation | 0.6546 | 0.7497 | 0.8360 |
-| Random | Baseline | 0.6586 | 0.7585 | 0.8435 |
-| Entropy | Baseline | **0.6702** | **0.7696** | **0.8527** |
-| Core-set | Baseline | 0.6547 | 0.7420 | 0.8295 |
-| BALD | Baseline | 0.6670 | 0.7571 | 0.8422 |
-| LLM-RS baseline | Baseline | 0.6554 | 0.7585 | 0.8435 |
-| LLM-US baseline | Baseline | 0.6691 | 0.7628 | 0.8470 |
+| AAL-SD (policy full, A) | Proposed | 0.6693 | **0.7651** | **0.8490** |
+| AAL-SD (agent-lambda, B) | Proposed | 0.6701 | 0.7634 | 0.8476 |
+| Entropy | Baseline | 0.6674 | 0.7555 | 0.8409 |
+| BALD | Baseline | 0.6673 | 0.7644 | 0.8483 |
+| DIAL-style | Baseline | 0.6681 | 0.7626 | 0.8469 |
+| Wang-style | Baseline | **0.6714** | 0.7560 | 0.8412 |
+| Core-set | Baseline | 0.6578 | 0.7507 | 0.8370 |
+| Random | Baseline | 0.6563 | 0.7391 | 0.8268 |
 
-Figure 2 shows the learning curves for AAL-SD and key baselines under the fixed-epoch protocol.
+The seed-42 comparison already reveals an important pattern: no method dominates all metrics. Wang-style achieves the best ALC in this representative run, whereas the policy-controlled AAL-SD variant attains the best final mIoU and F1. The agent-lambda variant is also competitive, but its strength in this run is concentrated more in ALC than in terminal segmentation accuracy. This split motivates a multi-seed analysis rather than a single-seed winner-take-all interpretation.
+
+Figure 2 shows the refreshed multi-seed learning curves for the two AAL-SD variants and the six baselines.
 
 ![Figure 2: Learning Curves](./Figure2_Learning_Curves_generated.png)
 
-Figure 6 visualizes the gradient diagnostics aggregated from the trace, providing an optimization/gradient perspective on learning-curve differences.
-
-![Figure 6: Gradient Diagnostics](./Figure6_Gradient_Diagnostics.png)
-
-From the baseline comparison, Entropy is the strongest traditional heuristic in this setting. Core-set underperforms in both ALC and final metrics, suggesting that pure diversity selection based on the current feature embedding may be less effective than uncertainty-driven querying for landslide segmentation. Under this run, the LLM-US baseline is competitive, indicating that LLM-driven scoring can be effective even without our full controller structure; we therefore include a multi-seed robustness check for the full model and major baselines.
+The learning curves confirm that the performance gaps are small but structured. Random and Core-set remain consistently weaker, while Entropy, BALD, DIAL-style, Wang-style, and both AAL-SD variants form the leading group. The curves also suggest that the AAL-SD variants are not merely early-round heuristics; they stay competitive deep into the labeling budget, which is important for the final mapping model used in practice.
 
 #### 4.4.1. Multi-Seed Results
 
-To assess robustness for submission-quality reporting, we run a 4-seed evaluation (seeds 43/44/45/46) for the full model and major baselines (runs: `run_src_full_model_with_baselines_seed43`–`seed46`). In contrast to the single-seed “full ablation matrix”, this multi-seed set focuses on the most important comparisons: the AAL-SD full model against traditional baselines (Entropy/Core-set/BALD/Random), diversity-driven baselines (DIAL-style/Wang-style), and LLM baselines (LLM-US/LLM-RS). Table 2 reports mean±std across seeds.
+Table 2 reports the refreshed four-seed summary over seeds 42-45. The comparison is restricted to the methods that are complete in all four runs.
 
-**Table 2: Multi-Seed Summary (mean±std over 4 seeds).**
+**Table 2: Multi-Seed Summary (mean+-std over 4 seeds).**
 
-| Method | ALC (mean±std) | Final mIoU (mean±std) | Final F1 (mean±std) |
+| Method | ALC (mean+-std) | Final mIoU (mean+-std) | Final F1 (mean+-std) |
 |---|---:|---:|---:|
-| Entropy | **0.6695±0.0019** | 0.7614±0.0031 | 0.8459±0.0026 |
-| Wang-style | 0.6691±0.0041 | 0.7591±0.0052 | 0.8440±0.0044 |
-| LLM-US baseline | 0.6683±0.0020 | **0.7637±0.0028** | **0.8478±0.0023** |
-| AAL-SD (Full) | 0.6678±0.0023 | 0.7603±0.0043 | 0.8450±0.0036 |
-| DIAL-style | 0.6641±0.0041 | 0.7574±0.0043 | 0.8425±0.0037 |
-| BALD | 0.6640±0.0025 | 0.7564±0.0045 | 0.8415±0.0038 |
-| LLM-RS baseline | 0.6562±0.0033 | 0.7521±0.0078 | 0.8381±0.0065 |
-| Core-set | 0.6551±0.0032 | 0.7487±0.0039 | 0.8351±0.0034 |
-| Random | 0.6538±0.0040 | 0.7511±0.0060 | 0.8372±0.0050 |
+| AAL-SD (policy full, A) | 0.6674+-0.0029 | 0.7607+-0.0046 | 0.8453+-0.0039 |
+| AAL-SD (agent-lambda, B) | 0.6664+-0.0036 | **0.7616+-0.0014** | **0.8461+-0.0012** |
+| Entropy | 0.6672+-0.0006 | 0.7589+-0.0047 | 0.8438+-0.0039 |
+| BALD | 0.6657+-0.0028 | 0.7595+-0.0036 | 0.8443+-0.0030 |
+| DIAL-style | 0.6647+-0.0030 | 0.7570+-0.0064 | 0.8421+-0.0055 |
+| Wang-style | **0.6682+-0.0037** | 0.7585+-0.0019 | 0.8434+-0.0016 |
+| Core-set | 0.6532+-0.0035 | 0.7498+-0.0047 | 0.8362+-0.0039 |
+| Random | 0.6545+-0.0043 | 0.7466+-0.0088 | 0.8332+-0.0077 |
 
-These results indicate that AAL-SD is stable and competitive but does not consistently outperform the strongest baselines under this fixed-budget setup. Accordingly, we avoid “significant improvement” wording and emphasize AAL-SD’s auditable constrained-control interface and trace-based diagnostics as the primary contribution.
-
-#### 4.4.2. Cross-split Generalization (TrainData AL Pool, ValidData Evaluation)
-
-To complement in-split evaluation, we report a cross-split setting where the AL pool is restricted to TrainData and each round is evaluated on ValidData (run: `run_src_full_model_with_baselines_seed42__eval_val`). Since this run starts from a larger initial labeled set and can exceed the total budget used for ALC normalization, we report the budget-aligned point |L|=1,383 as the primary comparison point.
-
-**Table 2b: Cross-split results at |L|=1,383 (seed=42, external-domain evaluation on ValidData).**
-
-| Method | mIoU@|L|=1383 | F1@|L|=1383 |
-|---|---:|---:|
-| AD-KUCS (fixed λ=0.5) | **0.7318** | **0.8191** |
-| BALD | 0.7227 | 0.8109 |
-| AAL-SD (V5, calibrated risk) | 0.7219 | 0.8101 |
-| Entropy | 0.7107 | 0.7992 |
-| Core-set | 0.7040 | 0.7930 |
-| LLM-US baseline | 0.6931 | 0.7818 |
-| Random | 0.6885 | 0.7771 |
-
-These cross-split results show a noticeable performance drop relative to in-split evaluation, consistent with a domain shift between the AL pool and the evaluation split. Importantly, relative differences among acquisition strategies remain measurable under this more generalization-oriented protocol, providing complementary evidence beyond same-split testing.
+The four-seed results reinforce the main message of the refreshed analysis: the ranking depends on which criterion is emphasized. Wang-style has the highest mean ALC, but the margin over the policy-controlled AAL-SD variant is small. The policy-controlled AAL-SD remains ahead of Entropy, BALD, DIAL-style, Core-set, and Random in mean ALC, which supports its use as the primary full model when label efficiency across the whole budget is prioritized. By contrast, the agent-lambda variant reaches the highest mean final mIoU and F1, suggesting that direct lambda control can be beneficial for terminal accuracy even if it does not yield the strongest average ALC. Accordingly, we avoid claiming universal superiority and instead emphasize the two complementary strengths exposed by the refreshed multi-seed evidence.
 
 #### 4.5. Ablation Study
 
-The ablation results suggest that the relative benefit of the agent/controller can vary under a fixed training budget. In this run, several non-agent variants (e.g., `no_agent`, `fixed_lambda`) are competitive in ALC, while single-term scoring (`knowledge_only`) is notably weaker. This supports the need to balance uncertainty and knowledge gain, and also indicates that controller design and constraints are important for consistent gains.
+The most relevant refreshed ablation is the comparison between the two full-model variants. Variant A (`full_model_A_lambda_policy`) keeps lambda under deterministic warmup + risk-aware policy control, whereas Variant B (`full_model_B_lambda_agent`) grants the agent explicit lambda-setting authority under constraints.
 
-**Table 3: Focused Ablation Summary.**
+**Table 3: Focused Full-Model Comparison.**
 
-| Variant | ALC | Final mIoU | Final F1 |
-|---|---:|---:|---:|
-| AAL-SD (Full) | 0.6654 | 0.7607 | 0.8453 |
-| AD-KUCS (no agent, fixed rule) | 0.6692 | 0.7639 | 0.8482 |
-| AD-KUCS (fixed λ=0.5) | 0.6684 | 0.7624 | 0.8467 |
-| Uncertainty-only (λ=0) | 0.6668 | 0.7613 | 0.8458 |
-| Knowledge-only (λ=1) | 0.6546 | 0.7497 | 0.8360 |
-| AAL-SD (λ+query-size control) | 0.6677 | 0.7660 | 0.8498 |
+| Variant | Seed-42 ALC | Seed-42 Final mIoU | 4-seed ALC (mean+-std) | 4-seed Final mIoU (mean+-std) | 4-seed Mean Overfit Risk |
+|---|---:|---:|---:|---:|---:|
+| AAL-SD (policy full, A) | 0.6693 | **0.7651** | **0.6674+-0.0029** | 0.7607+-0.0046 | 0.5580 |
+| AAL-SD (agent-lambda, B) | **0.6701** | 0.7634 | 0.6664+-0.0036 | **0.7616+-0.0014** | **0.4682** |
+
+This table explains why we retain Variant A as the primary full model for the paper. Variant B is attractive from an innovation standpoint and achieves the best mean final mIoU across seeds, but Variant A offers a stronger label-efficiency profile in the multi-seed average and keeps the control logic primarily in the explicit closed-loop policy rather than delegating lambda updates to the agent itself. In other words, Variant A is the better match for the paper's central theoretical claim, while Variant B is the stronger "direct agent control" contrast.
 
 #### 4.6. Controller Behavior
 
-Figure 3 visualizes an example controller trajectory for AAL-SD. Under the fixed training protocol (10 epochs per round), we only analyze controllable acquisition decisions (λ and query size) and do not treat training-budget control as a controller action in this paper.
+Figure 3 compares the seed-42 controller trajectories of the two full-model variants. The top panel shows mIoU by round, the middle panels show effective lambda, and the lower panels report optimization-proxy signals (`grad_train_val_cos_last` and overfit risk).
 
 ![Figure 3: Controller Trajectory of AAL-SD (Full)](./Figure3_Controller_Trajectory_Full_Model.png)
 
-For completeness, we provide bar-chart summaries of ALC and final mIoU across all variants in Figures 4–5.
+The figure highlights the qualitative difference between the two full-model variants. Variant A stays in a more conservative lambda regime and repeatedly falls back to uncertainty-biased behavior when severe overfitting rules are triggered. Variant B keeps a higher average effective lambda and shows smoother final-accuracy behavior, which is consistent with its stronger mean final mIoU in Table 2. At the same time, Variant A's tighter risk-aware policy appears to support stronger whole-curve efficiency, which is consistent with its better multi-seed mean ALC.
+
+For completeness, Figures 4-5 summarize the refreshed multi-seed ALC and final mIoU comparisons.
 
 ![Figure 4: ALC Comparison](./Figure4_ALC_Bar.png)
 
 ![Figure 5: Final mIoU Comparison](./Figure5_Final_mIoU_Bar.png)
 
+Figure 6 aggregates optimization-proxy diagnostics across methods.
+
+![Figure 6: Gradient Diagnostics](./Figure6_Gradient_Diagnostics.png)
+
+These diagnostics support a cautious version of the paper's deeper claim. We do not argue that the controller directly changes the optimizer or analytically optimizes gradients. Instead, the refreshed evidence shows that acquisition policy, gradient-derived risk signals, and subsequent optimization behavior are coupled in practice. Across four seeds, the policy-controlled AAL-SD has a lower mean effective lambda than the agent-lambda variant (0.181 versus 0.211), a higher negative-gradient rate, and a higher mean overfit-risk proxy, yet it still achieves the stronger mean ALC. This pattern is consistent with the idea that the controller is indirectly shaping later optimization trajectories through data acquisition, rather than simply following a fixed uncertainty/diversity heuristic.
+
 ### 5. Conclusion
 
-In this paper, we proposed AAL-SD, a framework that exposes active learning acquisition as a constrained controller interface for remote sensing image segmentation. By combining uncertainty with a feature-space novelty term and scheduling their trade-off via a warmup + risk-based closed-loop policy (with optional LLM control in dedicated ablations), AAL-SD adapts its acquisition focus across rounds while keeping actions auditable. Under a fixed training protocol (10 epochs per round), AAL-SD is competitive with strong baselines in label efficiency (ALC) in a single-seed full comparison, and a 4-seed robustness check shows small gaps but no consistent dominance over the strongest baselines. We further report a cross-split generalization setting (TrainData as AL pool, ValidData as per-round evaluation) to complement same-split testing and to better approximate cross-scene validation. Future work should focus on improving controller stability (across seeds and under stricter selection constraints) and adding stronger statistical testing (more seeds, confidence intervals, and paired tests), while continuing to strengthen trace-based interpretability and reproducibility.
+In this paper, we proposed AAL-SD, a framework that exposes active learning acquisition as a constrained controller interface for remote sensing image segmentation. By combining uncertainty with a feature-space novelty term and scheduling their trade-off via a warmup + risk-based closed-loop policy (with optional direct agent control in a dedicated variant), AAL-SD adapts its acquisition focus across rounds while keeping actions auditable. The refreshed four-seed analysis shows that AAL-SD is genuinely competitive but not uniformly dominant: the policy-controlled full model is among the strongest methods in mean ALC, the agent-lambda variant attains the highest mean final mIoU, and Wang-style remains a very strong baseline in whole-curve efficiency. This evidence supports a measured conclusion. AAL-SD's main value lies in making acquisition state-aware, auditable, and theoretically interpretable through optimization-proxy diagnostics, rather than in claiming universal numerical superiority under a fixed 10-epoch-per-round budget. Future work should strengthen multi-seed statistical testing, improve policy stability under severe overfitting signals, and further study how acquisition control indirectly shapes downstream optimization trajectories.
 
 ### Code Availability
 
-The implementation used in this study is available in the accompanying repository and will be archived in a long-term public repository upon acceptance.
+The implementation used in this study is publicly available at `https://github.com/jinqisen/AAL_SD`.
 
 ### Data Availability
 

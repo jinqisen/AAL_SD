@@ -1185,7 +1185,13 @@ class Toolbox:
         mask = None
         name = None
 
-        if isinstance(item, (tuple, list)):
+        if isinstance(item, dict):
+            image = item.get("image")
+            mask = item.get("mask")
+            name = item.get("image_name")
+            if mask is not None and hasattr(mask, "numel") and int(mask.numel()) == 0:
+                mask = None
+        elif isinstance(item, (tuple, list)):
             if len(item) >= 1:
                 image = item[0]
             if len(item) >= 2:

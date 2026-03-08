@@ -13,6 +13,13 @@ if [[ ! -f "${INPUT_MD}" ]]; then
   exit 1
 fi
 
+INPUT_DIR="$(cd "$(dirname "${INPUT_MD}")" && pwd)"
+LANG_TAG="en"
+if [[ "${INPUT_MD}" == *_CN.md ]]; then
+  LANG_TAG="zh"
+fi
+TITLE="$(basename "${INPUT_MD%.*}")"
+
 if ! command -v npx >/dev/null 2>&1; then
   echo "npx not found. Please install Node.js (npm/npx) first." >&2
   exit 1
@@ -43,11 +50,11 @@ WRAPPED_HTML="${TMP_DIR}/paper.html"
 
 npx --yes marked --gfm -i "${INPUT_MD}" -o "${BODY_HTML}"
 
-BASE_URL="file://${ROOT_DIR}/"
+BASE_URL="file://${INPUT_DIR}/"
 
 cat > "${WRAPPED_HTML}" <<'HTML'
 <!doctype html>
-<html lang="zh">
+<html lang="__LANG__">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -75,7 +82,7 @@ cat > "${WRAPPED_HTML}" <<'HTML'
       };
     </script>
     <script defer src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
-    <title>AAL-SD 中文版</title>
+    <title>__TITLE__</title>
   </head>
   <body>
 __BODY_HTML__
@@ -90,6 +97,8 @@ wrapped = Path("${WRAPPED_HTML}")
 body = Path("${BODY_HTML}").read_text(encoding="utf-8")
 html = wrapped.read_text(encoding="utf-8")
 html = html.replace("__BASE_URL__", "${BASE_URL}")
+html = html.replace("__LANG__", "${LANG_TAG}")
+html = html.replace("__TITLE__", "${TITLE}")
 html = html.replace("__BODY_HTML__", body)
 wrapped.write_text(html, encoding="utf-8")
 PY

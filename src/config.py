@@ -43,10 +43,16 @@ def _looks_like_dataset_root(path: str | None) -> bool:
         return False
     if not os.path.isdir(path):
         return False
-    for rel in ("TrainData/img", "images"):
-        if os.path.isdir(os.path.join(path, rel)):
-            return True
-    return False
+    required_dirs = (
+        "TrainData/img",
+        "TrainData/mask",
+        "ValidData/img",
+        "ValidData/mask",
+    )
+    for rel in required_dirs:
+        if not os.path.isdir(os.path.join(path, rel)):
+            return False
+    return True
 
 class Config:
     # 路径配置
@@ -112,21 +118,11 @@ class Config:
     ESTIMATED_TOTAL_SAMPLES = 3799 # 实际训练集总大小
     NUM_CLASSES = 2
     IN_CHANNELS = 14
-    CLOSED_LOOP_SPLIT = os.getenv("AAL_SD_CLOSED_LOOP_SPLIT", "internal_val")
-    REPORT_SPLIT = os.getenv("AAL_SD_REPORT_SPLIT", "internal_test")
-    NO_TEST_DURING_TRAINING = _coerce_bool(os.getenv("AAL_SD_NO_TEST_DURING_TRAINING"), default=True)
-    _INTERNAL_VAL_SIZE_ENV = os.getenv("AAL_SD_INTERNAL_VAL_SIZE")
-    INTERNAL_VAL_SIZE = (
-        float(_INTERNAL_VAL_SIZE_ENV)
-        if _INTERNAL_VAL_SIZE_ENV is not None and str(_INTERNAL_VAL_SIZE_ENV).strip() != ""
-        else 0.1
-    )
-    _INTERNAL_TEST_SIZE_ENV = os.getenv("AAL_SD_INTERNAL_TEST_SIZE")
-    INTERNAL_TEST_SIZE = (
-        float(_INTERNAL_TEST_SIZE_ENV)
-        if _INTERNAL_TEST_SIZE_ENV is not None and str(_INTERNAL_TEST_SIZE_ENV).strip() != ""
-        else 0.1
-    )
+    TRAIN_SPLIT = "train"
+    VAL_SPLIT = "val"
+    TEST_SPLIT = "test"
+    MODEL_SELECTION = str(os.getenv("AAL_SD_MODEL_SELECTION", "best_val") or "best_val").strip().lower()
+    FAIL_ON_NONFINITE = _coerce_bool(os.getenv("AAL_SD_FAIL_ON_NONFINITE"), default=True)
 
     RANDOM_SEED = int(os.getenv("AAL_SD_RANDOM_SEED", "42"))
     DETERMINISTIC = _coerce_bool(os.getenv("AAL_SD_DETERMINISTIC"), default=True)
@@ -188,7 +184,7 @@ class Config:
     GRAD_LOG_VAL_ALIGNMENT = True
     
     # 主动学习配置
-    N_ROUNDS = 15
+    N_ROUNDS = 16
     STRATEGY = 'ad_kucs'
     FIXED_LAMBDA = 0.5
     ALPHA = 5.0
@@ -237,7 +233,8 @@ class Config:
              # TOTAL_BUDGET=1500, Initial = 3000 * 0.02 = 60. Available for AL = 1440.
              # 1440 / 15 = 96.
              initial_estimate = int(getattr(self, 'ESTIMATED_TOTAL_SAMPLES', 3000) * getattr(self, 'INITIAL_LABELED_SIZE', 0.02))
-             estimated = int((self.TOTAL_BUDGET - initial_estimate) / self.N_ROUNDS)
+             selection_rounds = int(max(1, int(self.N_ROUNDS) - 1))
+             estimated = int((self.TOTAL_BUDGET - initial_estimate) / selection_rounds)
              # 保证至少为1
              return max(1, estimated)
         return 100
@@ -265,7 +262,6 @@ class Config:
 
     RESEARCH_MODE = True
     STRICT_RESUME = True
-    ALLOW_LEGACY_POOLS = False
 
     STRICT_INNOVATION = _coerce_bool(_LLM_CONFIG.get('strict_innovation', True), default=True)
     FAIL_ON_AGENT_FALLBACK = _coerce_bool(_LLM_CONFIG.get('fail_on_agent_fallback', True), default=True)

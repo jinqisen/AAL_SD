@@ -21,25 +21,17 @@ class CheckpointManager:
                                Expected keys: round, labeled_indices, performance_history, budget_history, fallback_history, etc.
         """
         try:
-            # Add metadata
             state_dict['timestamp'] = datetime.now().isoformat()
             state_dict['experiment_name'] = self.experiment_name
-            
-            # Ensure directory exists
             os.makedirs(self.checkpoint_dir, exist_ok=True)
-            
-            # Write to temporary file first for atomicity
             temp_path = self.checkpoint_path + ".tmp"
             with open(temp_path, 'w', encoding='utf-8') as f:
                 json.dump(state_dict, f, indent=4, ensure_ascii=False)
-            
-            # Rename to final path
             os.rename(temp_path, self.checkpoint_path)
             logger.info(f"Checkpoint saved to {self.checkpoint_path}")
             return True
         except Exception as e:
-            logger.error(f"Failed to save checkpoint: {str(e)}")
-            return False
+            raise RuntimeError(f"Failed to save checkpoint: {e}") from e
 
     def load(self):
         """
@@ -58,5 +50,4 @@ class CheckpointManager:
             logger.info(f"Checkpoint loaded from {self.checkpoint_path}")
             return state_dict
         except Exception as e:
-            logger.error(f"Failed to load checkpoint: {str(e)}")
-            return None
+            raise RuntimeError(f"Failed to load checkpoint: {e}") from e

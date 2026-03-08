@@ -15,7 +15,8 @@ def test_dataset():
     try:
         train_ds = Landslide4SenseDataset(root_dir, split='train')
         print(f"Train Dataset size: {len(train_ds)}")
-        img, mask = train_ds[0]
+        item = train_ds[0]
+        img, mask = item["image"], item["mask"]
         print(f"Train Image Shape: {img.shape}, Dtype: {img.dtype}")
         print(f"Train Mask Shape: {mask.shape}, Dtype: {mask.dtype}")
         
@@ -32,7 +33,8 @@ def test_dataset():
     try:
         val_ds = Landslide4SenseDataset(root_dir, split='val')
         print(f"Valid Dataset size: {len(val_ds)}")
-        img, mask = val_ds[0]
+        item = val_ds[0]
+        img, mask = item["image"], item["mask"]
         assert img.shape == (14, 128, 128)
         assert mask.shape == (128, 128)
         print("Valid Set Check: PASSED")
@@ -41,12 +43,21 @@ def test_dataset():
 
     print("\nTesting Test Set...")
     try:
+        test_img_dir = os.path.join(root_dir, "TestData", "img")
+        if not os.path.isdir(test_img_dir):
+            print(f"Test Set Check: SKIPPED - missing directory {test_img_dir}")
+            return
         test_ds = Landslide4SenseDataset(root_dir, split='test')
         print(f"Test Dataset size: {len(test_ds)}")
-        img, name = test_ds[0]
+        item = test_ds[0]
+        img = item["image"]
+        name = item["image_name"]
+        mask = item["mask"]
         print(f"Test Image Name: {name}")
         assert img.shape == (14, 128, 128)
         assert isinstance(name, str)
+        if int(mask.numel()) > 0:
+            assert mask.shape == (128, 128)
         print("Test Set Check: PASSED")
     except Exception as e:
         print(f"Test Set Check: FAILED - {e}")

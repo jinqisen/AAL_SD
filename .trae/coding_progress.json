@@ -1,11 +1,13 @@
 {
-  "updated_at": "2026-03-07",
+  "updated_at": "2026-03-08",
   "goals": [
     "对齐 ablation_config 实验口径与论文方案",
     "实验名重命名并保持向后兼容",
     "消除实验降级/分支不一致的不可观测性",
     "将缺失 LLM_API_KEY 变为可观测且可终止的失败",
-    "对齐 A/B λ 控制为风险-收益一致的护栏与局部搜索"
+    "对齐 A/B λ 控制为风险-收益一致的护栏与局部搜索",
+    "固定官方 Train/Val/Test 并移除 split 兼容分支",
+    "数据加载严格化：分层切分、manifest 强审计、异常 fail-fast"
   ],
   "tasks": [
     {
@@ -151,6 +153,106 @@
     {
       "id": "t29",
       "title": "补齐单测并运行 pytest 验证",
+      "status": "completed"
+    },
+    {
+      "id": "t30",
+      "title": "固定官方 Train/Val/Test 并移除 split 兼容分支",
+      "status": "completed"
+    },
+    {
+      "id": "t31",
+      "title": "移除 val/test pools 与 indices 冗余以消除评估口径歧义",
+      "status": "completed"
+    },
+    {
+      "id": "t32",
+      "title": "统一 Dataset 输出为固定 dict 并适配下游解包",
+      "status": "completed"
+    },
+    {
+      "id": "t33",
+      "title": "修正分割指标空类处理并补齐单元测试",
+      "status": "completed"
+    },
+    {
+      "id": "t34",
+      "title": "对齐 round 汇报口径与选样模型权重一致性",
+      "status": "completed"
+    },
+    {
+      "id": "t35",
+      "title": "收紧 checkpoint IO 异常处理为 fail-fast",
+      "status": "completed"
+    },
+    {
+      "id": "t36",
+      "title": "新增非有限指标 fail-fast 与 manifest 口径落盘",
+      "status": "completed"
+    },
+    {
+      "id": "t37",
+      "title": "收紧 DATA_DIR 布局判定并移除 images 降级扫描",
+      "status": "completed"
+    },
+    {
+      "id": "t38",
+      "title": "实现初始分层切分并落盘 pools_manifest 强校验",
+      "status": "completed"
+    },
+    {
+      "id": "t39",
+      "title": "修正 Dataset 掩码对齐并将不一致改为失败",
+      "status": "completed"
+    },
+    {
+      "id": "t40",
+      "title": "运行数据加载相关测试与静态检查验证",
+      "status": "completed"
+    },
+    {
+      "id": "t41",
+      "title": "核验 Landslide4Sense mask 标签取值与 void 风险",
+      "status": "completed"
+    },
+    {
+      "id": "t42",
+      "title": "修复最终 test 评估的 mask 存在性判断错误",
+      "status": "completed"
+    },
+    {
+      "id": "t43",
+      "title": "抽取并复用 DataLoader kwargs 构造逻辑",
+      "status": "completed"
+    },
+    {
+      "id": "t44",
+      "title": "运行 pytest 与基础静态检查验证本轮改动",
+      "status": "completed"
+    },
+    {
+      "id": "t45",
+      "title": "每轮落盘 best val 模型权重并记录元数据",
+      "status": "completed"
+    },
+    {
+      "id": "t46",
+      "title": "补充最终 report_eval 的选模轮次与epoch审计字段",
+      "status": "completed"
+    },
+    {
+      "id": "t47",
+      "title": "将默认 MODEL_SELECTION 调整为 best_val 并回归验证",
+      "status": "completed"
+    },
+    {
+      "id": "t48",
+      "title": "将第16轮改为加载第15轮best_val并仅执行测试评估",
+      "status": "completed"
+    },
+    {
+      "id": "t49",
+      "title": "优化第16轮测试轮日志文案并补充来源轮次审计",
       "status": "completed"
     }
   ]

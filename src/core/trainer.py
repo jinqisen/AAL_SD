@@ -7,9 +7,6 @@ from tqdm import tqdm
 import numpy as np
 import math
 
-from utils.evaluation import calculate_metrics
-
-
 class Trainer:
     def __init__(self, model, config, device):
         self.model = model
@@ -157,6 +154,30 @@ class Trainer:
             "n": int(arr.size),
         }
 
+    def _unpack_batch(self, batch, require_mask: bool):
+        images = None
+        masks = None
+        if isinstance(batch, dict):
+            images = batch.get("image")
+            masks = batch.get("mask")
+        elif isinstance(batch, (list, tuple)):
+            if len(batch) >= 1:
+                images = batch[0]
+            if len(batch) >= 2:
+                masks = batch[1]
+        else:
+            images = batch
+
+        if isinstance(masks, str):
+            masks = None
+        if isinstance(masks, list) and masks and isinstance(masks[0], str):
+            masks = None
+        if masks is not None and hasattr(masks, "numel") and int(masks.numel()) == 0:
+            masks = None
+        if require_mask and masks is None:
+            raise RuntimeError("Batch is missing masks")
+        return images, masks
+
     def _get_loss_function(self, loss_type):
         if loss_type == "FocalLoss":
             return FocalLoss()
@@ -182,7 +203,8 @@ class Trainer:
         ):
             probe_iter = iter(grad_probe_loader)
 
-        for images, masks in pbar:
+        for batch in pbar:
+            images, masks = self._unpack_batch(batch, require_mask=True)
             images = images.to(self.device)
             masks = masks.to(self.device)
 
@@ -260,10 +282,7 @@ class Trainer:
             if probe_iter is not None and mean_vec is not None:
                 try:
                     vb = next(probe_iter)
-                    if isinstance(vb, (list, tuple)):
-                        v_images, v_masks = vb[0], vb[1]
-                    else:
-                        v_images, v_masks = vb
+                    v_images, v_masks = self._unpack_batch(vb, require_mask=True)
                     v_images = v_images.to(self.device)
                     v_masks = v_masks.to(self.device)
                     was_training = self.model.training
@@ -302,13 +321,14 @@ class Trainer:
     def evaluate(self, loader):
         self.model.eval()
         running_loss = 0.0
-        all_preds = []
-        all_targets = []
-        all_targets = []
+        num_classes = int(getattr(self.config, "NUM_CLASSES", 2) or 2)
+        k = int(num_classes)
+        conf = np.zeros((k, k), dtype=np.int64) if k > 0 else None
 
         with torch.no_grad():
             pbar = tqdm(loader, desc="Validating")
-            for images, masks in pbar:
+            for batch in pbar:
+                images, masks = self._unpack_batch(batch, require_mask=True)
                 images = images.to(self.device)
                 masks = masks.to(self.device)
 
@@ -326,19 +346,37 @@ class Trainer:
 
                 preds = torch.argmax(outputs, dim=1).detach().cpu().numpy()
                 targets = masks.detach().cpu().numpy()
-                all_preds.append(preds)
-                all_targets.append(targets)
+                if conf is not None:
+                    y_pred_flat = np.asarray(preds).reshape(-1)
+                    y_true_flat = np.asarray(targets).reshape(-1)
+                    y_true_flat = np.clip(y_true_flat.astype(np.int64, copy=False), 0, k - 1)
+                    y_pred_flat = np.clip(y_pred_flat.astype(np.int64, copy=False), 0, k - 1)
+                    indices = y_true_flat * k + y_pred_flat
+                    conf += np.bincount(indices, minlength=k * k).reshape(k, k).astype(np.int64)
 
-        if all_preds and all_targets:
-            y_pred = np.concatenate([p.reshape(-1) for p in all_preds], axis=0)
-            y_true = np.concatenate([t.reshape(-1) for t in all_targets], axis=0)
-            num_classes = int(getattr(self.config, "NUM_CLASSES", 2) or 2)
-            metrics = calculate_metrics(y_true, y_pred, num_classes=num_classes)
-            mean_iou = float(metrics.get("mIoU", 0.0))
-            mean_f1 = float(metrics.get("f1_score", 0.0))
-        else:
+        if conf is None or int(conf.size) == 0:
             mean_iou = 0.0
             mean_f1 = 0.0
+        else:
+            tp = np.diag(conf).astype(np.float64, copy=False)
+            fp = conf.sum(axis=0).astype(np.float64, copy=False) - tp
+            fn = conf.sum(axis=1).astype(np.float64, copy=False) - tp
+            iou_denom = tp + fp + fn
+            f1_denom = 2.0 * tp + fp + fn
+            iou = np.divide(
+                tp,
+                iou_denom,
+                out=np.full_like(tp, np.nan, dtype=np.float64),
+                where=iou_denom > 0.0,
+            )
+            f1 = np.divide(
+                2.0 * tp,
+                f1_denom,
+                out=np.full_like(tp, np.nan, dtype=np.float64),
+                where=f1_denom > 0.0,
+            )
+            mean_iou = float(np.nanmean(iou)) if bool(np.any(np.isfinite(iou))) else 0.0
+            mean_f1 = float(np.nanmean(f1)) if bool(np.any(np.isfinite(f1))) else 0.0
 
         return {
             "loss": running_loss / len(loader),
@@ -371,10 +409,7 @@ class Trainer:
         offset = 0
         with torch.no_grad():
             for batch in tqdm(data_loader, desc="Extracting Features"):
-                if isinstance(batch, (list, tuple)):
-                    images = batch[0]
-                else:
-                    images = batch
+                images, _ = self._unpack_batch(batch, require_mask=False)
                 features_list.clear()
                 images = images.to(self.device)
                 if self._amp_enabled:
@@ -423,10 +458,7 @@ class Trainer:
 
         with torch.no_grad():
             for batch in tqdm(data_loader, desc="Predicting"):
-                if len(batch) == 2:
-                    images, _ = batch  # Ignore masks/ids
-                else:
-                    images = batch
+                images, _ = self._unpack_batch(batch, require_mask=False)
 
                 images = images.to(self.device)
                 if self._amp_enabled:

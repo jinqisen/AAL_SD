@@ -1,3 +1,0 @@
-experiment,description,status,alc,final_mIoU,final_f1,total_epochs,wall_clock_sec,n_rounds
-baseline_entropy,熵采样基线,running,,,,93,3405.193314,15
-full_model,完整模型（我们的方法）：Agent驱动的自适应梯度选样（epochs固定=10）,completed,0.6668573762660736,0.7624439109019197,0.8468196682907495,150,9232.301148,15

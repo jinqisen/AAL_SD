@@ -56,6 +56,13 @@ class ADKUCSSampler:
     def set_round(self, round_idx: int | None) -> None:
         self.current_round = int(round_idx) if round_idx is not None else None
 
+    def _unpack_images(self, batch):
+        if isinstance(batch, dict):
+            return batch.get("image")
+        if isinstance(batch, (list, tuple)):
+            return batch[0] if len(batch) >= 1 else None
+        return batch
+
     def _should_calibrate_uncertainty(self) -> bool:
         cfg = self.uncertainty_calibration
         if not isinstance(cfg, dict):
@@ -345,13 +352,9 @@ class ADKUCSSampler:
             self._enable_mc_dropout(model)
             with torch.no_grad():
                 for batch in tqdm(data_loader, desc="MC Dropout Sampling"):
-                    if isinstance(batch, (list, tuple)):
-                        if len(batch) >= 1:
-                            images = batch[0]
-                        else:
-                            continue
-                    else:
-                        images = batch
+                    images = self._unpack_images(batch)
+                    if images is None:
+                        continue
 
                     images = images.to(self.device)
                     batch_size = int(images.shape[0])
@@ -405,13 +408,9 @@ class ADKUCSSampler:
 
         with torch.no_grad():
             for batch in tqdm(data_loader, desc="Querying Samples"):
-                if isinstance(batch, (list, tuple)):
-                    if len(batch) >= 1:
-                        images = batch[0]
-                    else:
-                        continue
-                else:
-                    images = batch
+                images = self._unpack_images(batch)
+                if images is None:
+                    continue
 
                 images = images.to(self.device)
                 logits = model(images)
@@ -443,13 +442,9 @@ class ADKUCSSampler:
             self._enable_mc_dropout(model)
             with torch.no_grad():
                 for batch in tqdm(data_loader, desc="MC Dropout Sampling"):
-                    if isinstance(batch, (list, tuple)):
-                        if len(batch) >= 1:
-                            images = batch[0]
-                        else:
-                            continue
-                    else:
-                        images = batch
+                    images = self._unpack_images(batch)
+                    if images is None:
+                        continue
 
                     images = images.to(self.device)
                     batch_size = int(images.shape[0])
@@ -522,13 +517,9 @@ class ADKUCSSampler:
         eps = 1e-10
         with torch.no_grad():
             for batch in tqdm(data_loader, desc="Querying Samples"):
-                if isinstance(batch, (list, tuple)):
-                    if len(batch) >= 1:
-                        images = batch[0]
-                    else:
-                        continue
-                else:
-                    images = batch
+                images = self._unpack_images(batch)
+                if images is None:
+                    continue
 
                 images = images.to(self.device)
                 logits = model(images)
@@ -591,13 +582,9 @@ class ADKUCSSampler:
 
         with torch.no_grad():
             for batch in tqdm(data_loader, desc="Querying Samples"):
-                if isinstance(batch, (list, tuple)):
-                    if len(batch) >= 1:
-                        images = batch[0]
-                    else:
-                        continue
-                else:
-                    images = batch
+                images = self._unpack_images(batch)
+                if images is None:
+                    continue
 
                 images = images.to(self.device)
                 _ = model(images)

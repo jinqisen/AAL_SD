@@ -207,10 +207,14 @@ class BALDSampler:
         sample_idx = 0
 
         for batch in data_loader:
-            if isinstance(batch, (list, tuple)):
+            if isinstance(batch, dict):
+                images = batch.get("image")
+            elif isinstance(batch, (list, tuple)):
                 images = batch[0]
             else:
                 images = batch
+            if images is None:
+                continue
 
             batch_size = images.shape[0]
 
