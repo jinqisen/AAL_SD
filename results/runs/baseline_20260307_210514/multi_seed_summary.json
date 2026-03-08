@@ -1,0 +1,241 @@
+{
+  "run_ids": [
+    "baseline_20260307_210514_seed42",
+    "baseline_20260307_210514_seed43",
+    "baseline_20260307_210514_seed44",
+    "baseline_20260307_210514_seed45"
+  ],
+  "experiments": {
+    "baseline_bald": {
+      "per_seed": {
+        "alc": {},
+        "final_miou": {},
+        "final_f1": {}
+      },
+      "summary": {
+        "alc": {
+          "n": 0,
+          "mean": NaN,
+          "std": NaN,
+          "ci95": NaN
+        },
+        "final_miou": {
+          "n": 0,
+          "mean": NaN,
+          "std": NaN,
+          "ci95": NaN
+        },
+        "final_f1": {
+          "n": 0,
+          "mean": NaN,
+          "std": NaN,
+          "ci95": NaN
+        }
+      },
+      "statuses": {
+        "baseline_20260307_210514_seed42": "failed",
+        "baseline_20260307_210514_seed43": "failed",
+        "baseline_20260307_210514_seed44": "failed",
+        "baseline_20260307_210514_seed45": "failed"
+      }
+    },
+    "baseline_coreset": {
+      "per_seed": {
+        "alc": {},
+        "final_miou": {},
+        "final_f1": {}
+      },
+      "summary": {
+        "alc": {
+          "n": 0,
+          "mean": NaN,
+          "std": NaN,
+          "ci95": NaN
+        },
+        "final_miou": {
+          "n": 0,
+          "mean": NaN,
+          "std": NaN,
+          "ci95": NaN
+        },
+        "final_f1": {
+          "n": 0,
+          "mean": NaN,
+          "std": NaN,
+          "ci95": NaN
+        }
+      },
+      "statuses": {
+        "baseline_20260307_210514_seed42": "failed",
+        "baseline_20260307_210514_seed43": "failed",
+        "baseline_20260307_210514_seed44": "failed",
+        "baseline_20260307_210514_seed45": "failed"
+      }
+    },
+    "baseline_dial_style": {
+      "per_seed": {
+        "alc": {},
+        "final_miou": {},
+        "final_f1": {}
+      },
+      "summary": {
+        "alc": {
+          "n": 0,
+          "mean": NaN,
+          "std": NaN,
+          "ci95": NaN
+        },
+        "final_miou": {
+          "n": 0,
+          "mean": NaN,
+          "std": NaN,
+          "ci95": NaN
+        },
+        "final_f1": {
+          "n": 0,
+          "mean": NaN,
+          "std": NaN,
+          "ci95": NaN
+        }
+      },
+      "statuses": {
+        "baseline_20260307_210514_seed42": "failed",
+        "baseline_20260307_210514_seed43": "failed",
+        "baseline_20260307_210514_seed44": "failed",
+        "baseline_20260307_210514_seed45": "failed"
+      }
+    },
+    "baseline_entropy": {
+      "per_seed": {
+        "alc": {},
+        "final_miou": {},
+        "final_f1": {}
+      },
+      "summary": {
+        "alc": {
+          "n": 0,
+          "mean": NaN,
+          "std": NaN,
+          "ci95": NaN
+        },
+        "final_miou": {
+          "n": 0,
+          "mean": NaN,
+          "std": NaN,
+          "ci95": NaN
+        },
+        "final_f1": {
+          "n": 0,
+          "mean": NaN,
+          "std": NaN,
+          "ci95": NaN
+        }
+      },
+      "statuses": {
+        "baseline_20260307_210514_seed42": "failed",
+        "baseline_20260307_210514_seed43": "failed",
+        "baseline_20260307_210514_seed44": "failed",
+        "baseline_20260307_210514_seed45": "failed"
+      }
+    },
+    "baseline_random": {
+      "per_seed": {
+        "alc": {},
+        "final_miou": {},
+        "final_f1": {}
+      },
+      "summary": {
+        "alc": {
+          "n": 0,
+          "mean": NaN,
+          "std": NaN,
+          "ci95": NaN
+        },
+        "final_miou": {
+          "n": 0,
+          "mean": NaN,
+          "std": NaN,
+          "ci95": NaN
+        },
+        "final_f1": {
+          "n": 0,
+          "mean": NaN,
+          "std": NaN,
+          "ci95": NaN
+        }
+      },
+      "statuses": {
+        "baseline_20260307_210514_seed42": "failed",
+        "baseline_20260307_210514_seed43": "failed",
+        "baseline_20260307_210514_seed44": "failed",
+        "baseline_20260307_210514_seed45": "failed"
+      }
+    },
+    "baseline_wang_style": {
+      "per_seed": {
+        "alc": {},
+        "final_miou": {},
+        "final_f1": {}
+      },
+      "summary": {
+        "alc": {
+          "n": 0,
+          "mean": NaN,
+          "std": NaN,
+          "ci95": NaN
+        },
+        "final_miou": {
+          "n": 0,
+          "mean": NaN,
+          "std": NaN,
+          "ci95": NaN
+        },
+        "final_f1": {
+          "n": 0,
+          "mean": NaN,
+          "std": NaN,
+          "ci95": NaN
+        }
+      },
+      "statuses": {
+        "baseline_20260307_210514_seed42": "failed",
+        "baseline_20260307_210514_seed43": "failed",
+        "baseline_20260307_210514_seed44": "failed",
+        "baseline_20260307_210514_seed45": "failed"
+      }
+    },
+    "full_model_A_lambda_policy": {
+      "per_seed": {
+        "alc": {},
+        "final_miou": {},
+        "final_f1": {}
+      },
+      "summary": {
+        "alc": {
+          "n": 0,
+          "mean": NaN,
+          "std": NaN,
+          "ci95": NaN
+        },
+        "final_miou": {
+          "n": 0,
+          "mean": NaN,
+          "std": NaN,
+          "ci95": NaN
+        },
+        "final_f1": {
+          "n": 0,
+          "mean": NaN,
+          "std": NaN,
+          "ci95": NaN
+        }
+      },
+      "statuses": {
+        "baseline_20260307_210514_seed42": "failed",
+        "baseline_20260307_210514_seed43": "failed",
+        "baseline_20260307_210514_seed44": "failed",
+        "baseline_20260307_210514_seed45": "failed"
+      }
+    }
+  }
+}

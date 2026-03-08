@@ -1,0 +1,163 @@
+{
+  "baseline_coreset": {
+    "experiment_name": "baseline_coreset",
+    "description": "Core-Set采样基线",
+    "performance_history": [
+      {
+        "round": 1,
+        "mIoU": 0.5242447070721642,
+        "f1_score": 0.5568990946702687,
+        "labeled_size": 189,
+        "model_selection": "last_epoch",
+        "selected_epoch": 10
+      },
+      {
+        "round": 2,
+        "mIoU": 0.548609449948939,
+        "f1_score": 0.5974766084036597,
+        "labeled_size": 277,
+        "model_selection": "last_epoch",
+        "selected_epoch": 10
+      },
+      {
+        "round": 3,
+        "mIoU": 0.592665834007159,
+        "f1_score": 0.6629784944200912,
+        "labeled_size": 365,
+        "model_selection": "last_epoch",
+        "selected_epoch": 10
+      },
+      {
+        "round": 4,
+        "mIoU": 0.5391188498017191,
+        "f1_score": 0.5821282354175904,
+        "labeled_size": 453,
+        "model_selection": "last_epoch",
+        "selected_epoch": 10
+      },
+      {
+        "round": 5,
+        "mIoU": 0.590620291338227,
+        "f1_score": 0.6604808253312131,
+        "labeled_size": 541,
+        "model_selection": "last_epoch",
+        "selected_epoch": 10
+      },
+      {
+        "round": 6,
+        "mIoU": 0.5020864631663472,
+        "f1_score": 0.5163555217158093,
+        "labeled_size": 629,
+        "model_selection": "last_epoch",
+        "selected_epoch": 10
+      },
+      {
+        "round": 7,
+        "mIoU": 0.6194103798392719,
+        "f1_score": 0.6981862777415694,
+        "labeled_size": 717,
+        "model_selection": "last_epoch",
+        "selected_epoch": 10
+      },
+      {
+        "round": 8,
+        "mIoU": 0.6167249083945499,
+        "f1_score": 0.6950890497613689,
+        "labeled_size": 805,
+        "model_selection": "last_epoch",
+        "selected_epoch": 10
+      },
+      {
+        "round": 9,
+        "mIoU": 0.6639760088036,
+        "f1_score": 0.7514083455135964,
+        "labeled_size": 893,
+        "model_selection": "last_epoch",
+        "selected_epoch": 10
+      },
+      {
+        "round": 10,
+        "mIoU": 0.6387862497470258,
+        "f1_score": 0.7218415968867006,
+        "labeled_size": 981,
+        "model_selection": "last_epoch",
+        "selected_epoch": 10
+      },
+      {
+        "round": 11,
+        "mIoU": 0.6581342908476276,
+        "f1_score": 0.747122970148723,
+        "labeled_size": 1069,
+        "model_selection": "last_epoch",
+        "selected_epoch": 10
+      },
+      {
+        "round": 12,
+        "mIoU": 0.7064473268922532,
+        "f1_score": 0.7950911588612843,
+        "labeled_size": 1157,
+        "model_selection": "last_epoch",
+        "selected_epoch": 10
+      },
+      {
+        "round": 13,
+        "mIoU": 0.6371121431596022,
+        "f1_score": 0.7210487975898269,
+        "labeled_size": 1245,
+        "model_selection": "last_epoch",
+        "selected_epoch": 10
+      },
+      {
+        "round": 14,
+        "mIoU": 0.687199405055025,
+        "f1_score": 0.7771966603258904,
+        "labeled_size": 1333,
+        "model_selection": "last_epoch",
+        "selected_epoch": 10
+      },
+      {
+        "round": 15,
+        "mIoU": 0.7383152553399441,
+        "f1_score": 0.8250349231637724,
+        "labeled_size": 1421,
+        "model_selection": "last_epoch",
+        "selected_epoch": 10
+      },
+      {
+        "round": 16,
+        "mIoU": 0.6740005469848681,
+        "f1_score": 0.7620995147766522,
+        "labeled_size": 1509,
+        "model_selection": "last_epoch",
+        "selected_epoch": 10
+      }
+    ],
+    "budget_history": [
+      189,
+      277,
+      365,
+      453,
+      541,
+      629,
+      717,
+      805,
+      893,
+      981,
+      1069,
+      1157,
+      1245,
+      1333,
+      1421,
+      1509
+    ],
+    "fallback_history": [],
+    "alc": 0.5454331797277101,
+    "final_miou": 0.6740005469848681,
+    "final_f1": 0.7620995147766522,
+    "epochs_schedule_source": null,
+    "epochs_schedule": null,
+    "status": "success",
+    "timestamp": "2026-03-08T11:37:12.191139",
+    "log_file": "results/logs_md/baseline_coreset_baseline_20260307_210635_seed42.md"
+  }
+}

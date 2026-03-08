@@ -1,0 +1,91 @@
+Starting Advanced Training Monitor...
+Runs Directory: /Users/anykong/AD-KUCS/AAL_SD/results/runs
+Target Run IDs: results/runs/baseline_20260307_210514
+System Health: Main Script Running | main=1 python=14 spawn_main=8 resource_tracker=1 torch_shm_manager=876 | Mem(Python)=0.0MB
+
+[21:05:15] Monitoring Run: baseline_20260307_210514
+====================================================================================================
+Run: baseline_20260307_210514 | Reports: /Users/anykong/AD-KUCS/AAL_SD/results/runs/baseline_20260307_210514/reports
+Experiment                | Rnd  | Ep       | Loss       | mIoU(E)  | mIoU(R)  | F1(R)    | Upd      | Status     | Warnings
+--------------------------------------------------------------------------------------------------------------------------------------------
+
+Stage Summary
+----------------------------------------------------------------------------------------------------
+已完成（0 个）
+
+进行中（0 个）
+System Health: Main Script Running | main=1(+0) python=15(+1) spawn_main=8(+0) resource_tracker=2(+1) torch_shm_manager=876(+0) | Mem(Python)=0.0MB(+0.0)
+
+[21:05:45] Multi-Run Overview
+====================================================================================================
+Run                                        | Done | Run  | Stal | Fail | Unk  | Latest  
+----------------------------------------------------------------------------------------------------
+baseline_20260307_210514_seed42            | 0    | 0    | 0    | 7    | 0    | 21:05:25
+baseline_20260307_210514_seed43            | 0    | 0    | 0    | 7    | 0    | 21:05:37
+baseline_20260307_210514_seed44            | 0    | 0    | 0    | 0    | 0    | -       
+baseline_20260307_210514_seed45            | 0    | 0    | 0    | 0    | 7    | MISSING 
+
+[21:05:45] Monitoring Run: baseline_20260307_210514_seed42
+====================================================================================================
+Run: baseline_20260307_210514_seed42 | Reports: /Users/anykong/AD-KUCS/AAL_SD/results/runs/baseline_20260307_210514_seed42/reports
+Experiment                | Rnd  | Ep       | Loss       | mIoU(E)  | mIoU(R)  | F1(R)    | Upd      | Status     | Warnings
+--------------------------------------------------------------------------------------------------------------------------------------------
+baseline_bald             | -    | -        | -          | -        | -        | -        | 21:05:23 | failed     | ! 1 issues
+baseline_coreset          | -    | -        | -          | -        | -        | -        | 21:05:23 | failed     | ! 1 issues
+baseline_dial_style       | -    | -        | -          | -        | -        | -        | 21:05:23 | failed     | ! 1 issues
+baseline_entropy          | -    | -        | -          | -        | -        | -        | 21:05:20 | failed     | ! 1 issues
+baseline_random           | -    | -        | -          | -        | -        | -        | 21:05:20 | failed     | ! 1 issues
+baseline_wang_style       | -    | -        | -          | -        | -        | -        | 21:05:25 | failed     | ! 1 issues
+full_model_A_lambda_policy | -    | -        | -          | -        | -        | -        | 21:05:20 | failed     | ! 1 issues
+
+Stage Summary
+----------------------------------------------------------------------------------------------------
+已完成（0 个）
+
+进行中（0 个）
+
+已失败（7 个）
+- baseline_bald (updated_at 21:05:23) | Missing masks for split=train (example_ids=['image_1', 'image_10', 'image_100']) dir=/Users/anykong/AAL_SD/data/Landslide4Sense/TrainData/mask
+- baseline_coreset (updated_at 21:05:23) | Missing masks for split=train (example_ids=['image_1', 'image_10', 'image_100']) dir=/Users/anykong/AAL_SD/data/Landslide4Sense/TrainData/mask
+- baseline_dial_style (updated_at 21:05:23) | Missing masks for split=train (example_ids=['image_1', 'image_10', 'image_100']) dir=/Users/anykong/AAL_SD/data/Landslide4Sense/TrainData/mask
+- baseline_entropy (updated_at 21:05:20) | Missing masks for split=train (example_ids=['image_1', 'image_10', 'image_100']) dir=/Users/anykong/AAL_SD/data/Landslide4Sense/TrainData/mask
+- baseline_random (updated_at 21:05:20) | Missing masks for split=train (example_ids=['image_1', 'image_10', 'image_100']) dir=/Users/anykong/AAL_SD/data/Landslide4Sense/TrainData/mask
+- baseline_wang_style (updated_at 21:05:25) | Missing masks for split=train (example_ids=['image_1', 'image_10', 'image_100']) dir=/Users/anykong/AAL_SD/data/Landslide4Sense/TrainData/mask
+- full_model_A_lambda_policy (updated_at 21:05:20) | Missing masks for split=train (example_ids=['image_1', 'image_10', 'image_100']) dir=/Users/anykong/AAL_SD/data/Landslide4Sense/TrainData/mask
+
+尚未开始/未生成 status（0 个）
+
+[21:05:45] Monitoring Run: baseline_20260307_210514_seed43
+====================================================================================================
+Run: baseline_20260307_210514_seed43 | Reports: /Users/anykong/AD-KUCS/AAL_SD/results/runs/baseline_20260307_210514_seed43/reports
+Experiment                | Rnd  | Ep       | Loss       | mIoU(E)  | mIoU(R)  | F1(R)    | Upd      | Status     | Warnings
+--------------------------------------------------------------------------------------------------------------------------------------------
+baseline_bald             | -    | -        | -          | -        | -        | -        | 21:05:35 | failed     | ! 1 issues
+baseline_coreset          | -    | -        | -          | -        | -        | -        | 21:05:35 | failed     | ! 1 issues
+baseline_dial_style       | -    | -        | -          | -        | -        | -        | 21:05:35 | failed     | ! 1 issues
+baseline_entropy          | -    | -        | -          | -        | -        | -        | 21:05:32 | failed     | ! 1 issues
+baseline_random           | -    | -        | -          | -        | -        | -        | 21:05:32 | failed     | ! 1 issues
+baseline_wang_style       | -    | -        | -          | -        | -        | -        | 21:05:37 | failed     | ! 1 issues
+full_model_A_lambda_policy | -    | -        | -          | -        | -        | -        | 21:05:32 | failed     | ! 1 issues
+
+Stage Summary
+----------------------------------------------------------------------------------------------------
+已完成（0 个）
+
+进行中（0 个）
+
+已失败（7 个）
+- baseline_bald (updated_at 21:05:35) | Missing masks for split=train (example_ids=['image_1', 'image_10', 'image_100']) dir=/Users/anykong/AAL_SD/data/Landslide4Sense/TrainData/mask
+- baseline_coreset (updated_at 21:05:35) | Missing masks for split=train (example_ids=['image_1', 'image_10', 'image_100']) dir=/Users/anykong/AAL_SD/data/Landslide4Sense/TrainData/mask
+- baseline_dial_style (updated_at 21:05:35) | Missing masks for split=train (example_ids=['image_1', 'image_10', 'image_100']) dir=/Users/anykong/AAL_SD/data/Landslide4Sense/TrainData/mask
+- baseline_entropy (updated_at 21:05:32) | Missing masks for split=train (example_ids=['image_1', 'image_10', 'image_100']) dir=/Users/anykong/AAL_SD/data/Landslide4Sense/TrainData/mask
+- baseline_random (updated_at 21:05:32) | Missing masks for split=train (example_ids=['image_1', 'image_10', 'image_100']) dir=/Users/anykong/AAL_SD/data/Landslide4Sense/TrainData/mask
+- baseline_wang_style (updated_at 21:05:37) | Missing masks for split=train (example_ids=['image_1', 'image_10', 'image_100']) dir=/Users/anykong/AAL_SD/data/Landslide4Sense/TrainData/mask
+- full_model_A_lambda_policy (updated_at 21:05:32) | Missing masks for split=train (example_ids=['image_1', 'image_10', 'image_100']) dir=/Users/anykong/AAL_SD/data/Landslide4Sense/TrainData/mask
+
+尚未开始/未生成 status（0 个）
+
+[21:05:45] Monitoring Run: baseline_20260307_210514_seed44
+====================================================================================================
+Run: baseline_20260307_210514_seed44 | Reports: /Users/anykong/AD-KUCS/AAL_SD/results/runs/baseline_20260307_210514_seed44/reports
+Experiment                | Rnd  | Ep       | Loss       | mIoU(E)  | mIoU(R)  | F1(R)    | Upd      | Status     | Warnings

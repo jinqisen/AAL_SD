@@ -1,0 +1,41 @@
+{
+  "run_id": "baseline_20260307_210635_seed43",
+  "experiment_name": "full_model_A_lambda_policy",
+  "updated_at": "2026-03-08T22:44:01.970551",
+  "pool_integrity": {
+    "counts": {
+      "labeled": 189,
+      "unlabeled": 3610,
+      "union": 3799,
+      "dataset": 3799
+    },
+    "overlaps": {
+      "labeled_unlabeled": 0
+    }
+  },
+  "pool_integrity_ok": true,
+  "status": "running",
+  "pools_dir": "/Users/anykong/AD-KUCS/AAL_SD/results/pools/baseline_20260307_210635_seed43/full_model_A_lambda_policy",
+  "checkpoint_path": "/Users/anykong/AD-KUCS/AAL_SD/results/checkpoints/baseline_20260307_210635_seed43/full_model_A_lambda_policy_state.json",
+  "initial": {
+    "labeled": 189,
+    "unlabeled": 3610
+  },
+  "dataset_fingerprint": {
+    "count": 3799,
+    "sha256": "ab1c6ed6ffcd25606a577ecf266996d10127065c72db2f5cc8c43cb90fd7c95a"
+  },
+  "resume": {
+    "start_round": 0
+  },
+  "progress": {
+    "round": 14,
+    "epoch": 8,
+    "labeled_size": 1333,
+    "loss": 0.07690815906132664,
+    "mIoU": 0.6568395723850808,
+    "f1": 0.7430521426761068,
+    "best_mIoU_round": 0.6759254075905493,
+    "warnings": []
+  }
+}

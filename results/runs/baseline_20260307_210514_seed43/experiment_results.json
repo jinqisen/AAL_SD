@@ -1,0 +1,79 @@
+{
+  "baseline_random": {
+    "experiment_name": "baseline_random",
+    "description": "随机采样基线",
+    "status": "failed",
+    "error": "Missing masks for split=train (example_ids=['image_1', 'image_10', 'image_100']) dir=/Users/anykong/AAL_SD/data/Landslide4Sense/TrainData/mask",
+    "performance_history": [],
+    "budget_history": [],
+    "last_round": null,
+    "timestamp": "2026-03-07T21:05:32.351260",
+    "log_file": "results/logs_md/baseline_random_baseline_20260307_210514_seed43.md"
+  },
+  "baseline_entropy": {
+    "experiment_name": "baseline_entropy",
+    "description": "熵采样基线",
+    "status": "failed",
+    "error": "Missing masks for split=train (example_ids=['image_1', 'image_10', 'image_100']) dir=/Users/anykong/AAL_SD/data/Landslide4Sense/TrainData/mask",
+    "performance_history": [],
+    "budget_history": [],
+    "last_round": null,
+    "timestamp": "2026-03-07T21:05:32.354301",
+    "log_file": "results/logs_md/baseline_entropy_baseline_20260307_210514_seed43.md"
+  },
+  "full_model_A_lambda_policy": {
+    "experiment_name": "full_model_A_lambda_policy",
+    "description": "对照A / AAL-SD (Full)：LLM 参与决策与解释；λ由 warmup+风险闭环策略生成并在工具层 clamp（启用CI阈值+AND严重判定+EMA/冷却/限步长；默认禁止 set_lambda；不调整query_size/epochs）",
+    "status": "failed",
+    "error": "Missing masks for split=train (example_ids=['image_1', 'image_10', 'image_100']) dir=/Users/anykong/AAL_SD/data/Landslide4Sense/TrainData/mask",
+    "performance_history": [],
+    "budget_history": [],
+    "last_round": null,
+    "timestamp": "2026-03-07T21:05:32.354629",
+    "log_file": "results/logs_md/full_model_A_lambda_policy_baseline_20260307_210514_seed43.md"
+  },
+  "baseline_dial_style": {
+    "experiment_name": "baseline_dial_style",
+    "description": "DIAL-style基线：分簇多样性约束+不确定性",
+    "status": "failed",
+    "error": "Missing masks for split=train (example_ids=['image_1', 'image_10', 'image_100']) dir=/Users/anykong/AAL_SD/data/Landslide4Sense/TrainData/mask",
+    "performance_history": [],
+    "budget_history": [],
+    "last_round": null,
+    "timestamp": "2026-03-07T21:05:35.375641",
+    "log_file": "results/logs_md/baseline_dial_style_baseline_20260307_210514_seed43.md"
+  },
+  "baseline_bald": {
+    "experiment_name": "baseline_bald",
+    "description": "BALD采样基线",
+    "status": "failed",
+    "error": "Missing masks for split=train (example_ids=['image_1', 'image_10', 'image_100']) dir=/Users/anykong/AAL_SD/data/Landslide4Sense/TrainData/mask",
+    "performance_history": [],
+    "budget_history": [],
+    "last_round": null,
+    "timestamp": "2026-03-07T21:05:35.378795",
+    "log_file": "results/logs_md/baseline_bald_baseline_20260307_210514_seed43.md"
+  },
+  "baseline_coreset": {
+    "experiment_name": "baseline_coreset",
+    "description": "Core-Set采样基线",
+    "status": "failed",
+    "error": "Missing masks for split=train (example_ids=['image_1', 'image_10', 'image_100']) dir=/Users/anykong/AAL_SD/data/Landslide4Sense/TrainData/mask",
+    "performance_history": [],
+    "budget_history": [],
+    "last_round": null,
+    "timestamp": "2026-03-07T21:05:35.378980",
+    "log_file": "results/logs_md/baseline_coreset_baseline_20260307_210514_seed43.md"
+  },
+  "baseline_wang_style": {
+    "experiment_name": "baseline_wang_style",
+    "description": "Wang-style基线：两阶段U→K重排",
+    "status": "failed",
+    "error": "Missing masks for split=train (example_ids=['image_1', 'image_10', 'image_100']) dir=/Users/anykong/AAL_SD/data/Landslide4Sense/TrainData/mask",
+    "performance_history": [],
+    "budget_history": [],
+    "last_round": null,
+    "timestamp": "2026-03-07T21:05:37.871268",
+    "log_file": "results/logs_md/baseline_wang_style_baseline_20260307_210514_seed43.md"
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "baseline_dial_style": {
+    "experiment_name": "baseline_dial_style",
+    "description": "DIAL-style基线：分簇多样性约束+不确定性",
+    "status": "failed",
+    "error": "Missing masks for split=train (example_ids=['image_1', 'image_10', 'image_100']) dir=/Users/anykong/AAL_SD/data/Landslide4Sense/TrainData/mask",
+    "performance_history": [],
+    "budget_history": [],
+    "last_round": null,
+    "timestamp": "2026-03-07T21:05:58.488161",
+    "log_file": "results/logs_md/baseline_dial_style_baseline_20260307_210514_seed45.md"
+  }
+}
