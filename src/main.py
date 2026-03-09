@@ -2810,17 +2810,17 @@ class ActiveLearningPipeline:
 
         layer = self._resolve_feature_layer(model)
         handle = layer.register_forward_hook(hook_fn) if layer is not None else None
-
-        with torch.no_grad():
-            for batch in data_loader:
-                images = self._unpack_images(batch)
-                if images is None:
-                    continue
-                images = images.to(self.config.DEVICE)
-                _ = model(images)
-
-        if handle is not None:
-            handle.remove()
+        try:
+            with torch.no_grad():
+                for batch in data_loader:
+                    images = self._unpack_images(batch)
+                    if images is None:
+                        continue
+                    images = images.to(self.config.DEVICE)
+                    _ = model(images)
+        finally:
+            if handle is not None:
+                handle.remove()
 
         return torch.cat(features_list) if features_list else None
 
@@ -2864,31 +2864,33 @@ class ActiveLearningPipeline:
             for module in model.modules():
                 if isinstance(module, (torch.nn.Dropout, torch.nn.Dropout2d)):
                     module.train()
-            with torch.no_grad():
-                for batch in data_loader:
-                    images = self._unpack_images(batch)
-                    if images is None:
-                        continue
-                    images = images.to(self.config.DEVICE)
-                    batch_size = int(images.shape[0])
-                    sum_probs = None
-                    sum_ent = torch.zeros((batch_size,), device=self.config.DEVICE)
-                    for _ in range(int(n_mc_samples or 10)):
-                        logits = model(images)
-                        probs = torch.softmax(logits, dim=1)
-                        sum_probs = probs if sum_probs is None else (sum_probs + probs)
-                        ent = -torch.sum(probs * torch.log2(probs + eps), dim=1)
-                        sum_ent = sum_ent + _aggregate_uncertainty(ent)
-                    mean_probs = sum_probs / float(int(n_mc_samples or 10))
-                    pred_ent = -torch.sum(mean_probs * torch.log2(mean_probs + eps), dim=1)
-                    mi = _aggregate_uncertainty(pred_ent) - (sum_ent / float(int(n_mc_samples or 10)))
-                    uncertainties.extend([float(x) for x in mi.detach().cpu().tolist()])
-                    if pos_areas is not None:
-                        channel = mean_probs[:, int(pos_class), :, :]
-                        area = (channel > float(pos_threshold)).float().mean(dim=(1, 2))
-                        pos_areas.extend([float(x) for x in area.detach().cpu().tolist()])
+            try:
+                with torch.no_grad():
+                    for batch in data_loader:
+                        images = self._unpack_images(batch)
+                        if images is None:
+                            continue
+                        images = images.to(self.config.DEVICE)
+                        batch_size = int(images.shape[0])
+                        sum_probs = None
+                        sum_ent = torch.zeros((batch_size,), device=self.config.DEVICE)
+                        for _ in range(int(n_mc_samples or 10)):
+                            logits = model(images)
+                            probs = torch.softmax(logits, dim=1)
+                            sum_probs = probs if sum_probs is None else (sum_probs + probs)
+                            ent = -torch.sum(probs * torch.log2(probs + eps), dim=1)
+                            sum_ent = sum_ent + _aggregate_uncertainty(ent)
+                        mean_probs = sum_probs / float(int(n_mc_samples or 10))
+                        pred_ent = -torch.sum(mean_probs * torch.log2(mean_probs + eps), dim=1)
+                        mi = _aggregate_uncertainty(pred_ent) - (sum_ent / float(int(n_mc_samples or 10)))
+                        uncertainties.extend(mi.detach().cpu().tolist())
+                        if pos_areas is not None:
+                            channel = mean_probs[:, int(pos_class), :, :]
+                            area = (channel > float(pos_threshold)).float().mean(dim=(1, 2))
+                            pos_areas.extend(area.detach().cpu().tolist())
+            finally:
+                model.eval()
 
-            model.eval()
             features_tensor = self._extract_features_only(model, data_loader)
             unc_arr = np.asarray(uncertainties, dtype=np.float32)
             pos_arr = np.asarray(pos_areas, dtype=np.float32) if pos_areas is not None else None
@@ -2905,25 +2907,25 @@ class ActiveLearningPipeline:
 
         layer = self._resolve_feature_layer(model)
         handle = layer.register_forward_hook(hook_fn) if layer is not None else None
-
-        with torch.no_grad():
-            for batch in data_loader:
-                images = self._unpack_images(batch)
-                if images is None:
-                    continue
-                images = images.to(self.config.DEVICE)
-                logits = model(images)
-                probs = torch.softmax(logits, dim=1)
-                ent = -torch.sum(probs * torch.log2(probs + eps), dim=1)
-                ent_mean = _aggregate_uncertainty(ent)
-                uncertainties.extend([float(x) for x in ent_mean.detach().cpu().tolist()])
-                if pos_areas is not None:
-                    channel = probs[:, int(pos_class), :, :]
-                    area = (channel > float(pos_threshold)).float().mean(dim=(1, 2))
-                    pos_areas.extend([float(x) for x in area.detach().cpu().tolist()])
-
-        if handle is not None:
-            handle.remove()
+        try:
+            with torch.no_grad():
+                for batch in data_loader:
+                    images = self._unpack_images(batch)
+                    if images is None:
+                        continue
+                    images = images.to(self.config.DEVICE)
+                    logits = model(images)
+                    probs = torch.softmax(logits, dim=1)
+                    ent = -torch.sum(probs * torch.log2(probs + eps), dim=1)
+                    ent_mean = _aggregate_uncertainty(ent)
+                    uncertainties.extend(ent_mean.detach().cpu().tolist())
+                    if pos_areas is not None:
+                        channel = probs[:, int(pos_class), :, :]
+                        area = (channel > float(pos_threshold)).float().mean(dim=(1, 2))
+                        pos_areas.extend(area.detach().cpu().tolist())
+        finally:
+            if handle is not None:
+                handle.remove()
 
         features_tensor = torch.cat(features_list) if features_list else None
         unc_arr = np.asarray(uncertainties, dtype=np.float32)
@@ -2988,7 +2990,7 @@ class ActiveLearningPipeline:
 
         for i, idx in enumerate(self.unlabeled_indices):
             info = {
-                "feature": features_tensor[i].numpy(),
+                "feature": features_tensor[i].numpy().copy(),
                 "uncertainty_score": float(unc_arr[i]),
             }
             if pos_arr is not None and i < int(len(pos_arr)):

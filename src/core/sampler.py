@@ -449,28 +449,28 @@ class ADKUCSSampler:
         handle = None
         if layer is not None:
             handle = layer.register_forward_hook(hook_fn)
+        try:
+            with torch.no_grad():
+                for batch in tqdm(data_loader, desc="Querying Samples"):
+                    images = self._unpack_images(batch)
+                    if images is None:
+                        continue
 
-        with torch.no_grad():
-            for batch in tqdm(data_loader, desc="Querying Samples"):
-                images = self._unpack_images(batch)
-                if images is None:
-                    continue
-
-                images = images.to(self.device)
-                logits = model(images)
-                probs = F.softmax(logits, dim=1)
-                probs_cpu = probs.detach().cpu()
-                batch_size = int(probs_cpu.shape[0])
-                if probs_tensor is None and total_len is not None:
-                    probs_tensor = torch.empty((total_len, *probs_cpu.shape[1:]), dtype=probs_cpu.dtype)
-                if probs_tensor is not None:
-                    probs_tensor[write_offset:write_offset + batch_size] = probs_cpu
-                else:
-                    probs_list.append(probs_cpu)
-                write_offset += batch_size
-
-        if handle is not None:
-            handle.remove()
+                    images = images.to(self.device)
+                    logits = model(images)
+                    probs = F.softmax(logits, dim=1)
+                    probs_cpu = probs.detach().cpu()
+                    batch_size = int(probs_cpu.shape[0])
+                    if probs_tensor is None and total_len is not None:
+                        probs_tensor = torch.empty((total_len, *probs_cpu.shape[1:]), dtype=probs_cpu.dtype)
+                    if probs_tensor is not None:
+                        probs_tensor[write_offset:write_offset + batch_size] = probs_cpu
+                    else:
+                        probs_list.append(probs_cpu)
+                    write_offset += batch_size
+        finally:
+            if handle is not None:
+                handle.remove()
 
         features_tensor = torch.cat(features_list) if features_list else None
         if probs_tensor is not None:
@@ -495,73 +495,72 @@ class ADKUCSSampler:
             pos_areas: list[float] | None = [] if pos_class is not None else None
             features_list: list[torch.Tensor] = []
 
-            capture = {"on": False}
+            capture_first = {"on": True}
 
             def hook_fn(module, input, output):
-                if not capture["on"]:
+                if not capture_first["on"]:
                     return
                 gap = F.adaptive_avg_pool2d(output, (1, 1)).flatten(1)
                 features_list.append(gap.detach().cpu())
+                capture_first["on"] = False
 
             layer = self._resolve_feature_layer(model)
             handle = layer.register_forward_hook(hook_fn) if layer is not None else None
             model.eval()
             self._enable_mc_dropout(model)
-            with torch.no_grad():
-                for batch in tqdm(data_loader, desc="MC Dropout Sampling"):
-                    images = self._unpack_images(batch)
-                    if images is None:
-                        continue
+            try:
+                with torch.no_grad():
+                    for batch in tqdm(data_loader, desc="MC Dropout Sampling"):
+                        images = self._unpack_images(batch)
+                        if images is None:
+                            continue
 
-                    images = images.to(self.device)
-                    batch_size = int(images.shape[0])
-                    sum_probs = None
-                    sum_ent = torch.zeros((batch_size,), device=self.device)
-                    for _ in range(int(getattr(self, "n_mc_samples", 10) or 10)):
-                        logits = model(images)
-                        probs = torch.softmax(logits, dim=1)
-                        if sum_probs is None:
-                            sum_probs = probs
-                        else:
-                            sum_probs = sum_probs + probs
-                        ent = -torch.sum(probs * torch.log2(probs + eps), dim=1)
+                        images = images.to(self.device)
+                        batch_size = int(images.shape[0])
+                        sum_probs = None
+                        sum_ent = torch.zeros((batch_size,), device=self.device)
+                        capture_first["on"] = True
+                        for mc_idx in range(int(getattr(self, "n_mc_samples", 10) or 10)):
+                            logits = model(images)
+                            if mc_idx == 0:
+                                capture_first["on"] = False
+                            probs = torch.softmax(logits, dim=1)
+                            if sum_probs is None:
+                                sum_probs = probs
+                            else:
+                                sum_probs = sum_probs + probs
+                            ent = -torch.sum(probs * torch.log2(probs + eps), dim=1)
+                            mode = str(getattr(self, "uncertainty_aggregation", "mean") or "mean").strip().lower()
+                            if mode in ("mean", "full_mean", "none", ""):
+                                sum_ent = sum_ent + ent.mean(dim=(1, 2))
+                            else:
+                                tau = float(getattr(self, "entropy_threshold", 0.5) or 0.5)
+                                ent_mask = ent > tau
+                                ent_sum_masked = (ent * ent_mask).sum(dim=(1, 2))
+                                mask_count = ent_mask.sum(dim=(1, 2)) + 1e-10
+                                sum_ent = sum_ent + (ent_sum_masked / mask_count)
+
+                        mean_probs = sum_probs / float(int(getattr(self, "n_mc_samples", 10) or 10))
+                        pred_ent = -torch.sum(
+                            mean_probs * torch.log2(mean_probs + eps), dim=1
+                        )
                         mode = str(getattr(self, "uncertainty_aggregation", "mean") or "mean").strip().lower()
                         if mode in ("mean", "full_mean", "none", ""):
-                            sum_ent = sum_ent + ent.mean(dim=(1, 2))
+                            pred_ent_scalar = pred_ent.mean(dim=(1, 2))
                         else:
                             tau = float(getattr(self, "entropy_threshold", 0.5) or 0.5)
-                            ent_mask = ent > tau
-                            ent_sum_masked = (ent * ent_mask).sum(dim=(1, 2))
-                            mask_count = ent_mask.sum(dim=(1, 2)) + 1e-10
-                            sum_ent = sum_ent + (ent_sum_masked / mask_count)
-
-                    mean_probs = sum_probs / float(int(getattr(self, "n_mc_samples", 10) or 10))
-                    pred_ent = -torch.sum(
-                        mean_probs * torch.log2(mean_probs + eps), dim=1
-                    )
-                    mode = str(getattr(self, "uncertainty_aggregation", "mean") or "mean").strip().lower()
-                    if mode in ("mean", "full_mean", "none", ""):
-                        pred_ent_scalar = pred_ent.mean(dim=(1, 2))
-                    else:
-                        tau = float(getattr(self, "entropy_threshold", 0.5) or 0.5)
-                        pred_ent_mask = pred_ent > tau
-                        pred_ent_scalar = (pred_ent * pred_ent_mask).sum(dim=(1, 2)) / (pred_ent_mask.sum(dim=(1, 2)) + 1e-10)
-                    mi = pred_ent_scalar - (sum_ent / float(int(getattr(self, "n_mc_samples", 10) or 10)))
-                    uncertainties.extend(mi.detach().cpu().tolist())
-                    if pos_areas is not None:
-                        channel = mean_probs[:, int(pos_class), :, :]
-                        area = (channel > float(pos_threshold)).float().mean(dim=(1, 2))
-                        pos_areas.extend(area.detach().cpu().tolist())
-
-                    model.eval()
-                    capture["on"] = True
-                    _ = model(images)
-                    capture["on"] = False
-                    self._enable_mc_dropout(model)
-
-            model.eval()
-            if handle is not None:
-                handle.remove()
+                            pred_ent_mask = pred_ent > tau
+                            pred_ent_scalar = (pred_ent * pred_ent_mask).sum(dim=(1, 2)) / (pred_ent_mask.sum(dim=(1, 2)) + 1e-10)
+                        mi = pred_ent_scalar - (sum_ent / float(int(getattr(self, "n_mc_samples", 10) or 10)))
+                        uncertainties.extend(mi.detach().cpu().tolist())
+                        if pos_areas is not None:
+                            channel = mean_probs[:, int(pos_class), :, :]
+                            area = (channel > float(pos_threshold)).float().mean(dim=(1, 2))
+                            pos_areas.extend(area.detach().cpu().tolist())
+            finally:
+                model.eval()
+                if handle is not None:
+                    handle.remove()
             features_tensor = torch.cat(features_list) if features_list else None
             unc_arr = np.asarray(uncertainties, dtype=np.float32)
             pos_arr = (
@@ -585,33 +584,34 @@ class ADKUCSSampler:
             handle = layer.register_forward_hook(hook_fn)
 
         eps = 1e-10
-        with torch.no_grad():
-            for batch in tqdm(data_loader, desc="Querying Samples"):
-                images = self._unpack_images(batch)
-                if images is None:
-                    continue
+        try:
+            with torch.no_grad():
+                for batch in tqdm(data_loader, desc="Querying Samples"):
+                    images = self._unpack_images(batch)
+                    if images is None:
+                        continue
 
-                images = images.to(self.device)
-                logits = model(images)
-                probs = F.softmax(logits, dim=1)
+                    images = images.to(self.device)
+                    logits = model(images)
+                    probs = F.softmax(logits, dim=1)
 
-                ent = -torch.sum(probs * torch.log2(probs + eps), dim=1)
-                mode = str(getattr(self, "uncertainty_aggregation", "mean") or "mean").strip().lower()
-                if mode in ("mean", "full_mean", "none", ""):
-                    ent_mean = ent.mean(dim=(1, 2))
-                else:
-                    tau = float(getattr(self, "entropy_threshold", 0.5) or 0.5)
-                    ent_mask = ent > tau
-                    ent_mean = (ent * ent_mask).sum(dim=(1, 2)) / (ent_mask.sum(dim=(1, 2)) + 1e-10)
-                uncertainties.extend(ent_mean.detach().cpu().tolist())
+                    ent = -torch.sum(probs * torch.log2(probs + eps), dim=1)
+                    mode = str(getattr(self, "uncertainty_aggregation", "mean") or "mean").strip().lower()
+                    if mode in ("mean", "full_mean", "none", ""):
+                        ent_mean = ent.mean(dim=(1, 2))
+                    else:
+                        tau = float(getattr(self, "entropy_threshold", 0.5) or 0.5)
+                        ent_mask = ent > tau
+                        ent_mean = (ent * ent_mask).sum(dim=(1, 2)) / (ent_mask.sum(dim=(1, 2)) + 1e-10)
+                    uncertainties.extend(ent_mean.detach().cpu().tolist())
 
-                if pos_areas is not None:
-                    channel = probs[:, int(pos_class), :, :]
-                    area = (channel > float(pos_threshold)).float().mean(dim=(1, 2))
-                    pos_areas.extend(area.detach().cpu().tolist())
-
-        if handle is not None:
-            handle.remove()
+                    if pos_areas is not None:
+                        channel = probs[:, int(pos_class), :, :]
+                        area = (channel > float(pos_threshold)).float().mean(dim=(1, 2))
+                        pos_areas.extend(area.detach().cpu().tolist())
+        finally:
+            if handle is not None:
+                handle.remove()
 
         features_tensor = torch.cat(features_list) if features_list else None
         unc_arr = np.asarray(uncertainties, dtype=np.float32)
@@ -633,18 +633,18 @@ class ADKUCSSampler:
         handle = None
         if layer is not None:
             handle = layer.register_forward_hook(hook_fn)
+        try:
+            with torch.no_grad():
+                for batch in tqdm(data_loader, desc="Querying Samples"):
+                    images = self._unpack_images(batch)
+                    if images is None:
+                        continue
 
-        with torch.no_grad():
-            for batch in tqdm(data_loader, desc="Querying Samples"):
-                images = self._unpack_images(batch)
-                if images is None:
-                    continue
-
-                images = images.to(self.device)
-                _ = model(images)
-
-        if handle is not None:
-            handle.remove()
+                    images = images.to(self.device)
+                    _ = model(images)
+        finally:
+            if handle is not None:
+                handle.remove()
 
         return torch.cat(features_list) if features_list else None
 

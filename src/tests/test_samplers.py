@@ -446,5 +446,138 @@ class TestADKUCSSBaldScores(unittest.TestCase):
             )
         )
 
+
+class TestHookExceptionSafety(unittest.TestCase):
+    def test_sampler_removes_forward_hook_on_exception(self):
+        from contextlib import ExitStack
+        from unittest.mock import patch
+
+        class FakeHandle:
+            def __init__(self, layer, key):
+                self._layer = layer
+                self._key = key
+
+            def remove(self):
+                self._layer._forward_hooks.pop(self._key, None)
+
+        class FakeLayer:
+            def __init__(self):
+                self._forward_hooks = {}
+
+            def register_forward_hook(self, fn):
+                key = object()
+                self._forward_hooks[key] = fn
+                return FakeHandle(self, key)
+
+        class FakeModel:
+            def __init__(self):
+                self.layer4 = FakeLayer()
+
+            def eval(self):
+                return self
+
+            def __call__(self, images):
+                return None
+
+        class CrashIterable:
+            def __iter__(self):
+                raise RuntimeError("intentional crash")
+
+        sampler = ADKUCSSampler(device="cpu")
+        model = FakeModel()
+
+        with ExitStack() as stack:
+            for target in ("core.sampler.tqdm", "src.core.sampler.tqdm"):
+                try:
+                    stack.enter_context(patch(target, new=lambda it, **kwargs: it))
+                except Exception:
+                    pass
+            with self.assertRaises(RuntimeError):
+                sampler.get_features_only(model, CrashIterable())
+        self.assertEqual(len(model.layer4._forward_hooks), 0)
+
+        sampler.uncertainty_method = "entropy"
+        with ExitStack() as stack:
+            for target in ("core.sampler.tqdm", "src.core.sampler.tqdm"):
+                try:
+                    stack.enter_context(patch(target, new=lambda it, **kwargs: it))
+                except Exception:
+                    pass
+            with self.assertRaises(RuntimeError):
+                sampler.get_uncertainty_and_features(model, CrashIterable())
+        self.assertEqual(len(model.layer4._forward_hooks), 0)
+
+        with ExitStack() as stack:
+            for target in ("core.sampler.tqdm", "src.core.sampler.tqdm"):
+                try:
+                    stack.enter_context(patch(target, new=lambda it, **kwargs: it))
+                except Exception:
+                    pass
+            with self.assertRaises(RuntimeError):
+                sampler.get_predictions_and_features(model, CrashIterable(), mc_dropout=False)
+        self.assertEqual(len(model.layer4._forward_hooks), 0)
+
+    def test_trainer_removes_forward_hook_on_exception(self):
+        from core.trainer import Trainer
+        from contextlib import ExitStack
+        from unittest.mock import patch
+
+        class FakeHandle:
+            def __init__(self, layer, key):
+                self._layer = layer
+                self._key = key
+
+            def remove(self):
+                self._layer._forward_hooks.pop(self._key, None)
+
+        class FakeLayer:
+            def __init__(self):
+                self._forward_hooks = {}
+
+            def register_forward_hook(self, fn):
+                key = object()
+                self._forward_hooks[key] = fn
+                return FakeHandle(self, key)
+
+        class FakeEncoder:
+            def __init__(self):
+                self.layer4 = FakeLayer()
+
+        class FakeInner:
+            def __init__(self):
+                self.encoder = FakeEncoder()
+
+        class FakeModel:
+            def __init__(self):
+                self.model = FakeInner()
+
+            def eval(self):
+                return self
+
+            def __call__(self, images):
+                return None
+
+        class CrashIterable:
+            def __iter__(self):
+                raise RuntimeError("intentional crash")
+
+        model = FakeModel()
+        trainer = Trainer.__new__(Trainer)
+        trainer.model = model
+        trainer.device = "cpu"
+        trainer._amp_enabled = False
+        trainer._amp_dtype = "float16"
+
+        with ExitStack() as stack:
+            for target in ("core.trainer.tqdm", "src.core.trainer.tqdm"):
+                try:
+                    stack.enter_context(patch(target, new=lambda it, **kwargs: it))
+                except Exception:
+                    pass
+            with self.assertRaises(RuntimeError):
+                trainer.predict_probs(CrashIterable())
+        self.assertEqual(len(trainer.model.model.encoder.layer4._forward_hooks), 0)
+
+
 if __name__ == '__main__':
     unittest.main()

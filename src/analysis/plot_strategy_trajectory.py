@@ -135,12 +135,19 @@ def load_trace(trace_path: str) -> pd.DataFrame:
                 r = entry.get("round")
                 row = _row(r)
                 row["lambda_override"] = entry.get("applied")
+                row["lambda_override_suggested"] = entry.get("suggested_lambda")
+                row["lambda_override_exceeds_suggested_range"] = entry.get(
+                    "exceeds_suggested_range"
+                )
+                row["lambda_override_clamped"] = entry.get("clamped")
+                row["lambda_override_clamp_reason"] = entry.get("clamp_reason")
 
             elif etype == "lambda_policy_apply":
                 r = entry.get("round")
                 row = _row(r)
                 row["lambda_policy_apply"] = entry.get("applied")
                 row["lambda_policy_rule"] = entry.get("rule")
+                row["lambda_policy_base"] = entry.get("base")
 
             elif etype == "overfit_signal":
                 r = entry.get("round")
@@ -257,6 +264,155 @@ def load_trace(trace_path: str) -> pd.DataFrame:
     if "l3_k_p75_selected" in df.columns:
         df["k_p75"] = df["k_p75"].fillna(pd.to_numeric(df["l3_k_p75_selected"], errors="coerce"))
 
+    return df
+
+def load_trace_meta(trace_path: str) -> Dict[str, Any]:
+    if not os.path.exists(trace_path):
+        raise FileNotFoundError(trace_path)
+    with open(trace_path, "r") as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                entry = json.loads(line)
+            except Exception:
+                continue
+            if entry.get("type") != "initialized":
+                continue
+            ab = entry.get("ablation") if isinstance(entry.get("ablation"), dict) else {}
+            return {
+                "lambda_policy": ab.get("lambda_policy") if isinstance(ab.get("lambda_policy"), dict) else None,
+                "agent_threshold_overrides": ab.get("agent_threshold_overrides") if isinstance(ab.get("agent_threshold_overrides"), dict) else {},
+            }
+    return {"lambda_policy": None, "agent_threshold_overrides": {}}
+
+def _tvc_series_for_policy_key(df: pd.DataFrame, tvc_key: str) -> pd.Series:
+    mapping = {
+        "grad_train_val_cos_last": "grad_tvc_last",
+        "grad_train_val_cos_min": "grad_tvc_min",
+        "grad_train_val_cos_mean": "grad_tvc_mean",
+        "grad_train_val_cos_neg_rate": "grad_tvc_neg_rate",
+    }
+    col = mapping.get(str(tvc_key), None)
+    if col and col in df.columns:
+        return pd.to_numeric(df[col], errors="coerce").astype(float)
+    if "grad_tvc_last" in df.columns:
+        return pd.to_numeric(df["grad_tvc_last"], errors="coerce").astype(float)
+    return pd.Series([float("nan")] * len(df))
+
+def add_lambda_policy_diagnostics(per_round_df: pd.DataFrame, trace_meta: Dict[str, Any]) -> pd.DataFrame:
+    if per_round_df.empty:
+        return per_round_df
+    policy = trace_meta.get("lambda_policy") if isinstance(trace_meta, dict) else None
+    if not isinstance(policy, dict) or not policy:
+        return per_round_df
+
+    df = per_round_df.copy()
+    overrides = trace_meta.get("agent_threshold_overrides") if isinstance(trace_meta, dict) else {}
+    if not isinstance(overrides, dict):
+        overrides = {}
+
+    q = float(policy.get("risk_ci_quantile", 0.2))
+    window = int(policy.get("risk_ci_window", 6))
+    min_samples = int(policy.get("risk_ci_min_samples", 3))
+    severe_logic = str(policy.get("severe_logic", "or")).strip().lower()
+    tvc_key = str(policy.get("severe_tvc_key", "grad_train_val_cos_last"))
+
+    alpha = float(overrides.get("OVERFIT_RISK_EMA_ALPHA", 1.0))
+    alpha = float(min(max(alpha, 0.0), 1.0))
+    cooling = int(overrides.get("LAMBDA_DOWN_COOLING_ROUNDS", 0) or 0)
+
+    df["policy_risk_ci_quantile"] = q
+    df["policy_risk_ci_window"] = window
+    df["policy_risk_ci_min_samples"] = min_samples
+    df["policy_severe_logic"] = severe_logic
+    df["policy_severe_tvc_key"] = tvc_key
+    df["policy_overfit_risk_ema_alpha"] = alpha
+    df["policy_lambda_down_cooling_rounds"] = cooling
+
+    risk_raw = pd.to_numeric(df.get("overfit_risk", pd.Series([float("nan")] * len(df))), errors="coerce").astype(float)
+    tvc = _tvc_series_for_policy_key(df, tvc_key)
+    rule = df.get("lambda_policy_rule", pd.Series([None] * len(df)))
+
+    risk_hist: List[float] = []
+    tvc_hist: List[float] = []
+    ema: Optional[float] = None
+    last_down_round: Optional[int] = None
+
+    rounds = pd.to_numeric(df.get("round"), errors="coerce").astype("Int64")
+
+    out_ema: List[Optional[float]] = []
+    out_risk_th: List[Optional[float]] = []
+    out_risk_hit: List[Optional[bool]] = []
+    out_tvc_th: List[Optional[float]] = []
+    out_tvc_hit: List[Optional[bool]] = []
+    out_severe: List[bool] = []
+    out_in_cooling: List[bool] = []
+
+    for i in range(len(df)):
+        rr = risk_raw.iloc[i]
+        tv = tvc.iloc[i]
+        rd = rounds.iloc[i]
+        rd_int = int(rd) if pd.notna(rd) else None
+
+        if math.isfinite(float(rr)) if rr is not None else False:
+            rrv = float(rr)
+            ema = rrv if ema is None else (alpha * rrv + (1.0 - alpha) * float(ema))
+            risk_hist.append(rrv)
+        else:
+            risk_hist.append(float("nan"))
+
+        if math.isfinite(float(tv)) if tv is not None else False:
+            tvc_hist.append(float(tv))
+        else:
+            tvc_hist.append(float("nan"))
+
+        rh = [x for x in risk_hist[max(0, len(risk_hist) - window) :] if math.isfinite(float(x))]
+        th = [x for x in tvc_hist[max(0, len(tvc_hist) - window) :] if math.isfinite(float(x))]
+
+        risk_th = None
+        risk_hit = None
+        if ema is not None and len(rh) >= min_samples:
+            risk_th = float(np.quantile(np.asarray(rh, dtype=float), 1.0 - q))
+            risk_hit = bool(float(ema) >= float(risk_th))
+
+        tvc_th = None
+        tvc_hit = None
+        if math.isfinite(float(tv)) and len(th) >= min_samples:
+            tvc_th = float(np.quantile(np.asarray(th, dtype=float), q))
+            tvc_hit = bool(float(tv) <= float(tvc_th))
+
+        if severe_logic == "and":
+            severe = bool((risk_hit is True) and (tvc_hit is True))
+        else:
+            severe = bool((risk_hit is True) or (tvc_hit is True))
+
+        if isinstance(rule.iloc[i], str) and rule.iloc[i] in {
+            "severe_overfit_lambda_down",
+            "rollback_lambda_down",
+        } and rd_int is not None:
+            last_down_round = rd_int
+
+        in_cooling = False
+        if cooling > 0 and last_down_round is not None and rd_int is not None:
+            in_cooling = bool((rd_int - last_down_round) <= cooling)
+
+        out_ema.append(float(ema) if ema is not None else None)
+        out_risk_th.append(risk_th)
+        out_risk_hit.append(risk_hit)
+        out_tvc_th.append(tvc_th)
+        out_tvc_hit.append(tvc_hit)
+        out_severe.append(severe)
+        out_in_cooling.append(in_cooling)
+
+    df["policy_overfit_risk_ema"] = pd.to_numeric(pd.Series(out_ema), errors="coerce").astype(float)
+    df["policy_ci_risk_th_rawhist"] = pd.to_numeric(pd.Series(out_risk_th), errors="coerce").astype(float)
+    df["policy_ci_risk_hit"] = pd.Series(out_risk_hit, dtype="boolean")
+    df["policy_ci_tvc_th"] = pd.to_numeric(pd.Series(out_tvc_th), errors="coerce").astype(float)
+    df["policy_ci_tvc_hit"] = pd.Series(out_tvc_hit, dtype="boolean")
+    df["policy_ci_severe"] = pd.Series(out_severe, dtype=bool)
+    df["policy_in_cooling"] = pd.Series(out_in_cooling, dtype=bool)
     return df
 
 def plot_lambda_trajectory(df: pd.DataFrame, output_dir: str):
@@ -554,11 +710,17 @@ def aggregate_gradients_per_round(epoch_df: pd.DataFrame) -> pd.DataFrame:
     return out
 
 def _effective_lambda(per_round_df: pd.DataFrame) -> pd.Series:
+    n = len(per_round_df)
+    base = pd.Series([pd.NA] * n)
     if "lambda_effective" in per_round_df.columns:
-        lam = pd.to_numeric(per_round_df["lambda_effective"], errors="coerce")
-    else:
-        lam = pd.Series([pd.NA] * len(per_round_df))
-    return pd.to_numeric(lam, errors="coerce").astype(float)
+        base = base.combine_first(pd.to_numeric(per_round_df["lambda_effective"], errors="coerce"))
+    if "lambda_policy_apply" in per_round_df.columns:
+        base = base.combine_first(pd.to_numeric(per_round_df["lambda_policy_apply"], errors="coerce"))
+    if "lambda_override" in per_round_df.columns:
+        base = base.combine_first(pd.to_numeric(per_round_df["lambda_override"], errors="coerce"))
+    if "lambda_t" in per_round_df.columns:
+        base = base.combine_first(pd.to_numeric(per_round_df["lambda_t"], errors="coerce"))
+    return pd.to_numeric(base, errors="coerce").astype(float)
 
 def _corr(x: pd.Series, y: pd.Series) -> Optional[float]:
     try:
@@ -870,6 +1032,46 @@ def analyze_trace_with_gradients(trace_path: str) -> Tuple[pd.DataFrame, pd.Data
         per_round = per_round.merge(grad_round, on="round", how="left")
     return per_round, epoch
 
+def export_lambda_diagnostics(per_round_df: pd.DataFrame, output_dir: str, name: str) -> Optional[str]:
+    if per_round_df.empty:
+        return None
+    cols = [
+        c
+        for c in [
+            "round",
+            "lambda_eff",
+            "lambda_policy_apply",
+            "lambda_policy_rule",
+            "lambda_policy_base",
+            "lambda_override",
+            "lambda_override_suggested",
+            "lambda_override_exceeds_suggested_range",
+            "lambda_override_clamped",
+            "lambda_override_clamp_reason",
+            "overfit_risk",
+            "policy_overfit_risk_ema",
+            "policy_ci_risk_th_rawhist",
+            "policy_ci_risk_hit",
+            "grad_tvc_last",
+            "policy_ci_tvc_th",
+            "policy_ci_tvc_hit",
+            "policy_ci_severe",
+            "policy_in_cooling",
+            "miou_delta",
+            "miou_gain",
+            "miou_gain_next",
+            "final_miou",
+        ]
+        if c in per_round_df.columns
+    ]
+    if not cols:
+        return None
+    out = per_round_df[cols].copy()
+    out_path = os.path.join(output_dir, f"{name}_lambda_diagnostics.csv")
+    out.to_csv(out_path, index=False)
+    print(f"Saved {out_path}")
+    return out_path
+
 def plot_overfit_vs_gain(per_round_df: pd.DataFrame, output_dir: str, name: str):
     if per_round_df.empty:
         return
@@ -963,6 +1165,8 @@ def analyze_run_dir(run_dir: str, output_dir: str, experiment_name: Optional[str
         if per_round.empty:
             continue
         per_round = add_overfit_signals(per_round)
+        meta = load_trace_meta(trace_path)
+        per_round = add_lambda_policy_diagnostics(per_round, meta)
         per_round["experiment_name"] = name
         if not epoch.empty:
             epoch["experiment_name"] = name
@@ -971,6 +1175,7 @@ def analyze_run_dir(run_dir: str, output_dir: str, experiment_name: Optional[str
 
         export_path = os.path.join(output_dir, f"{name}_per_round_with_grad.csv")
         per_round.to_csv(export_path, index=False)
+        export_lambda_diagnostics(per_round, output_dir, name)
 
         lam = _effective_lambda(per_round)
         corr_lam_tvc_mean = _corr(lam, per_round.get("grad_tvc_mean", pd.Series(dtype=float)))
@@ -1150,6 +1355,8 @@ def main():
 
     df, _epoch = analyze_trace_with_gradients(trace_path)
     df = add_overfit_signals(df)
+    meta = load_trace_meta(trace_path)
+    df = add_lambda_policy_diagnostics(df, meta)
 
     if df.empty:
         raise RuntimeError("No per-round data found in trace")
@@ -1182,6 +1389,7 @@ def main():
         export_path = os.path.join(output_dir, f"{name}_per_round_summary.csv")
         df.to_csv(export_path, index=False)
         print(f"CSV exported to {export_path}")
+        export_lambda_diagnostics(df, output_dir, name)
 
     plot_lambda_trajectory(df, output_dir)
     plot_gradient_decomposition(df, output_dir)

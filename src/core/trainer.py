@@ -407,34 +407,36 @@ class Trainer:
         handle = layer.register_forward_hook(hook_fn)
         ordered_indices = self._get_ordered_indices(data_loader)
         offset = 0
-        with torch.no_grad():
-            for batch in tqdm(data_loader, desc="Extracting Features"):
-                images, _ = self._unpack_batch(batch, require_mask=False)
-                features_list.clear()
-                images = images.to(self.device)
-                if self._amp_enabled:
-                    amp_dtype = torch.float16
-                    if self._amp_dtype in ("bf16", "bfloat16"):
-                        amp_dtype = torch.bfloat16
-                    with torch.autocast(device_type="cuda", dtype=amp_dtype):
+        try:
+            with torch.no_grad():
+                for batch in tqdm(data_loader, desc="Extracting Features"):
+                    images, _ = self._unpack_batch(batch, require_mask=False)
+                    features_list.clear()
+                    images = images.to(self.device)
+                    if self._amp_enabled:
+                        amp_dtype = torch.float16
+                        if self._amp_dtype in ("bf16", "bfloat16"):
+                            amp_dtype = torch.bfloat16
+                        with torch.autocast(device_type="cuda", dtype=amp_dtype):
+                            _ = self.model(images)
+                    else:
                         _ = self.model(images)
-                else:
-                    _ = self.model(images)
-                if not features_list:
-                    continue
-                batch_features = features_list[-1]
-                batch_size = batch_features.size(0)
-                if ordered_indices is None:
-                    batch_indices = list(range(offset, offset + batch_size))
-                else:
-                    batch_indices = ordered_indices[offset : offset + batch_size]
-                for i, dataset_index in enumerate(batch_indices):
-                    sample_id = self._resolve_sample_id(
-                        data_loader.dataset, dataset_index
-                    )
-                    features_dict[str(sample_id)] = batch_features[i].numpy()
-                offset += batch_size
-        handle.remove()
+                    if not features_list:
+                        continue
+                    batch_features = features_list[-1]
+                    batch_size = batch_features.size(0)
+                    if ordered_indices is None:
+                        batch_indices = list(range(offset, offset + batch_size))
+                    else:
+                        batch_indices = ordered_indices[offset : offset + batch_size]
+                    for i, dataset_index in enumerate(batch_indices):
+                        sample_id = self._resolve_sample_id(
+                            data_loader.dataset, dataset_index
+                        )
+                        features_dict[str(sample_id)] = batch_features[i].numpy()
+                    offset += batch_size
+        finally:
+            handle.remove()
         return features_dict
 
     def predict_probs(self, data_loader):
@@ -456,25 +458,26 @@ class Trainer:
             if layer:
                 handle = layer.register_forward_hook(hook_fn)
 
-        with torch.no_grad():
-            for batch in tqdm(data_loader, desc="Predicting"):
-                images, _ = self._unpack_batch(batch, require_mask=False)
+        try:
+            with torch.no_grad():
+                for batch in tqdm(data_loader, desc="Predicting"):
+                    images, _ = self._unpack_batch(batch, require_mask=False)
 
-                images = images.to(self.device)
-                if self._amp_enabled:
-                    amp_dtype = torch.float16
-                    if self._amp_dtype in ("bf16", "bfloat16"):
-                        amp_dtype = torch.bfloat16
-                    with torch.autocast(device_type="cuda", dtype=amp_dtype):
+                    images = images.to(self.device)
+                    if self._amp_enabled:
+                        amp_dtype = torch.float16
+                        if self._amp_dtype in ("bf16", "bfloat16"):
+                            amp_dtype = torch.bfloat16
+                        with torch.autocast(device_type="cuda", dtype=amp_dtype):
+                            outputs = self.model(images)  # Logits
+                        probs = F.softmax(outputs.float(), dim=1)
+                    else:
                         outputs = self.model(images)  # Logits
-                    probs = F.softmax(outputs.float(), dim=1)
-                else:
-                    outputs = self.model(images)  # Logits
-                    probs = F.softmax(outputs, dim=1)
-                probs_list.append(probs.cpu())
-
-        if handle:
-            handle.remove()
+                        probs = F.softmax(outputs, dim=1)
+                    probs_list.append(probs.cpu())
+        finally:
+            if handle:
+                handle.remove()
 
         return torch.cat(probs_list), torch.cat(
             features_list
