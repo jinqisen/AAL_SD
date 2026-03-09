@@ -34,13 +34,6 @@ SEEDS="${SEEDS:-42 43 44 45}"
 WORKERS="${WORKERS:-1}"
 EXP_WORKERS="${EXP_WORKERS:-4}"
 N_ROUNDS="${N_ROUNDS:-}"
-MONITOR_ENABLE="${MONITOR_ENABLE:-1}"
-MONITOR_INTERVAL="${MONITOR_INTERVAL:-30}"
-MONITOR_STALL_THRESHOLD="${MONITOR_STALL_THRESHOLD:-600}"
-MONITOR_PROC_LOG="${MONITOR_PROC_LOG:-0}"
-MONITOR_SUMMARY="${MONITOR_SUMMARY:-1}"
-RUN_GROUP_DIR="${RESULTS_DIR}/runs/${BASE_RUN_ID}"
-MONITOR_LOG="${MONITOR_LOG:-${RUN_GROUP_DIR}/reports/monitor_protocol_robustness.log}"
 
 EXPERIMENTS=(
   protocol_aligned_full_model_A
@@ -56,31 +49,6 @@ if [[ "${HAS_LLM_KEY}" != "1" ]]; then
   echo "错误：未检测到 LLM_API_KEY，但本脚本包含 agent 协议实验（protocol_aligned_full_model_*）。" 1>&2
   echo "请配置 src/llm_config.json（或设置对应 API key 环境变量，例如 SILICONFLOW_API_KEY）后重试。" 1>&2
   exit 3
-fi
-
-if [[ "${MONITOR_ENABLE}" == "1" ]]; then
-  mkdir -p "${RUN_GROUP_DIR}/reports"
-  monitor_cmd=(
-    "${PYTHON_BIN}"
-    "src/monitor_and_recover.py"
-    "--run-dirs" "${RUN_GROUP_DIR}"
-    "--interval" "${MONITOR_INTERVAL}"
-    "--stall-threshold" "${MONITOR_STALL_THRESHOLD}"
-  )
-  if [[ "${MONITOR_SUMMARY}" == "1" ]]; then
-    monitor_cmd+=("--summary")
-  else
-    monitor_cmd+=("--no-summary")
-  fi
-  if [[ "${MONITOR_PROC_LOG}" == "1" ]]; then
-    monitor_cmd+=("--proc-log")
-  fi
-  printf 'Monitoring:'
-  printf ' %q' "${monitor_cmd[@]}"
-  printf '\n'
-  "${monitor_cmd[@]}" >"${MONITOR_LOG}" 2>&1 &
-  MONITOR_PID=$!
-  trap 'if [[ -n "${MONITOR_PID:-}" ]]; then kill "${MONITOR_PID}" 2>/dev/null || true; fi' EXIT
 fi
 
 cmd=(

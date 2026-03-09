@@ -1837,6 +1837,7 @@ class ActiveLearningPipeline:
                         selected = int(update_result.get("selected_count") or 0)
                         if expected > 0 and selected < expected:
                             early_stop = True
+                            early_stop_reason = "selection_short"
                         if expected > 0 and selected < expected:
                             self._write_status(
                                 {
@@ -1850,17 +1851,24 @@ class ActiveLearningPipeline:
                                     }
                                 }
                             )
-                    elif self.use_agent and self._last_query_selected_count is not None:
+                    # Early stopping logic
+                    # 1. Selection Short
+                    if self.use_agent and self._last_query_selected_count is not None:
                         expected = int(getattr(self.config, "QUERY_SIZE", 0) or 0)
                         if (
                             expected > 0
                             and int(self._last_query_selected_count) < expected
                         ):
                             early_stop = True
+                            early_stop_reason = "selection_short"
                             
-                    if getattr(self, "_main_miou_low_gain_streak", 0) >= 3 and round_idx >= self.config.N_ROUNDS // 2:
-                        logger.info(f"Early stopping triggered: mIoU low gain (<{getattr(AgentThresholds, 'MIOU_LOW_GAIN_THRESH', 0.001)}) for 3 consecutive rounds.")
-                        early_stop = True
+                    # 2. mIoU Low Gain (Disabled, used for lambda adjustment instead)
+                    low_gain_streak = getattr(self, "_main_miou_low_gain_streak", 0)
+                    low_gain_thresh_streak = getattr(AgentThresholds, "MIOU_LOW_GAIN_STREAK", 3)
+                    if low_gain_streak >= low_gain_thresh_streak and round_idx >= self.config.N_ROUNDS // 2:
+                        logger.warning(f"Low gain warning: mIoU low gain for {low_gain_streak} consecutive rounds (threshold={low_gain_thresh_streak}). NOT stopping early, letting agent/policy adjust.")
+                        # early_stop = True # Disabled to allow policy adjustment
+                        # if not early_stop_reason: early_stop_reason = "miou_low_gain"
 
                     self._append_round_summary(
                         int(round_idx + 1),
@@ -1918,7 +1926,11 @@ class ActiveLearningPipeline:
                         {
                             "type": "early_stop",
                             "round": int(round_idx + 1),
-                            "reason": "selection_short",
+                            "reason": early_stop_reason if "early_stop_reason" in locals() else "unknown",
+                            "details": {
+                                "low_gain_streak": getattr(self, "_main_miou_low_gain_streak", 0),
+                                "selection_short": (int(self._last_query_selected_count) < expected) if (self.use_agent and self._last_query_selected_count is not None and expected > 0) else False
+                            }
                         }
                     )
                     break

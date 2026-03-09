@@ -2,7 +2,7 @@ import json
 from .config import AgentThresholds, AgentConstraints
 
 class PromptBuilder:
-    def build_system_prompt(self, total_iterations=0, current_iteration=0, last_miou=0.0, lambda_t=0.0, rollback_threshold=None, rollback_mode=None, k_definition=None, control_permissions=None, require_explicit_lambda: bool = False):
+    def build_system_prompt(self, total_iterations=0, current_iteration=0, last_miou=0.0, lambda_t=0.0, rollback_threshold=None, rollback_mode=None, k_definition=None, control_permissions=None, require_explicit_lambda: bool = False, miou_low_gain_streak=0):
         allowed_actions = []
         control_permissions_json = "null"
         alpha_allowed = None
@@ -103,6 +103,7 @@ class PromptBuilder:
             - 总迭代轮数 (T_max): {total_iterations}
             - 当前迭代轮数 (t): {current_iteration}
             - 当前模型性能 (mIoU): {last_miou:.4f}
+            - 当前连续低增益轮数: {miou_low_gain_streak}
             - 当前自适应权重 (lambda_t): {lambda_t:.4f}
             - 是否要求显式设置lambda: {require_explicit_lambda_str}
             - 控制权限(JSON): {control_permissions_json}
@@ -135,6 +136,7 @@ class PromptBuilder:
             - rollback_flag为真（表示本轮mIoU出现显著回撤）或miou_delta显著为负：不得提高λ，必要时小幅降低λ，并标注"回撤-保守控制"。
             - 若观测到过拟合严重：以实验策略为准（可能采用 severe_logic=and/or、risk_trigger=ci/abs、severe_tvc_key=grad_train_val_cos_last/min）。触发后下一轮降低λ（例如 λ=max(λ-{lambda_delta_down},{lambda_policy_min})），且不得提高λ。
             - 若观测到过拟合风险低（overfit_risk<={overfit_risk_lo}）且 miou_gain 连续低：才允许小幅上调λ（例如 λ=min(λ+{lambda_delta_up},{lambda_policy_max})），并将单轮上调控制在步长限制内。
+            - 若连续低增益轮数(miou_low_gain_streak) >= 3 且无明显过拟合：说明当前样本冗余度高，应增加探索（提高λ，例如+0.05~0.1），以引入更多新颖样本打破停滞。
 
             异常处理（必须遵守）：
             - miou为NaN/Inf：使用上轮有效值并注明“miou异常-使用历史值”。
@@ -165,6 +167,7 @@ class PromptBuilder:
             total_iterations=int(total_iterations or 0),
             current_iteration=int(current_iteration or 0),
             last_miou=float(last_miou or 0.0),
+            miou_low_gain_streak=int(miou_low_gain_streak or 0),
             lambda_t=float(lambda_t or 0.0),
             control_permissions_json=control_permissions_json,
             allowed_actions_str=allowed_actions_str,

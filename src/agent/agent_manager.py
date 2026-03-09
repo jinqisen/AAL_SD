@@ -180,6 +180,7 @@ class AgentManager:
                     k_definition=k_definition,
                     control_permissions=getattr(self.tools, "control_permissions", None),
                     require_explicit_lambda=bool(require_explicit_lambda),
+                    miou_low_gain_streak=int(self.tools.training_state.get("miou_low_gain_streak", 0)),
                 )
             },
             {"role": "user", "content": user_prompt}

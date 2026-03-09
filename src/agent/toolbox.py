@@ -1301,8 +1301,10 @@ class Toolbox:
                 self._miou_low_gain_streak = int(self._miou_low_gain_streak) + 1
             else:
                 self._miou_low_gain_streak = 0
+            self.training_state["miou_low_gain_streak"] = self._miou_low_gain_streak
         except Exception:
             self._miou_low_gain_streak = 0
+            self.training_state["miou_low_gain_streak"] = 0
 
     def finalize_selection(self, sample_ids: List[str], reason: str, thought: Optional[str] = None) -> str:
         """

@@ -9,6 +9,6 @@ __pycache__/
 paper/
 AAL-SD-Doc/survey/
 data/
-results/checkpoints/
 *.pt
 src.zip
+results/
