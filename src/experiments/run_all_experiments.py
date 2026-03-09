@@ -311,6 +311,7 @@ class ExperimentRunner:
             exp_cfg = ABLATION_SETTINGS.get(canonical, {})
             schedule_from = exp_cfg.get("epoch_schedule_from") if isinstance(exp_cfg, dict) else None
             original_schedule = getattr(self.config, "EPOCHS_PER_ROUND_SCHEDULE", None)
+            original_epochs_per_round = getattr(self.config, "EPOCHS_PER_ROUND", None)
             schedule_applied = None
             fixed_epochs = bool(getattr(self.config, "FIX_EPOCHS_PER_ROUND", False))
             if schedule_from and (not fixed_epochs):
@@ -323,10 +324,19 @@ class ExperimentRunner:
                     setattr(self.config, "EPOCHS_PER_ROUND_SCHEDULE", schedule_applied)
 
             try:
+                epochs_override = (
+                    exp_cfg.get("epochs_per_round_override")
+                    if isinstance(exp_cfg, dict)
+                    else None
+                )
+                if epochs_override is not None:
+                    setattr(self.config, "EPOCHS_PER_ROUND", int(epochs_override))
                 pipeline = ActiveLearningPipeline(self.config, experiment_name, run_id=self.run_id)
                 run_result = pipeline.run_and_collect(log_path=log_path)
             finally:
                 setattr(self.config, "EPOCHS_PER_ROUND_SCHEDULE", original_schedule)
+                if original_epochs_per_round is not None:
+                    setattr(self.config, "EPOCHS_PER_ROUND", original_epochs_per_round)
             result = {
                 'experiment_name': experiment_name,
                 'description': (exp_cfg.get('description') if isinstance(exp_cfg, dict) else None),
