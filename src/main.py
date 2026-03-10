@@ -1037,6 +1037,15 @@ class ActiveLearningPipeline:
                 if start_mode != "fresh" and isinstance(manifest, dict):
                     cfg_snapshot = manifest.get("config")
                     if isinstance(cfg_snapshot, dict):
+                        manifest_exempt_keys = set()
+                        try:
+                            if (
+                                isinstance(getattr(self, "exp_config", None), dict)
+                                and self.exp_config.get("epochs_per_round_override") is not None
+                            ):
+                                manifest_exempt_keys.add("EPOCHS_PER_ROUND")
+                        except Exception:
+                            manifest_exempt_keys = set()
                         tracked_keys = (
                             "RANDOM_SEED",
                             "DETERMINISTIC",
@@ -1057,6 +1066,8 @@ class ActiveLearningPipeline:
                         )
                         mismatches = {}
                         for key in tracked_keys:
+                            if key in manifest_exempt_keys:
+                                continue
                             if key not in cfg_snapshot:
                                 continue
                             value = cfg_snapshot.get(key)

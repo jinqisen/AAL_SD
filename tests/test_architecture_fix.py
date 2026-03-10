@@ -230,6 +230,7 @@ class TestArchitectureFix(unittest.TestCase):
                 "rollback_config": cfg.get("rollback_config"),
                 "control_permissions": cfg.get("control_permissions"),
                 "agent_threshold_overrides": cfg.get("agent_threshold_overrides"),
+                "epochs_per_round_override": cfg.get("epochs_per_round_override"),
             }
             sig = freeze(effective)
             other = signatures.get(sig)

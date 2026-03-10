@@ -302,6 +302,48 @@ class ExperimentRunner:
             f"results_dir={self.results_dir} | pools_dir={getattr(self.config, 'POOLS_DIR', None)} | checkpoint_dir={getattr(self.config, 'CHECKPOINT_DIR', None)}"
         )
         logger.info(f"{'='*80}")
+
+        if str(self.start_mode) == "resume":
+            completed = None
+            try:
+                n_rounds = int(getattr(self.config, "N_ROUNDS", 0) or 0)
+            except Exception:
+                n_rounds = 0
+            try:
+                p = self.run_dir / f"result_{experiment_name}.json"
+                if p.exists():
+                    payload = json.loads(p.read_text(encoding="utf-8"))
+                    if isinstance(payload, dict):
+                        completed = payload.get(experiment_name)
+            except Exception:
+                completed = None
+            if completed is None:
+                try:
+                    p = self.run_dir / "experiment_results.json"
+                    if p.exists():
+                        payload = json.loads(p.read_text(encoding="utf-8"))
+                        if isinstance(payload, dict):
+                            completed = payload.get(experiment_name)
+                except Exception:
+                    completed = None
+            if isinstance(completed, dict) and str(completed.get("status")) == "success":
+                perf = completed.get("performance_history")
+                has_rounds = isinstance(perf, list) and len(perf) > 0
+                last_round = None
+                if has_rounds:
+                    try:
+                        last_round = int((perf[-1] or {}).get("round") or 0)
+                    except Exception:
+                        last_round = None
+                looks_complete = (not n_rounds) or (last_round is not None and last_round >= n_rounds) or (
+                    isinstance(perf, list) and len(perf) >= n_rounds and n_rounds > 0
+                )
+                if has_rounds and looks_complete:
+                    self.all_results[experiment_name] = completed
+                    logger.info(
+                        f"RUN SKIP  | run_id={self.run_id} | experiment={experiment_name} | reason=already_completed"
+                    )
+                    return completed
         
         log_path = None
         try:
