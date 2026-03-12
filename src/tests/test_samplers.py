@@ -332,14 +332,15 @@ class TestADKUCSSCoresetToLabeled(unittest.TestCase):
             }
         }
         sampler = ADKUCSSampler()
-        with self.assertRaises(RuntimeError):
-            sampler.rank_samples(
-                unlabeled_info,
-                labeled_features=np.zeros((0, 8), dtype=np.float32),
-                current_iteration=1,
-                total_iterations=10,
-                lambda_override=0.5,
-            )
+        ranked = sampler.rank_samples(
+            unlabeled_info,
+            labeled_features=np.zeros((0, 8), dtype=np.float32),
+            current_iteration=1,
+            total_iterations=10,
+            lambda_override=0.5,
+        )
+        self.assertEqual(len(ranked), 1)
+        self.assertEqual(ranked[0]["sample_id"], "u0")
 
     def test_score_normalization_toggle(self):
         rng = np.random.default_rng(1234)

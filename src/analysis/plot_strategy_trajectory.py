@@ -169,6 +169,12 @@ def load_trace(trace_path: str) -> pd.DataFrame:
                 row["lambda_guard_cap"] = entry.get("cap")
                 row["lambda_guard_before"] = entry.get("lambda_before")
                 row["lambda_guard_after"] = entry.get("lambda_after")
+            elif etype == "selection_guardrail":
+                r = entry.get("round")
+                row = _row(r)
+                row["lambda_guard_cap"] = entry.get("cap")
+                row["lambda_guard_before"] = entry.get("lambda_before")
+                row["lambda_guard_after"] = entry.get("lambda_after")
 
             elif etype == "round_summary":
                 r = entry.get("round")

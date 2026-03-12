@@ -83,17 +83,14 @@ class PromptBuilder:
             rollback_threshold_val = float(AgentThresholds.ROLLBACK_THRESHOLD)
         rollback_mode_str = str(rollback_mode) if rollback_mode is not None else "adaptive_threshold"
 
-        kd = str(k_definition or "coreset_to_labeled").strip()
-        if kd == "coreset_to_labeled_fixed":
-            k_definition_desc = (
-                "1. coreset-to-labeled-fixed：K(x)=min_{l∈L0}||f_x-f_l|| 的归一化（L0为初始标注池，固定不随轮次扩张；越大越新颖/覆盖不足）。"
-                "若初始标注为空：视为实验配置/数据错误，必须终止运行并修复初始标注池。"
-            )
-        else:
-            k_definition_desc = (
-                "1. coreset-to-labeled：K(x)=min_{l∈L}||f_x-f_l|| 的归一化（L为当前标注池；越大越新颖/覆盖不足）。"
-                "若已标注为空：视为实验配置/数据错误，必须终止运行并修复初始标注池。"
-            )
+        kd = str(k_definition or "unlabeled_kmeans_representativeness").strip()
+        k_definition_desc = (
+            f"1. {kd or 'default'}（当前代码实现；k_definition 仅用于标识展示，不影响公式）：K(x)为“未标注池聚类代表性”得分（越大越代表性/越靠近簇中心）。"
+            "具体：对未标注样本特征做 KMeans 聚类（簇数 n_clusters=min(88, |U|)），"
+            "令 x 归属簇中心为 c(x)，距离 d(x)=||f_x-c(x)||，并以未标注池内最大距离 d_max 归一化，"
+            "K(x)=1-d(x)/max(d_max,1e-12)。"
+            "注意：当前 score 预计算阶段仍要求已标注池非空（否则会直接报错终止），这是实现层面的前置约束。"
+        )
 
         prompt = """
             你是一个主动学习系统的“动态控制器”（不是聊天助手），你的输出必须直接驱动本轮Round的控制动作与最终选样。
@@ -111,7 +108,7 @@ class PromptBuilder:
             - set_hyperparameter 可用: {alpha_allowed_str}
 
             AD-KUCS 评分逻辑（必须遵守） ：
-            - 不确定性 U(x) = entropy(p_x)，p_x为样本x预测概率分布。
+            - 不确定性 U(x) = 像素熵均值（log2）：U(I)=mean_i H(p_i)，H(p_i)=-sum_c p_{{i,c}} log2(p_{{i,c}}+1e-10)。
             - 知识增益 K(x) 定义：
               {k_definition_desc}
             - 融合得分 Score(x) = (1-λ)·U(x) + λ·K(x)，λ∈[0,1]。

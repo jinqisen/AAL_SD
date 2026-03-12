@@ -1,6 +1,7 @@
 
 import os
 import json
+import sys
 import torch
 
 def _coerce_bool(value, default=False):
@@ -35,6 +36,8 @@ def _resolve_llm_config_path():
     return os.path.join(os.path.dirname(os.path.abspath(__file__)), 'llm_config.json')
 
 def _default_worker_count():
+    if sys.platform == "darwin" and torch.backends.mps.is_available():
+        return 0
     cpu_count = os.cpu_count() or 2
     return max(1, min(4, cpu_count // 2))
 
@@ -154,7 +157,8 @@ class Config:
     FEATURE_PIN_MEMORY = _coerce_bool(os.getenv("AAL_SD_FEATURE_PIN_MEMORY"), default=PIN_MEMORY)
     PERSISTENT_WORKERS = _coerce_bool(os.getenv("AAL_SD_PERSISTENT_WORKERS"), default=NUM_WORKERS > 0)
     FEATURE_PERSISTENT_WORKERS = _coerce_bool(os.getenv("AAL_SD_FEATURE_PERSISTENT_WORKERS"), default=FEATURE_NUM_WORKERS > 0)
-    SHARING_STRATEGY = os.getenv("AAL_SD_SHARING_STRATEGY", "file_descriptor")
+    _DEFAULT_SHARING_STRATEGY = "file_system" if sys.platform == "darwin" else "file_descriptor"
+    SHARING_STRATEGY = os.getenv("AAL_SD_SHARING_STRATEGY", _DEFAULT_SHARING_STRATEGY)
     try:
         PREFETCH_FACTOR = int(os.getenv("AAL_SD_PREFETCH_FACTOR", "2"))
     except ValueError:
@@ -182,6 +186,11 @@ class Config:
     GRAD_LOG_MAX_BATCHES = 8
     GRAD_LOG_PARAM_MAX_ELEMENTS = 200000
     GRAD_LOG_VAL_ALIGNMENT = True
+    ROUND_MODEL_RETENTION = str(os.getenv("AAL_SD_ROUND_MODEL_RETENTION", "all") or "all").strip().lower()
+    try:
+        ROUND_MODEL_KEEP_LAST_N = int(os.getenv("AAL_SD_ROUND_MODEL_KEEP_LAST_N", "0"))
+    except ValueError:
+        ROUND_MODEL_KEEP_LAST_N = 0
     
     # 主动学习配置
     N_ROUNDS = 16

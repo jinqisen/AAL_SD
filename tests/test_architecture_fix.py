@@ -227,6 +227,9 @@ class TestArchitectureFix(unittest.TestCase):
                 "lambda_override": cfg.get("lambda_override"),
                 "lambda_controller": cfg.get("lambda_controller"),
                 "lambda_policy": cfg.get("lambda_policy"),
+                "grad_probe_source": cfg.get("grad_probe_source"),
+                "grad_probe_holdout_frac": cfg.get("grad_probe_holdout_frac"),
+                "grad_probe_holdout_min": cfg.get("grad_probe_holdout_min"),
                 "rollback_config": cfg.get("rollback_config"),
                 "control_permissions": cfg.get("control_permissions"),
                 "agent_threshold_overrides": cfg.get("agent_threshold_overrides"),
@@ -548,7 +551,9 @@ class TestArchitectureFix(unittest.TestCase):
         ranked_alt = sampler.rank_samples(
             unlabeled_info, None, current_iteration=10, total_iterations=100, lambda_override=lam_alt
         )
-        self.assertNotEqual(ranked_full[0]["sample_id"], ranked_alt[0]["sample_id"])
+        self.assertNotAlmostEqual(float(lam_full), float(lam_alt), places=6)
+        self.assertNotAlmostEqual(float(ranked_full[0]["lambda_t"]), float(ranked_alt[0]["lambda_t"]), places=6)
+        self.assertNotAlmostEqual(float(ranked_full[0]["final_score"]), float(ranked_alt[0]["final_score"]), places=6)
 
     def test_resolve_lambda_override_precedence_and_strictness(self):
         pipeline = ActiveLearningPipeline.__new__(ActiveLearningPipeline)

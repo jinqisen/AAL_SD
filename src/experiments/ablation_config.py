@@ -21,7 +21,7 @@ ABLATION_SETTINGS = {
             "LAMBDA_UP_K_U_GAP_MIN": 0.0,
             "LAMBDA_CLAMP_MIN": 0.05,
             "LAMBDA_CLAMP_MAX": 0.80,
-            "LAMBDA_DELTA_UP": 0.05,
+            "LAMBDA_DELTA_UP": 0.15,
             "LAMBDA_DELTA_DOWN": 0.10,
             "OVERFIT_RISK_EMA_ALPHA": 0.6,
             "LAMBDA_DOWN_COOLING_ROUNDS": 2
@@ -45,8 +45,376 @@ ABLATION_SETTINGS = {
             "risk_ci_quantile": 0.2,
             "risk_ci_min_samples": 3,
             "lambda_smoothing": "ema",
-            "lambda_smoothing_alpha": 0.7,
-            "lambda_max_step": 0.10
+            "lambda_smoothing_alpha": 0.85,
+            "lambda_max_step": 0.15
+        },
+        "rollback_config": {
+            "mode": "adaptive_threshold",
+            "std_factor": 1.5,
+            "tau_min": 0.005
+        },
+        "control_permissions": {
+            "set_lambda": False,
+            "set_query_size": False,
+            "set_epochs_per_round": False,
+            "set_alpha": False
+        }
+    },
+    "full_model_A_lambda_policy_u_guardrail": {
+        "description": "A1：仅加 U 底线安全阀（不改 λ 日程；用于验证失效模式是否消失与稳定性改善）",
+        "use_agent": True,
+        "sampler_type": "ad_kucs",
+        "lambda_override": None,
+        "acquisition_protocol": {
+            "uncertainty_aggregation": "mean",
+            "diversity_postprocess": "none",
+        },
+        "agent_threshold_overrides": {
+            "OVERFIT_RISK_HI": 1.2,
+            "OVERFIT_RISK_LO": 0.6,
+            "OVERFIT_TVC_MIN_HI": 0.8,
+            "OVERFIT_RISK_LAMBDA_UP_MAX": 0.9,
+            "MIOU_LOW_GAIN_THRESH": 0.01,
+            "MIOU_LOW_GAIN_STREAK": 1,
+            "LAMBDA_UP_K_U_GAP_MIN": 0.0,
+            "LAMBDA_CLAMP_MIN": 0.05,
+            "LAMBDA_CLAMP_MAX": 0.80,
+            "LAMBDA_DELTA_UP": 0.15,
+            "LAMBDA_DELTA_DOWN": 0.10,
+            "OVERFIT_RISK_EMA_ALPHA": 0.6,
+            "LAMBDA_DOWN_COOLING_ROUNDS": 2
+        },
+        "enable_l3_selection_logging": True,
+        "enable_agent_prompt_logging": True,
+        "l3_topk": 256,
+        "l3_max_selected": 256,
+        "lambda_policy": {
+            "mode": "warmup_risk_closed_loop",
+            "r1_lambda": 0.0,
+            "uncertainty_only_rounds": 2,
+            "warmup_start_round": 3,
+            "warmup_rounds": 1,
+            "warmup_lambda": 0.2,
+            "risk_control_start_round": 4,
+            "severe_logic": "and",
+            "severe_tvc_key": "grad_train_val_cos_last",
+            "risk_trigger": "ci",
+            "risk_ci_window": 6,
+            "risk_ci_quantile": 0.2,
+            "risk_ci_min_samples": 3,
+            "lambda_smoothing": "ema",
+            "lambda_smoothing_alpha": 0.85,
+            "lambda_max_step": 0.15,
+            "selection_guardrail": {
+                "enabled": True,
+                "u_median_min": 0.45,
+                "u_low_thresh": 0.40,
+                "u_low_frac_max": 0.20,
+                "lambda_step_down": 0.10,
+                "max_steps": 5,
+                "fallback_quota_u_frac": 0.70
+            }
+        },
+        "rollback_config": {
+            "mode": "adaptive_threshold",
+            "std_factor": 1.5,
+            "tau_min": 0.005
+        },
+        "control_permissions": {
+            "set_lambda": False,
+            "set_query_size": False,
+            "set_epochs_per_round": False,
+            "set_alpha": False
+        }
+    },
+    "full_model_A_lambda_policy_ramp_guardrail": {
+        "description": "A2：后期 λ_ramp + U 底线安全阀（用于在不引入失效模式前提下追 test gap）",
+        "use_agent": True,
+        "sampler_type": "ad_kucs",
+        "lambda_override": None,
+        "acquisition_protocol": {
+            "uncertainty_aggregation": "mean",
+            "diversity_postprocess": "none",
+        },
+        "agent_threshold_overrides": {
+            "OVERFIT_RISK_HI": 1.2,
+            "OVERFIT_RISK_LO": 0.6,
+            "OVERFIT_TVC_MIN_HI": 0.8,
+            "OVERFIT_RISK_LAMBDA_UP_MAX": 0.9,
+            "MIOU_LOW_GAIN_THRESH": 0.01,
+            "MIOU_LOW_GAIN_STREAK": 1,
+            "LAMBDA_UP_K_U_GAP_MIN": 0.0,
+            "LAMBDA_CLAMP_MIN": 0.05,
+            "LAMBDA_CLAMP_MAX": 0.80,
+            "LAMBDA_DELTA_UP": 0.15,
+            "LAMBDA_DELTA_DOWN": 0.10,
+            "OVERFIT_RISK_EMA_ALPHA": 0.6,
+            "LAMBDA_DOWN_COOLING_ROUNDS": 2
+        },
+        "enable_l3_selection_logging": True,
+        "enable_agent_prompt_logging": True,
+        "l3_topk": 256,
+        "l3_max_selected": 256,
+        "lambda_policy": {
+            "mode": "warmup_risk_closed_loop",
+            "r1_lambda": 0.0,
+            "uncertainty_only_rounds": 2,
+            "warmup_start_round": 3,
+            "warmup_rounds": 1,
+            "warmup_lambda": 0.2,
+            "risk_control_start_round": 4,
+            "severe_logic": "and",
+            "severe_tvc_key": "grad_train_val_cos_last",
+            "risk_trigger": "ci",
+            "risk_ci_window": 6,
+            "risk_ci_quantile": 0.2,
+            "risk_ci_min_samples": 3,
+            "lambda_smoothing": "ema",
+            "lambda_smoothing_alpha": 0.85,
+            "lambda_max_step": 0.15,
+            "late_stage_ramp": {
+                "start_round": 9,
+                "end_round": 12,
+                "start_lambda": 0.40,
+                "end_lambda": 0.70
+            },
+            "selection_guardrail": {
+                "enabled": True,
+                "u_median_min": 0.45,
+                "u_low_thresh": 0.40,
+                "u_low_frac_max": 0.20,
+                "lambda_step_down": 0.10,
+                "max_steps": 5,
+                "fallback_quota_u_frac": 0.70
+            }
+        },
+        "rollback_config": {
+            "mode": "adaptive_threshold",
+            "std_factor": 1.5,
+            "tau_min": 0.005
+        },
+        "control_permissions": {
+            "set_lambda": False,
+            "set_query_size": False,
+            "set_epochs_per_round": False,
+            "set_alpha": False
+        }
+    },
+    "full_model_A_lambda_policy_ramp_guardrail_train_probe": {
+        "description": "A2+：后期 λ_ramp + U 底线安全阀 + train-holdout probe 计算TVC（论文协议版；不使用 official val 的标签梯度信号）",
+        "use_agent": True,
+        "sampler_type": "ad_kucs",
+        "lambda_override": None,
+        "grad_probe_source": "train_holdout",
+        "grad_probe_holdout_frac": 0.10,
+        "grad_probe_holdout_min": 8,
+        "acquisition_protocol": {
+            "uncertainty_aggregation": "mean",
+            "diversity_postprocess": "none",
+        },
+        "agent_threshold_overrides": {
+            "OVERFIT_RISK_HI": 1.2,
+            "OVERFIT_RISK_LO": 0.6,
+            "OVERFIT_TVC_MIN_HI": 0.8,
+            "OVERFIT_RISK_LAMBDA_UP_MAX": 0.9,
+            "MIOU_LOW_GAIN_THRESH": 0.01,
+            "MIOU_LOW_GAIN_STREAK": 1,
+            "LAMBDA_UP_K_U_GAP_MIN": 0.0,
+            "LAMBDA_CLAMP_MIN": 0.05,
+            "LAMBDA_CLAMP_MAX": 0.80,
+            "LAMBDA_DELTA_UP": 0.15,
+            "LAMBDA_DELTA_DOWN": 0.10,
+            "OVERFIT_RISK_EMA_ALPHA": 0.6,
+            "LAMBDA_DOWN_COOLING_ROUNDS": 2
+        },
+        "enable_l3_selection_logging": True,
+        "enable_agent_prompt_logging": True,
+        "l3_topk": 256,
+        "l3_max_selected": 256,
+        "lambda_policy": {
+            "mode": "warmup_risk_closed_loop",
+            "r1_lambda": 0.0,
+            "uncertainty_only_rounds": 2,
+            "warmup_start_round": 3,
+            "warmup_rounds": 1,
+            "warmup_lambda": 0.2,
+            "risk_control_start_round": 4,
+            "severe_logic": "and",
+            "severe_tvc_key": "grad_train_val_cos_last",
+            "risk_trigger": "ci",
+            "risk_ci_window": 6,
+            "risk_ci_quantile": 0.2,
+            "risk_ci_min_samples": 3,
+            "lambda_smoothing": "ema",
+            "lambda_smoothing_alpha": 0.85,
+            "lambda_max_step": 0.15,
+            "late_stage_ramp": {
+                "start_round": 9,
+                "end_round": 12,
+                "start_lambda": 0.40,
+                "end_lambda": 0.70
+            },
+            "selection_guardrail": {
+                "enabled": True,
+                "u_median_min": 0.45,
+                "u_low_thresh": 0.40,
+                "u_low_frac_max": 0.20,
+                "lambda_step_down": 0.10,
+                "max_steps": 5,
+                "fallback_quota_u_frac": 0.70
+            }
+        },
+        "rollback_config": {
+            "mode": "adaptive_threshold",
+            "std_factor": 1.5,
+            "tau_min": 0.005
+        },
+        "control_permissions": {
+            "set_lambda": False,
+            "set_query_size": False,
+            "set_epochs_per_round": False,
+            "set_alpha": False
+        }
+    },
+    "full_model_A_lambda_policy_ramp_guardrail_train_probe_ramp055": {
+        "description": "A2+(branch)：从中后期起仅降低λ_ramp强度（end_lambda 0.70→0.55），用于隔离ramp影响",
+        "use_agent": True,
+        "sampler_type": "ad_kucs",
+        "lambda_override": None,
+        "grad_probe_source": "train_holdout",
+        "grad_probe_holdout_frac": 0.10,
+        "grad_probe_holdout_min": 8,
+        "acquisition_protocol": {
+            "uncertainty_aggregation": "mean",
+            "diversity_postprocess": "none",
+        },
+        "agent_threshold_overrides": {
+            "OVERFIT_RISK_HI": 1.2,
+            "OVERFIT_RISK_LO": 0.6,
+            "OVERFIT_TVC_MIN_HI": 0.8,
+            "OVERFIT_RISK_LAMBDA_UP_MAX": 0.9,
+            "MIOU_LOW_GAIN_THRESH": 0.01,
+            "MIOU_LOW_GAIN_STREAK": 1,
+            "LAMBDA_UP_K_U_GAP_MIN": 0.0,
+            "LAMBDA_CLAMP_MIN": 0.05,
+            "LAMBDA_CLAMP_MAX": 0.80,
+            "LAMBDA_DELTA_UP": 0.15,
+            "LAMBDA_DELTA_DOWN": 0.10,
+            "OVERFIT_RISK_EMA_ALPHA": 0.6,
+            "LAMBDA_DOWN_COOLING_ROUNDS": 2
+        },
+        "enable_l3_selection_logging": True,
+        "enable_agent_prompt_logging": True,
+        "l3_topk": 256,
+        "l3_max_selected": 256,
+        "lambda_policy": {
+            "mode": "warmup_risk_closed_loop",
+            "r1_lambda": 0.0,
+            "uncertainty_only_rounds": 2,
+            "warmup_start_round": 3,
+            "warmup_rounds": 1,
+            "warmup_lambda": 0.2,
+            "risk_control_start_round": 4,
+            "severe_logic": "and",
+            "severe_tvc_key": "grad_train_val_cos_last",
+            "risk_trigger": "ci",
+            "risk_ci_window": 6,
+            "risk_ci_quantile": 0.2,
+            "risk_ci_min_samples": 3,
+            "lambda_smoothing": "ema",
+            "lambda_smoothing_alpha": 0.85,
+            "lambda_max_step": 0.15,
+            "late_stage_ramp": {
+                "start_round": 9,
+                "end_round": 12,
+                "start_lambda": 0.40,
+                "end_lambda": 0.55
+            },
+            "selection_guardrail": {
+                "enabled": True,
+                "u_median_min": 0.45,
+                "u_low_thresh": 0.40,
+                "u_low_frac_max": 0.20,
+                "lambda_step_down": 0.10,
+                "max_steps": 5,
+                "fallback_quota_u_frac": 0.70
+            }
+        },
+        "rollback_config": {
+            "mode": "adaptive_threshold",
+            "std_factor": 1.5,
+            "tau_min": 0.005
+        },
+        "control_permissions": {
+            "set_lambda": False,
+            "set_query_size": False,
+            "set_epochs_per_round": False,
+            "set_alpha": False
+        }
+    },
+    "full_model_A_lambda_policy_ramp_guardrail_train_probe_guardrail_u30": {
+        "description": "A2+(branch)：从中后期起仅放宽U安全阀（u_median_min 0.45→0.30），用于隔离guardrail影响",
+        "use_agent": True,
+        "sampler_type": "ad_kucs",
+        "lambda_override": None,
+        "grad_probe_source": "train_holdout",
+        "grad_probe_holdout_frac": 0.10,
+        "grad_probe_holdout_min": 8,
+        "acquisition_protocol": {
+            "uncertainty_aggregation": "mean",
+            "diversity_postprocess": "none",
+        },
+        "agent_threshold_overrides": {
+            "OVERFIT_RISK_HI": 1.2,
+            "OVERFIT_RISK_LO": 0.6,
+            "OVERFIT_TVC_MIN_HI": 0.8,
+            "OVERFIT_RISK_LAMBDA_UP_MAX": 0.9,
+            "MIOU_LOW_GAIN_THRESH": 0.01,
+            "MIOU_LOW_GAIN_STREAK": 1,
+            "LAMBDA_UP_K_U_GAP_MIN": 0.0,
+            "LAMBDA_CLAMP_MIN": 0.05,
+            "LAMBDA_CLAMP_MAX": 0.80,
+            "LAMBDA_DELTA_UP": 0.15,
+            "LAMBDA_DELTA_DOWN": 0.10,
+            "OVERFIT_RISK_EMA_ALPHA": 0.6,
+            "LAMBDA_DOWN_COOLING_ROUNDS": 2
+        },
+        "enable_l3_selection_logging": True,
+        "enable_agent_prompt_logging": True,
+        "l3_topk": 256,
+        "l3_max_selected": 256,
+        "lambda_policy": {
+            "mode": "warmup_risk_closed_loop",
+            "r1_lambda": 0.0,
+            "uncertainty_only_rounds": 2,
+            "warmup_start_round": 3,
+            "warmup_rounds": 1,
+            "warmup_lambda": 0.2,
+            "risk_control_start_round": 4,
+            "severe_logic": "and",
+            "severe_tvc_key": "grad_train_val_cos_last",
+            "risk_trigger": "ci",
+            "risk_ci_window": 6,
+            "risk_ci_quantile": 0.2,
+            "risk_ci_min_samples": 3,
+            "lambda_smoothing": "ema",
+            "lambda_smoothing_alpha": 0.85,
+            "lambda_max_step": 0.15,
+            "late_stage_ramp": {
+                "start_round": 9,
+                "end_round": 12,
+                "start_lambda": 0.40,
+                "end_lambda": 0.70
+            },
+            "selection_guardrail": {
+                "enabled": True,
+                "u_median_min": 0.30,
+                "u_low_thresh": 0.40,
+                "u_low_frac_max": 0.20,
+                "lambda_step_down": 0.10,
+                "max_steps": 5,
+                "fallback_quota_u_frac": 0.70
+            }
         },
         "rollback_config": {
             "mode": "adaptive_threshold",
@@ -79,11 +447,11 @@ ABLATION_SETTINGS = {
             "MIOU_LOW_GAIN_STREAK": 1,
             "LAMBDA_CLAMP_MIN": 0.05,
             "LAMBDA_CLAMP_MAX": 0.80,
-            "LAMBDA_DELTA_UP": 0.10,
+            "LAMBDA_DELTA_UP": 0.15,
             "LAMBDA_DELTA_DOWN": 0.10,
             "OVERFIT_RISK_EMA_ALPHA": 0.6,
             "LAMBDA_DOWN_COOLING_ROUNDS": 2,
-            "LAMBDA_ADJUST_RANGE": 0.10
+            "LAMBDA_ADJUST_RANGE": 0.15
         },
         "enable_l3_selection_logging": True,
         "enable_agent_prompt_logging": True,
@@ -104,8 +472,8 @@ ABLATION_SETTINGS = {
             "risk_ci_quantile": 0.2,
             "risk_ci_min_samples": 3,
             "lambda_smoothing": "ema",
-            "lambda_smoothing_alpha": 0.7,
-            "lambda_max_step": 0.10
+            "lambda_smoothing_alpha": 0.85,
+            "lambda_max_step": 0.15
         },
         "rollback_config": {
             "mode": "adaptive_threshold",
@@ -294,7 +662,6 @@ ABLATION_SETTINGS = {
             "set_epochs_per_round": False,
             "set_alpha": False,
         },
-        # No override, use default 10
     },
     "full_model_A_lambda_policy_ab_tune_hi_ep10": {
         "description": "A/B调参(Hi) + Ep10对照：参数同ab_tune_hi，但恢复默认epochs=10",
@@ -353,7 +720,6 @@ ABLATION_SETTINGS = {
             "set_epochs_per_round": False,
             "set_alpha": False,
         },
-        # No override, use default 10
     },
     "full_model_B_lambda_agent_ab_tune_lo": {
         "description": "A/B调参(Lo)：更小EMA惰性、更大单步；cooling=1；epochs=8（仅影响该实验）",

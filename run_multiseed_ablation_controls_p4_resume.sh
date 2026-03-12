@@ -42,14 +42,18 @@ EXPERIMENTS=(
   rule_based_controller_r1
   rule_based_controller_r2
   rule_based_controller_r3
+  full_model_B_lambda_agent
   uncertainty_only
   knowledge_only
   no_cold_start
   fixed_k
   no_normalization
   bald_uncertainty
-  agent_control_lambda
 )
+
+if ! "${PYTHON_BIN}" -c "import sys; sys.path.insert(0,'src'); from experiments.ablation_config import ABLATION_SETTINGS, EXPERIMENT_NAME_ALIASES; exps=sys.argv[1:]; missing=[]; resolved=[]; \nfor e in exps:\n  c=EXPERIMENT_NAME_ALIASES.get(e,e)\n  resolved.append(c)\n  if c not in ABLATION_SETTINGS:\n    missing.append(e)\nprint('Resolved experiments:', ' '.join(resolved))\nif missing:\n  print('错误：存在未知实验名：'+' '.join(missing), file=sys.stderr)\n  sys.exit(3)\n" "${EXPERIMENTS[@]}"; then
+  exit 3
+fi
 
 HAS_LLM_KEY="$("${PYTHON_BIN}" -c "import sys; sys.path.insert(0,'src'); from config import Config; print('1' if bool(getattr(Config, 'LLM_API_KEY', None)) else '0')" 2>/dev/null || echo '0')"
 if [[ "${HAS_LLM_KEY}" != "1" ]]; then

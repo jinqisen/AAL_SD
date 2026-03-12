@@ -30,8 +30,32 @@ fi
 RESULTS_DIR="${RESULTS_DIR:-results}"
 START_MODE="${START_MODE:-fresh}"
 BASE_RUN_ID="${BASE_RUN_ID:-baseline_$(date +%Y%m%d_%H%M%S)}"
-SEEDS="${SEEDS:-42 43 44 45}"
-WORKERS="${WORKERS:-1}"
+RESUME_BASE_RUN_ID="${RESUME_BASE_RUN_ID:-}"
+if [[ -n "${RESUME_BASE_RUN_ID}" ]]; then
+  START_MODE="resume"
+  BASE_RUN_ID="${RESUME_BASE_RUN_ID}"
+fi
+SEEDS="${SEEDS:-}"
+if [[ -z "${SEEDS}" && -n "${RESUME_BASE_RUN_ID}" && -f "${RESULTS_DIR}/runs/${RESUME_BASE_RUN_ID}/multi_seed_manifest.json" ]]; then
+  SEEDS="$(RESULTS_DIR="${RESULTS_DIR}" RESUME_BASE_RUN_ID="${RESUME_BASE_RUN_ID}" "${PYTHON_BIN}" - <<'PY'
+import json
+from pathlib import Path
+import os
+
+results_dir = Path(os.environ.get("RESULTS_DIR", "results"))
+run_id = os.environ.get("RESUME_BASE_RUN_ID", "").strip()
+path = results_dir / "runs" / run_id / "multi_seed_manifest.json"
+try:
+    data = json.loads(path.read_text(encoding="utf-8"))
+    seeds = data.get("seeds") or []
+    print(" ".join(str(int(s)) for s in seeds if str(s).strip() != ""))
+except Exception:
+    print("")
+PY
+)"
+fi
+SEEDS="${SEEDS:-42 43 44}"
+WORKERS="${WORKERS:-2}"
 EXP_WORKERS="${EXP_WORKERS:-4}"
 N_ROUNDS="${N_ROUNDS:-}"
 
@@ -53,11 +77,35 @@ elif [[ "${AB_TUNING}" == "both" ]]; then
     full_model_B_lambda_agent_ab_tune_lo
     full_model_B_lambda_agent_ab_tune_hi
   )
+elif [[ "${AB_TUNING}" == "A_only" ]]; then
+  EXPERIMENTS=(
+    full_model_A_lambda_policy
+  )
+elif [[ "${AB_TUNING}" == "A_matrix" ]]; then
+  EXPERIMENTS=(
+    full_model_A_lambda_policy
+    full_model_A_lambda_policy_u_guardrail
+    full_model_A_lambda_policy_ramp_guardrail
+  )
+elif [[ "${AB_TUNING}" == "A_matrix_plus_probe" ]]; then
+  EXPERIMENTS=(
+    full_model_A_lambda_policy
+    full_model_A_lambda_policy_u_guardrail
+    full_model_A_lambda_policy_ramp_guardrail
+    full_model_A_lambda_policy_ramp_guardrail_train_probe
+  )
+elif [[ "${AB_TUNING}" == "baselines_only" ]]; then
+  EXPERIMENTS=(
+    baseline_random
+    baseline_entropy
+    baseline_coreset
+    baseline_bald
+    baseline_dial_style
+    baseline_wang_style
+  )
 else
   EXPERIMENTS=(
     full_model_A_lambda_policy
-    full_model_A_lambda_policy_ab_tune_lo
-    full_model_A_lambda_policy_ab_tune_hi
     full_model_A_lambda_policy_ab_tune_lo_ep10
     full_model_A_lambda_policy_ab_tune_hi_ep10
     full_model_B_lambda_agent
@@ -68,6 +116,29 @@ else
     baseline_dial_style
     baseline_wang_style
   )
+fi
+
+if ! "${PYTHON_BIN}" - "${EXPERIMENTS[@]}" <<'PY'
+import sys
+sys.path.insert(0, "src")
+from experiments.ablation_config import ABLATION_SETTINGS, EXPERIMENT_NAME_ALIASES
+
+exps = sys.argv[1:]
+missing = []
+resolved = []
+for e in exps:
+    c = EXPERIMENT_NAME_ALIASES.get(e, e)
+    resolved.append(c)
+    if c not in ABLATION_SETTINGS:
+        missing.append(e)
+
+print("Resolved experiments:", " ".join(resolved))
+if missing:
+    print("错误：存在未知实验名：" + " ".join(missing), file=sys.stderr)
+    raise SystemExit(3)
+PY
+then
+  exit 3
 fi
 
 HAS_LLM_KEY="$("${PYTHON_BIN}" -c "import sys; sys.path.insert(0,'src'); from config import Config; print('1' if bool(getattr(Config, 'LLM_API_KEY', None)) else '0')" 2>/dev/null || echo '0')"

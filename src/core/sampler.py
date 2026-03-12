@@ -679,10 +679,25 @@ class ADKUCSSampler:
         if labeled_features_np is None or len(labeled_features_np) == 0:
             raise RuntimeError("coreset-to-labeled requires non-empty labeled set; labeled pool is empty or feature extraction failed")
 
-        k_scores = []
-        k_scores = self._coreset_to_labeled_scores(
-            features_u_np, labeled_features_np
-        ).tolist()
+        # 1. Generate clustering on Unlabeled Features
+        n_clusters = min(88, len(features_u_np)) # Query size is 88 by default
+        cluster_labels, cluster_centers = self._cluster_features(features_u_np, n_clusters=n_clusters)
+        
+        # 2. Calculate Cluster-based Representativeness (K score)
+        # We compute the distance to the assigned cluster center. 
+        # Smaller distance means MORE representative. We want higher K score for more representative samples.
+        k_scores_dist = []
+        for feat, label in zip(features_u_np, cluster_labels):
+            center = cluster_centers[label]
+            dist = np.linalg.norm(feat - center)
+            k_scores_dist.append(dist)
+            
+        k_scores_dist = np.array(k_scores_dist, dtype=np.float32)
+        max_dist = k_scores_dist.max() if len(k_scores_dist) > 0 and k_scores_dist.max() > 0 else 1.0
+        
+        # Invert normalized distance so 1.0 is exactly at cluster center (most representative)
+        # and 0.0 is the furthest outlier in any cluster
+        k_scores = (1.0 - (k_scores_dist / max_dist)).tolist()
 
         u_scores_arr = self._calibrate_uncertainty_scores(np.asarray(u_scores_arr, dtype=np.float32))
         u_norm = self._normalize_scores(u_scores_arr)
@@ -716,11 +731,24 @@ class ADKUCSSampler:
 
         features_array = np.array(features_list)
 
-        k_scores = []
-        lf = np.asarray(labeled_features) if labeled_features is not None else None
-        if lf is None or lf.ndim != 2 or len(lf) == 0:
-            raise RuntimeError("coreset-to-labeled requires non-empty labeled_features")
-        k_scores = self._coreset_to_labeled_scores(features_array, lf).tolist()
+        # 1. Generate clustering on Unlabeled Features
+        n_clusters = min(88, len(features_array)) # Query size is 88 by default
+        cluster_labels, cluster_centers = self._cluster_features(features_array, n_clusters=n_clusters)
+        
+        # 2. Calculate Cluster-based Representativeness (K score)
+        # Smaller distance to assigned cluster center means MORE representative.
+        k_scores_dist = []
+        for feat, label in zip(features_array, cluster_labels):
+            center = cluster_centers[label]
+            dist = np.linalg.norm(feat - center)
+            k_scores_dist.append(dist)
+            
+        k_scores_dist = np.array(k_scores_dist, dtype=np.float32)
+        max_dist = k_scores_dist.max() if len(k_scores_dist) > 0 and k_scores_dist.max() > 0 else 1.0
+        
+        # Invert normalized distance so 1.0 is exactly at cluster center (most representative)
+        # and 0.0 is the furthest outlier.
+        k_scores = (1.0 - (k_scores_dist / max_dist)).tolist()
 
         u_scores_arr = self._calibrate_uncertainty_scores(np.array(u_scores, dtype=np.float32))
         if self.score_normalization:

@@ -62,6 +62,7 @@ class ActiveLearningPipeline:
         )
 
         self.pools_dir = self._resolve_pools_dir()
+        self._last_control_events = {}
 
         checkpoint_dir = os.path.join(config.CHECKPOINT_DIR, self.run_id)
         self.checkpoint_manager = CheckpointManager(checkpoint_dir, experiment_name)
@@ -431,6 +432,17 @@ class ActiveLearningPipeline:
         }
         if isinstance(event, dict):
             payload.update(event)
+        try:
+            et = payload.get("type")
+            if isinstance(et, str) and et in (
+                "lambda_policy_apply",
+                "lambda_override",
+                "lambda_guard",
+                "selection_guardrail",
+            ):
+                self._last_control_events[str(et)] = dict(payload)
+        except Exception:
+            pass
         line = json.dumps(payload, ensure_ascii=False)
         with open(self.trace_path, "a", encoding="utf-8") as f:
             f.write(line + "\n")
@@ -869,6 +881,19 @@ class ActiveLearningPipeline:
             if isinstance(self._last_training_state, dict)
             else None
         )
+        controls = {
+            "lambda_policy_apply": None,
+            "lambda_override": None,
+            "lambda_guard": None,
+            "selection_guardrail": None,
+        }
+        try:
+            for k in list(controls.keys()):
+                ev = self._last_control_events.get(k)
+                if isinstance(ev, dict) and int(ev.get("round") or -1) == int(round_idx):
+                    controls[k] = dict(ev)
+        except Exception:
+            pass
         self._append_trace(
             {
                 "type": "round_summary",
@@ -880,6 +905,7 @@ class ActiveLearningPipeline:
                 "ranking": ranking,
                 "lambda_controller": lambda_ctrl,
                 "training_state": training_state,
+                "controls": controls,
                 "sampler": self._sampler_audit(),
                 "score_precalc_error": dict(self._last_score_precalc_error or {})
                 if isinstance(getattr(self, "_last_score_precalc_error", None), dict)
@@ -894,26 +920,72 @@ class ActiveLearningPipeline:
         if not ranked:
             return None
         k = max(1, int(top_k))
-        u_vals = []
-        k_vals = []
-        for item in ranked[:k]:
-            u = item.get("uncertainty") if isinstance(item, dict) else None
-            k_score = item.get("knowledge_gain") if isinstance(item, dict) else None
-            if u is not None:
+
+        def _extract(values, key: str, limit=None, allow_none: bool = False):
+            out = []
+            take = len(values) if limit is None else min(int(limit), len(values))
+            for item in values[:take]:
+                if not isinstance(item, dict):
+                    continue
+                v = item.get(key)
+                if v is None:
+                    if allow_none:
+                        out.append(None)
+                    continue
                 try:
-                    u_vals.append(float(u))
+                    out.append(float(v))
                 except Exception:
-                    pass
-            if k_score is not None:
-                try:
-                    k_vals.append(float(k_score))
-                except Exception:
-                    pass
-        meta = {}
-        if u_vals:
-            meta["avg_uncertainty"] = float(np.mean(np.array(u_vals, dtype=float)))
-        if k_vals:
-            meta["avg_knowledge_gain"] = float(np.mean(np.array(k_vals, dtype=float)))
+                    continue
+            return out
+
+        def _stats(vals, qts=(0.1, 0.25, 0.5, 0.75, 0.9, 0.99)):
+            xs = [float(v) for v in (vals or []) if v is not None]
+            if not xs:
+                return None
+            arr = np.asarray(xs, dtype=float)
+            q = np.quantile(arr, np.asarray(list(qts), dtype=float)).tolist()
+            q_map = {f"p{int(round(float(p) * 100)):02d}": float(v) for p, v in zip(qts, q)}
+            return {
+                "n": int(arr.size),
+                "mean": float(arr.mean()),
+                "min": float(arr.min()),
+                "max": float(arr.max()),
+                **q_map,
+            }
+
+        top_u = _extract(ranked, "uncertainty", limit=k)
+        top_kg = _extract(ranked, "knowledge_gain", limit=k)
+        top_fs = _extract(ranked, "final_score", limit=k)
+        pool_u = _extract(ranked, "uncertainty")
+        pool_kg = _extract(ranked, "knowledge_gain")
+        pool_fs = _extract(ranked, "final_score")
+
+        meta = {
+            "pool_n": int(len(ranked)),
+            "topk_n": int(k),
+        }
+        if top_u:
+            meta["avg_uncertainty"] = float(np.mean(np.asarray(top_u, dtype=float)))
+        if top_kg:
+            meta["avg_knowledge_gain"] = float(np.mean(np.asarray(top_kg, dtype=float)))
+        if top_fs:
+            meta["avg_final_score"] = float(np.mean(np.asarray(top_fs, dtype=float)))
+
+        stats = {}
+        u_top = _stats(top_u)
+        u_pool = _stats(pool_u)
+        if u_top or u_pool:
+            stats["uncertainty"] = {"topk": u_top, "pool": u_pool}
+        k_top = _stats(top_kg)
+        k_pool = _stats(pool_kg)
+        if k_top or k_pool:
+            stats["knowledge_gain"] = {"topk": k_top, "pool": k_pool}
+        s_top = _stats(top_fs)
+        s_pool = _stats(pool_fs)
+        if s_top or s_pool:
+            stats["final_score"] = {"topk": s_top, "pool": s_pool}
+        if stats:
+            meta["score_stats"] = stats
         return meta or None
 
     def _deterministic_hash_order(self, indices, salt: str):
@@ -936,6 +1008,7 @@ class ActiveLearningPipeline:
         return os.path.join(self.round_model_dir, f"round_{int(round_idx):02d}_best_val.pt")
 
     def _save_round_best_val_model(self, round_idx: int, state_dict: dict, metadata: dict):
+        os.makedirs(self.round_model_dir, exist_ok=True)
         path = self._round_checkpoint_path(round_idx)
         tmp_path = f"{path}.tmp"
         payload = {
@@ -945,6 +1018,73 @@ class ActiveLearningPipeline:
         torch.save(payload, tmp_path)
         os.replace(tmp_path, path)
         return path
+
+    def _round_model_retention(self) -> tuple[str, int]:
+        mode = None
+        keep_last_n = None
+        if isinstance(getattr(self, "exp_config", None), dict):
+            v = self.exp_config.get("round_model_retention")
+            if v is not None:
+                mode = str(v)
+            v = self.exp_config.get("round_model_keep_last_n")
+            if v is not None:
+                try:
+                    keep_last_n = int(v)
+                except Exception:
+                    keep_last_n = None
+        if mode is None:
+            try:
+                mode = str(getattr(self.config, "ROUND_MODEL_RETENTION", None) or "")
+            except Exception:
+                mode = ""
+        mode = str(mode or "").strip().lower()
+        if not mode:
+            mode = "all"
+        if keep_last_n is None:
+            try:
+                keep_last_n = int(getattr(self.config, "ROUND_MODEL_KEEP_LAST_N", 0) or 0)
+            except Exception:
+                keep_last_n = 0
+
+        if mode in ("final_only", "latest_only", "last_only"):
+            return "last_n", 1
+        if mode in ("last_n", "keep_last_n"):
+            k = int(keep_last_n or 0)
+            return "last_n", max(1, k)
+        return "all", 0
+
+    def _prune_round_best_val_models(self, current_round: int) -> None:
+        mode, keep_n = self._round_model_retention()
+        if mode != "last_n":
+            return
+        keep_n = int(keep_n or 0)
+        if keep_n <= 0:
+            return
+        if not self.round_model_dir or not os.path.isdir(self.round_model_dir):
+            return
+        lo = int(max(1, int(current_round) - int(keep_n) + 1))
+        hi = int(current_round)
+        try:
+            for name in os.listdir(self.round_model_dir):
+                if not (name.startswith("round_") and name.endswith("_best_val.pt")):
+                    if name.startswith("round_") and name.endswith("_best_val.pt.tmp"):
+                        try:
+                            os.remove(os.path.join(self.round_model_dir, name))
+                        except Exception:
+                            pass
+                    continue
+                try:
+                    round_part = name.split("_", 2)[1]
+                    r = int(round_part)
+                except Exception:
+                    continue
+                if r < lo or r > hi:
+                    try:
+                        os.remove(os.path.join(self.round_model_dir, name))
+                    except Exception:
+                        pass
+        except Exception:
+            return
 
     def _parse_log_resume_state(self, log_path):
         if not log_path or not os.path.exists(log_path):
@@ -1286,7 +1426,41 @@ class ActiveLearningPipeline:
                 )
                 trainer = Trainer(model, self.config, self.config.DEVICE)
 
-                labeled_subset = Subset(self.full_dataset, self.labeled_indices)
+                grad_probe_source = "official_val"
+                grad_probe_holdout_frac = 0.1
+                grad_probe_holdout_min = int(getattr(self.config, "BATCH_SIZE", 1) or 1)
+                if isinstance(getattr(self, "exp_config", None), dict):
+                    v = self.exp_config.get("grad_probe_source")
+                    if v is not None:
+                        grad_probe_source = str(v)
+                    v = self.exp_config.get("grad_probe_holdout_frac")
+                    if v is not None:
+                        try:
+                            grad_probe_holdout_frac = float(v)
+                        except Exception:
+                            pass
+                    v = self.exp_config.get("grad_probe_holdout_min")
+                    if v is not None:
+                        try:
+                            grad_probe_holdout_min = int(v)
+                        except Exception:
+                            pass
+                grad_probe_source = str(grad_probe_source or "official_val").strip().lower()
+
+                labeled_ids_train = list(self.labeled_indices)
+                labeled_ids_probe = []
+                if bool(getattr(self.config, "GRAD_LOG_VAL_ALIGNMENT", False)) and grad_probe_source == "train_holdout":
+                    train_ids, probe_ids = self._split_labeled_indices_for_grad_probe(
+                        list(self.labeled_indices),
+                        frac=float(grad_probe_holdout_frac),
+                        min_count=int(grad_probe_holdout_min),
+                        seed=int(self.seed),
+                    )
+                    if train_ids and probe_ids:
+                        labeled_ids_train = list(train_ids)
+                        labeled_ids_probe = list(probe_ids)
+
+                labeled_subset = Subset(self.full_dataset, labeled_ids_train)
 
                 train_num_workers = int(getattr(self.config, "NUM_WORKERS", 0) or 0)
                 train_loader_kwargs = self._build_loader_kwargs(
@@ -1301,6 +1475,22 @@ class ActiveLearningPipeline:
                     prefetch_factor=int(getattr(self.config, "PREFETCH_FACTOR", 2) or 2),
                 )
                 labeled_loader = DataLoader(labeled_subset, **train_loader_kwargs)
+
+                probe_loader = None
+                if labeled_ids_probe:
+                    probe_subset = Subset(self.full_dataset, labeled_ids_probe)
+                    probe_loader_kwargs = self._build_loader_kwargs(
+                        batch_size=self.config.BATCH_SIZE,
+                        shuffle=False,
+                        num_workers=train_num_workers,
+                        generator=g,
+                        worker_init_fn=worker_init_fn,
+                        drop_last=False,
+                        pin_memory=bool(getattr(self.config, "PIN_MEMORY", False)),
+                        persistent_workers=bool(getattr(self.config, "PERSISTENT_WORKERS", False)),
+                        prefetch_factor=int(getattr(self.config, "PREFETCH_FACTOR", 2) or 2),
+                    )
+                    probe_loader = DataLoader(probe_subset, **probe_loader_kwargs)
 
                 val_dataset = Landslide4SenseDataset(self.config.DATA_DIR, split=self.val_split)
                 val_loader_kwargs = self._build_loader_kwargs(
@@ -1335,16 +1525,18 @@ class ActiveLearningPipeline:
                 last_f1_epoch = 0.0
                 epoch_mious = []
                 grad_tvc_values = []
+                grad_probe_loader = None
+                if bool(getattr(self.config, "GRAD_LOG_VAL_ALIGNMENT", False)):
+                    if grad_probe_source == "official_val":
+                        grad_probe_loader = val_loader
+                    elif grad_probe_source == "train_holdout":
+                        grad_probe_loader = probe_loader
                 if not is_test_only_round:
                     for epoch in range(self.config.EPOCHS_PER_ROUND):
                         grad = None
                         out = trainer.train_one_epoch(
                             labeled_loader,
-                            grad_probe_loader=(
-                                val_loader
-                                if getattr(self.config, "GRAD_LOG_VAL_ALIGNMENT", False)
-                                else None
-                            ),
+                            grad_probe_loader=grad_probe_loader,
                         )
 
                         if isinstance(out, tuple) and len(out) == 2:
@@ -1451,6 +1643,7 @@ class ActiveLearningPipeline:
                             "eval_split": str(self.val_split),
                         },
                     )
+                    self._prune_round_best_val_models(int(round_idx + 1))
                     self._append_trace(
                         {
                             "type": "round_best_val_checkpoint",
@@ -1982,6 +2175,7 @@ class ActiveLearningPipeline:
                     if "labeled_loader" in locals()
                     else None,
                     val_loader=val_loader if "val_loader" in locals() else None,
+                    probe_loader=probe_loader if "probe_loader" in locals() else None,
                     report_loader=report_loader if "report_loader" in locals() else None,
                     trainer=trainer if "trainer" in locals() else None,
                     model=model if "model" in locals() else None,
@@ -2061,6 +2255,39 @@ class ActiveLearningPipeline:
             kwargs["prefetch_factor"] = int(prefetch_factor or 2)
         return kwargs
 
+    @staticmethod
+    def _split_labeled_indices_for_grad_probe(
+        labeled_indices: list[int],
+        *,
+        frac: float,
+        min_count: int,
+        seed: int,
+    ) -> tuple[list[int], list[int]]:
+        import hashlib
+
+        ids = [int(x) for x in (labeled_indices or [])]
+        n = int(len(ids))
+        if n <= 0:
+            return [], []
+        frac = float(min(max(frac, 0.0), 0.8))
+        k = int(round(float(n) * float(frac)))
+        k = max(int(min_count), k)
+        k = min(k, max(0, n - 1))
+        if k <= 0:
+            return ids, []
+
+        scored = []
+        salt = str(int(seed))
+        for sid in ids:
+            h = hashlib.sha256(f"grad_probe|{salt}|{int(sid)}".encode("utf-8", errors="ignore")).digest()
+            u = int.from_bytes(h[:8], "big") / float(2**64 - 1)
+            scored.append((u, int(sid)))
+        scored.sort(key=lambda x: (float(x[0]), int(x[1])))
+        probe = [sid for _, sid in scored[:k]]
+        probe_set = set(probe)
+        train = [sid for sid in ids if sid not in probe_set]
+        return train, probe
+
     def _cleanup_loader(self, loader):
         """显式清理 DataLoader 资源"""
         if loader is None:
@@ -2078,12 +2305,13 @@ class ActiveLearningPipeline:
             del loader
 
     def _cleanup_resources(
-        self, labeled_loader=None, val_loader=None, report_loader=None, trainer=None, model=None
+        self, labeled_loader=None, val_loader=None, probe_loader=None, report_loader=None, trainer=None, model=None
     ):
         """统一资源清理入口"""
         # 1. Cleanup Loaders
         self._cleanup_loader(labeled_loader)
         self._cleanup_loader(val_loader)
+        self._cleanup_loader(probe_loader)
         self._cleanup_loader(report_loader)
 
         # 2. Cleanup Trainer
@@ -2374,6 +2602,10 @@ class ActiveLearningPipeline:
                     "uncertainty_type": str(u_type),
                     "uncertainty_definition": str(u_def),
                 }
+                base_meta = self._compute_ranking_metadata(ranked, int(self.config.QUERY_SIZE)) or {}
+                if isinstance(base_meta, dict):
+                    base_meta.update(self._last_ranking_metadata)
+                    self._last_ranking_metadata = base_meta
                 logger.info(
                     f"AD-KUCS Strategy: lambda_effective={lambda_effective:.4f} source={lambda_effective_source} (Top Sample: {top_item.get('sample_id')}) "
                     f"avg_uncertainty(top{top_k})={avg_uncertainty:.6f} avg_knowledge_gain(top{top_k})={avg_knowledge_gain:.6f} "
@@ -2508,6 +2740,59 @@ class ActiveLearningPipeline:
         ctx = None
         if isinstance(getattr(self, "_selection_context", None), dict):
             ctx = dict(self._selection_context)
+        if isinstance(ctx, dict) and isinstance(getattr(self, "_last_ranked_items", None), list):
+            ranked_items = list(getattr(self, "_last_ranked_items", []) or [])
+            if ranked_items:
+                qts = (0.1, 0.25, 0.5, 0.75, 0.9, 0.99)
+
+                def _stats(vals):
+                    xs = [float(v) for v in (vals or []) if v is not None]
+                    if not xs:
+                        return None
+                    arr = np.asarray(xs, dtype=float)
+                    q = np.quantile(arr, np.asarray(list(qts), dtype=float)).tolist()
+                    q_map = {f"p{int(round(float(p) * 100)):02d}": float(v) for p, v in zip(qts, q)}
+                    return {
+                        "n": int(arr.size),
+                        "mean": float(arr.mean()),
+                        "min": float(arr.min()),
+                        "max": float(arr.max()),
+                        **q_map,
+                    }
+
+                want = {str(i) for i in selected}
+                selected_rows = []
+                for item in ranked_items:
+                    if not isinstance(item, dict):
+                        continue
+                    sid = item.get("sample_id")
+                    if sid is None or str(sid) not in want:
+                        continue
+                    selected_rows.append(item)
+                    if len(selected_rows) >= int(len(selected)):
+                        break
+
+                def _extract(items, key: str):
+                    out = []
+                    for it in items:
+                        if not isinstance(it, dict):
+                            continue
+                        v = it.get(key)
+                        if v is None:
+                            continue
+                        try:
+                            out.append(float(v))
+                        except Exception:
+                            continue
+                    return out
+
+                sel_stats = {}
+                for key in ("final_score", "uncertainty", "knowledge_gain", "lambda_t"):
+                    st = _stats(_extract(selected_rows, key))
+                    if st is not None:
+                        sel_stats[key] = st
+                if sel_stats:
+                    ctx["selected_score_stats"] = sel_stats
         self._selection_context = None
         self._write_status(
             {

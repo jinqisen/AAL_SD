@@ -6,6 +6,7 @@ import glob
 import json
 import argparse
 import logging
+import signal
 from datetime import datetime
 import subprocess
 from typing import Dict, List, Optional, Any, Union
@@ -36,6 +37,10 @@ class TrainingMonitor:
         enable_summary: bool = True,
         enable_process_log: bool = False,
         process_grace_seconds: int = 60,
+        auto_clean_orphan_shm: bool = False,
+        orphan_shm_cleanup_interval_seconds: int = 300,
+        orphan_shm_kill_timeout_seconds: float = 2.0,
+        orphan_shm_only_when_main_stopped: bool = True,
     ):
         self.config = Config()
         self.run_id = run_id
@@ -59,6 +64,11 @@ class TrainingMonitor:
         self._last_main_process_seen_at: Optional[float] = None
         self._process_log_path: Optional[str] = None
         self._last_process_counts: Optional[Dict[str, int]] = None
+        self.auto_clean_orphan_shm = bool(auto_clean_orphan_shm)
+        self.orphan_shm_cleanup_interval_seconds = int(orphan_shm_cleanup_interval_seconds)
+        self.orphan_shm_kill_timeout_seconds = float(orphan_shm_kill_timeout_seconds)
+        self.orphan_shm_only_when_main_stopped = bool(orphan_shm_only_when_main_stopped)
+        self._last_orphan_shm_cleanup_at: Optional[float] = None
         if self.enable_process_log and self.run_id:
             reports_dir = os.path.join(self.runs_dir, self.run_id, "reports")
             os.makedirs(reports_dir, exist_ok=True)
@@ -128,6 +138,137 @@ class TrainingMonitor:
                 self._last_process_counts["python_mem"] = float(memory.get("python_mb") or 0)
         except Exception:
             self._last_process_counts = None
+
+    def _psutil_process_rows(self) -> Optional[List[Dict[str, Any]]]:
+        try:
+            import psutil
+        except Exception:
+            return None
+        rows: List[Dict[str, Any]] = []
+        for p in psutil.process_iter(["pid", "ppid", "name", "cmdline", "memory_info"]):
+            try:
+                info = p.info
+                pid = int(info.get("pid"))
+                ppid = int(info.get("ppid"))
+                name = str(info.get("name") or "")
+                cmdline = info.get("cmdline") or []
+                cmd = " ".join(str(x) for x in cmdline if x is not None).strip()
+                rss = int(getattr(info.get("memory_info"), "rss", 0) or 0)
+                rows.append({"pid": pid, "ppid": ppid, "rss": rss, "cmd": cmd, "name": name})
+            except Exception:
+                continue
+        return rows
+
+    def _ps_process_rows(self) -> List[Dict[str, Any]]:
+        result = subprocess.run(
+            ["ps", "-axo", "pid,ppid,rss,command"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        if result.returncode != 0:
+            raise RuntimeError("ps_failed")
+        lines = [ln.rstrip("\n") for ln in str(result.stdout).splitlines() if ln.strip()]
+        rows: List[Dict[str, Any]] = []
+        for ln in lines[1:]:
+            parts = ln.strip().split(None, 3)
+            if len(parts) < 4:
+                continue
+            pid_s, ppid_s, rss_s, cmd = parts[0], parts[1], parts[2], parts[3]
+            try:
+                pid = int(pid_s)
+                ppid = int(ppid_s)
+                rss_kb = int(rss_s)
+            except ValueError:
+                continue
+            rows.append({"pid": pid, "ppid": ppid, "rss": rss_kb * 1024, "cmd": cmd, "name": ""})
+        return rows
+
+    def _collect_process_rows(self) -> List[Dict[str, Any]]:
+        try:
+            return self._ps_process_rows()
+        except Exception:
+            ps_rows = self._psutil_process_rows()
+            return ps_rows or []
+
+    def _cleanup_orphan_torch_shm_manager(self, pids: List[int]) -> Dict[str, Any]:
+        try:
+            import psutil
+        except Exception:
+            psutil = None
+        killed_term = 0
+        killed_kill = 0
+        denied = 0
+        missing = 0
+
+        uid = None
+        if psutil is not None:
+            try:
+                uid = psutil.Process().uids().real
+            except Exception:
+                uid = None
+
+        safe_pids: List[int] = []
+        for pid in pids:
+            try:
+                pid_i = int(pid)
+            except Exception:
+                continue
+            if psutil is None or uid is None:
+                safe_pids.append(pid_i)
+                continue
+            try:
+                p = psutil.Process(pid_i)
+                puid = p.uids().real
+                if puid == uid:
+                    safe_pids.append(pid_i)
+            except Exception:
+                continue
+
+        if not safe_pids:
+            return {"target": int(len(pids)), "term": 0, "kill": 0, "denied": 0, "missing": int(len(pids))}
+
+        for pid in safe_pids:
+            try:
+                os.kill(pid, signal.SIGTERM)
+                killed_term += 1
+            except ProcessLookupError:
+                missing += 1
+            except PermissionError:
+                denied += 1
+            except Exception:
+                denied += 1
+
+        deadline = time.time() + float(self.orphan_shm_kill_timeout_seconds)
+        alive = set(safe_pids)
+        while alive and time.time() < deadline:
+            still = set()
+            for pid in list(alive):
+                try:
+                    if psutil is not None:
+                        if psutil.pid_exists(pid):
+                            still.add(pid)
+                    else:
+                        os.kill(pid, 0)
+                        still.add(pid)
+                except Exception:
+                    continue
+            alive = still
+            if alive:
+                time.sleep(0.1)
+
+        for pid in sorted(alive):
+            try:
+                os.kill(pid, signal.SIGKILL)
+                killed_kill += 1
+            except ProcessLookupError:
+                missing += 1
+            except PermissionError:
+                denied += 1
+            except Exception:
+                denied += 1
+
+        return {"target": int(len(pids)), "term": int(killed_term), "kill": int(killed_kill), "denied": int(denied), "missing": int(missing)}
 
     def _setup_llm_client(self) -> Optional[SiliconFlowClient]:
         try:
@@ -886,42 +1027,28 @@ class TrainingMonitor:
     def _check_processes(self):
         snapshot: Optional[Dict[str, Any]] = None
         try:
-            result = subprocess.run(
-                ["ps", "-axo", "pid,ppid,rss,command"],
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                text=True,
-            )
-            if result.returncode != 0:
-                raise RuntimeError("ps_failed")
-
-            lines = [ln.rstrip("\n") for ln in str(result.stdout).splitlines() if ln.strip()]
-            rows: List[Dict[str, Any]] = []
-            
-            total_python_rss_kb = 0
-            
-            for ln in lines[1:]:
-                parts = ln.strip().split(None, 3)
-                if len(parts) < 4:
-                    continue
-                pid_s, ppid_s, rss_s, cmd = parts[0], parts[1], parts[2], parts[3]
+            rows = self._collect_process_rows()
+            total_python_rss_bytes = 0
+            for r in rows:
                 try:
-                    pid = int(pid_s)
-                    ppid = int(ppid_s)
-                    rss = int(rss_s)
-                except ValueError:
+                    if "python" in str(r.get("cmd") or ""):
+                        total_python_rss_bytes += int(r.get("rss") or 0)
+                except Exception:
                     continue
-                rows.append({"pid": pid, "ppid": ppid, "rss": rss, "cmd": cmd})
-                
-                if "python" in cmd:
-                    total_python_rss_kb += rss
-
             main_markers = ("run_parallel_strict.py", "src/main.py", "run_multi_seed.py")
-            main_pids = {r["pid"] for r in rows if any(m in r["cmd"] for m in main_markers)}
-            python_pids = {r["pid"] for r in rows if "python" in r["cmd"]}
-            torch_shm = [r for r in rows if "torch_shm_manager" in r["cmd"]]
-            resource_tracker = [r for r in rows if "multiprocessing.resource_tracker" in r["cmd"]]
-            spawn_main = [r for r in rows if "multiprocessing.spawn" in r["cmd"] or "spawn_main" in r["cmd"]]
+            main_pids = {r["pid"] for r in rows if any(m in str(r.get("cmd") or "") for m in main_markers)}
+            python_pids = {r["pid"] for r in rows if "python" in str(r.get("cmd") or "")}
+            torch_shm = [
+                r
+                for r in rows
+                if ("torch_shm_manager" in str(r.get("cmd") or "")) or ("torch_shm_manager" in str(r.get("name") or ""))
+            ]
+            resource_tracker = [r for r in rows if "multiprocessing.resource_tracker" in str(r.get("cmd") or "")]
+            spawn_main = [
+                r
+                for r in rows
+                if ("multiprocessing.spawn" in str(r.get("cmd") or "")) or ("spawn_main" in str(r.get("cmd") or ""))
+            ]
 
             main_running = bool(main_pids)
             now_ts = time.time()
@@ -938,6 +1065,20 @@ class TrainingMonitor:
                     if int(r["ppid"]) not in python_pids:
                         orphan_shm.append(r)
 
+            orphan_ppid1 = [r for r in torch_shm if int(r.get("ppid") or -1) == 1]
+
+            cleanup_stats = None
+            if self.auto_clean_orphan_shm and orphan_ppid1:
+                allow = True
+                if self.orphan_shm_only_when_main_stopped:
+                    allow = (not main_running) and (not grace_ok)
+                if allow:
+                    last = float(self._last_orphan_shm_cleanup_at) if self._last_orphan_shm_cleanup_at is not None else None
+                    if last is None or (now_ts - last) >= float(self.orphan_shm_cleanup_interval_seconds):
+                        self._last_orphan_shm_cleanup_at = now_ts
+                        pids = [int(r["pid"]) for r in orphan_ppid1 if isinstance(r.get("pid"), int) or str(r.get("pid") or "").isdigit()]
+                        cleanup_stats = self._cleanup_orphan_torch_shm_manager(pids)
+
             snapshot = {
                 "ts": datetime.now().isoformat(),
                 "run_id": self._run_label(),
@@ -950,12 +1091,17 @@ class TrainingMonitor:
                     "spawn_main": int(len(spawn_main)),
                 },
                 "memory": {
-                    "python_mb": total_python_rss_kb / 1024.0
+                    "python_mb": total_python_rss_bytes / 1024.0 / 1024.0
                 },
                 "orphan_torch_shm_manager": [
-                    {"pid": r["pid"], "ppid": r["ppid"], "cmd": r["cmd"]}
+                    {"pid": r.get("pid"), "ppid": r.get("ppid"), "cmd": r.get("cmd")}
                     for r in orphan_shm[:50]
                 ],
+                "orphan_torch_shm_manager_ppid1": [
+                    {"pid": r.get("pid"), "ppid": r.get("ppid"), "cmd": r.get("cmd")}
+                    for r in orphan_ppid1[:50]
+                ],
+                "orphan_torch_shm_manager_cleanup": cleanup_stats,
             }
         except Exception:
             snapshot = {
@@ -971,6 +1117,8 @@ class TrainingMonitor:
                 },
                 "memory": {"python_mb": 0.0},
                 "orphan_torch_shm_manager": [],
+                "orphan_torch_shm_manager_ppid1": [],
+                "orphan_torch_shm_manager_cleanup": None,
             }
 
         if self._process_log_path and snapshot:
@@ -990,6 +1138,16 @@ class TrainingMonitor:
                             f"WARNING: Orphaned torch_shm_manager detected (n={orphan_n}). "
                             f"Suggested cleanup: pkill -x torch_shm_manager"
                         )
+                cleanup_stats = snapshot.get("orphan_torch_shm_manager_cleanup")
+                if isinstance(cleanup_stats, dict) and int(cleanup_stats.get("target") or 0) > 0:
+                    print(
+                        "Orphan torch_shm_manager cleanup: "
+                        f"target={int(cleanup_stats.get('target') or 0)} "
+                        f"term={int(cleanup_stats.get('term') or 0)} "
+                        f"kill={int(cleanup_stats.get('kill') or 0)} "
+                        f"denied={int(cleanup_stats.get('denied') or 0)} "
+                        f"missing={int(cleanup_stats.get('missing') or 0)}"
+                    )
             except Exception:
                 pass
 
@@ -1005,6 +1163,10 @@ def main():
     parser.add_argument("--summary", action=argparse.BooleanOptionalAction, default=True)
     parser.add_argument("--proc-log", action=argparse.BooleanOptionalAction, default=False)
     parser.add_argument("--proc-grace", type=int, default=60)
+    parser.add_argument("--auto-clean-orphan-shm", action=argparse.BooleanOptionalAction, default=False)
+    parser.add_argument("--orphan-shm-clean-interval", type=int, default=300)
+    parser.add_argument("--orphan-shm-kill-timeout", type=float, default=2.0)
+    parser.add_argument("--orphan-shm-only-when-main-stopped", action=argparse.BooleanOptionalAction, default=True)
     args = parser.parse_args()
     run_ids = [x.strip() for x in str(args.run_ids).split(",") if x.strip()]
     run_dirs = [x.strip() for x in str(args.run_dirs).split(",") if x.strip()]
@@ -1020,6 +1182,10 @@ def main():
         enable_summary=bool(args.summary),
         enable_process_log=bool(args.proc_log),
         process_grace_seconds=int(args.proc_grace),
+        auto_clean_orphan_shm=bool(args.auto_clean_orphan_shm),
+        orphan_shm_cleanup_interval_seconds=int(args.orphan_shm_clean_interval),
+        orphan_shm_kill_timeout_seconds=float(args.orphan_shm_kill_timeout),
+        orphan_shm_only_when_main_stopped=bool(args.orphan_shm_only_when_main_stopped),
     )
     print("Starting Advanced Training Monitor...")
     print(f"Runs Directory: {monitor.runs_dir}")
