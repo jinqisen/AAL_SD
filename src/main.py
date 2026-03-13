@@ -944,6 +944,17 @@ class ActiveLearningPipeline:
         )
         u_median_top = float(np.median(np.asarray(top_u, dtype=float))) if top_u else None
         k_median_top = float(np.median(np.asarray(top_k, dtype=float))) if top_k else None
+        selected_ids_list = [str(sid) for sid in list(selected_ids or [])[: max(0, max_selected)]]
+        top_ids_set = set(str(item.get("sample_id")) for item in top_rows if isinstance(item, dict) and item.get("sample_id") is not None)
+        hit_count = int(sum(1 for sid in selected_ids_list if sid in top_ids_set))
+        coverage_selected_in_top = (
+            float(hit_count) / float(len(selected_ids_list))
+            if int(len(selected_ids_list)) > 0
+            else None
+        )
+        topk_stats_warning = None
+        if coverage_selected_in_top is not None and float(coverage_selected_in_top) < 0.5:
+            topk_stats_warning = "topk_stats_low_coverage_diagnostics_only"
         self._append_trace(
             {
                 "type": "l3_selection",
@@ -970,6 +981,9 @@ class ActiveLearningPipeline:
                 "k_median_selected": k_median_selected,
                 "u_median_top": u_median_top,
                 "k_median_top": k_median_top,
+                "coverage_selected_in_top": coverage_selected_in_top,
+                "topk_stats_for_closed_loop": False,
+                "topk_stats_warning": topk_stats_warning,
             }
         )
 
@@ -1870,6 +1884,7 @@ class ActiveLearningPipeline:
                 tvc_last = None
                 tvc_p10 = None
                 tvc_neg_rate = None
+                tvc_sign_flip_rate = None
                 overfit_risk = None
                 if grad_tvc_values:
                     try:
@@ -1882,6 +1897,17 @@ class ActiveLearningPipeline:
                             tvc_last = float(arr[-1])
                             tvc_p10 = float(np.quantile(arr, 0.1))
                             tvc_neg_rate = float(np.mean(arr < 0))
+                            if int(arr.size) >= 2:
+                                signs = np.sign(arr)
+                                signs = signs[np.isfinite(signs)]
+                                sign_den = int(max(int(signs.size) - 1, 0))
+                                if sign_den > 0:
+                                    sign_flips = int(np.sum((signs[1:] * signs[:-1]) < 0))
+                                    tvc_sign_flip_rate = float(sign_flips) / float(sign_den)
+                                else:
+                                    tvc_sign_flip_rate = 0.0
+                            else:
+                                tvc_sign_flip_rate = 0.0
                             overfit_risk = float(
                                 (tvc_neg_rate or 0.0)
                                 + max(0.0, -tvc_min) * 0.5
@@ -1894,7 +1920,18 @@ class ActiveLearningPipeline:
                         tvc_last = None
                         tvc_p10 = None
                         tvc_neg_rate = None
+                        tvc_sign_flip_rate = None
                         overfit_risk = None
+                epoch_miou_volatility = None
+                try:
+                    if isinstance(epoch_mious, list) and len(epoch_mious) >= 2:
+                        epoch_miou_volatility = float(
+                            np.std(np.asarray(epoch_mious, dtype=float), ddof=1)
+                        )
+                    elif isinstance(epoch_mious, list) and len(epoch_mious) == 1:
+                        epoch_miou_volatility = 0.0
+                except Exception:
+                    epoch_miou_volatility = None
 
                 self._append_trace(
                     {
@@ -1906,6 +1943,8 @@ class ActiveLearningPipeline:
                         "grad_train_val_cos_last": tvc_last,
                         "grad_train_val_cos_p10": tvc_p10,
                         "grad_train_val_cos_neg_rate": tvc_neg_rate,
+                        "tvc_sign_flip_rate": tvc_sign_flip_rate,
+                        "epoch_miou_volatility": epoch_miou_volatility,
                         "overfit_risk": overfit_risk,
                     }
                 )
@@ -2069,6 +2108,8 @@ class ActiveLearningPipeline:
                     "grad_train_val_cos_last": tvc_last,
                     "grad_train_val_cos_p10": tvc_p10,
                     "grad_train_val_cos_neg_rate": tvc_neg_rate,
+                    "tvc_sign_flip_rate": tvc_sign_flip_rate,
+                    "epoch_miou_volatility": epoch_miou_volatility,
                     "overfit_risk": overfit_risk,
                 }
                 self._last_training_state = dict(training_state)

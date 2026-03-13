@@ -108,6 +108,11 @@
 - ramp 终点/斜率与风险耦合：风险偏高时降低 `end_lambda` 或延后 ramp 起点
 - 修订：不要在现阶段用 `u_median_top/k_median_top` 做闭环触发（因为 ramp 的后期覆盖率显著下降，见 2.3），最多作为离线告警；闭环触发应基于可靠信号（late_stage_gain/overfit_risk/TVC 等）
 
+实现状态（2026-03-13）：
+- 已在 `Toolbox._compute_policy_lambda_for_round()` 中实现 `late_stage_ramp.conditional` 门控
+- ramp 门控已接入 `overfit_risk`、`grad_train_val_cos_neg_rate`、`miou_delta/low_gain_streak`
+- 门控结果写入 `lambda_policy_apply.diagnostics.late_stage_ramp`
+
 ### P1：把 guardrail 从“硬阈值”改为“自适应阈值 + 配额联动”
 
 当前 guardrail 的 `u_median_min/u_low_frac_max` 作为常数，可能随 seed/轮次漂移。  
@@ -120,6 +125,10 @@
 
 建议把 `epoch_miou_volatility`、`tvc_sign_flip_rate`（设计文档已定义）接入 diagnose→policy 映射：当轮内振荡显著时，下轮限制 λ 上升或减少 epochs（若 epochs 可调）。
 
+实现状态（2026-03-13）：
+- 已在训练侧补充 `epoch_miou_volatility` 与 `tvc_sign_flip_rate` 的采集与 trace 输出
+- 已在 policy 闭环中加入稳定性门控：高波动/高翻转时禁止 λ 上调（`stability_risk_hold`）
+
 ### P3：将 guardrail 统计口径从“topk命中子集”改为“最终 selected_ids 全量”
 
 依据：在 `ramp_guardrail` 后期，`coverage_selected_in_top` 在多轮接近 0，`selected_score_stats` 常出现 `n<<selected_count`，导致统计失真。  
@@ -127,6 +136,11 @@
 - guardrail 触发后，直接在 `current_scores` 上对 `selected_ids_after` 计算 U/K 分布（mean/p50/p75/frac_u_lt）
 - 将该全量统计写入 `selection_guardrail.stats_after_selected_all`
 - `l3_selection` 中由 `top_items` 回推的统计仅保留为“告警信号”，不再用于闭环阈值
+
+实现状态（2026-03-13）：
+- 已新增 `stats_after_selected_all`（基于最终 `selected_ids_after` 全量统计）
+- 已新增 guardrail 自适应阈值能力（历史分位数模式），并写入 `threshold_mode/threshold_adaptive`
+- `l3_selection_stats` 已补 `coverage_selected_in_top` 与 `topk_stats_for_closed_loop=false`
 
 ## 4. Prompt 改进空间（前提：LLM 链路可用）
 
@@ -142,6 +156,11 @@
 - 在 trace 中稳定记录 `agent_llm_request/agent_llm_response`，并携带 `messages_sha1/response_sha1`
 - 每轮记录 `llm_calls_in_round`、`llm_transport_error_count`、`llm_invalid_format_count`
 - 没有上述事件或计数缺失时，该轮默认判定为“LLM未参与决策”，不纳入 prompt 效果分析
+
+实现状态（2026-03-13）：
+- 已在 async agent 路径补齐 `agent_llm_request/agent_llm_response` 事件
+- prompt 模板已结构化为 `diagnostics/issues/recent_history` 输入块
+- prompt 输出已加入动作白名单、参数范围与权限边界约束
 
 ## 5. 可观测性缺口：l3_selection 与 lambda_effective 的结论与整改
 
@@ -179,6 +198,8 @@
 - `selection` 事件补齐 `lambda_effective/lambda_source` 的回填逻辑
 - 新增 `l3_selection_stats` 轻量事件（便于形成 u/k trajectory）
 - 异步 agent 路径补齐 `agent_llm_request/agent_llm_response` 事件，确保 prompt 可审计
+- policy 增加条件化 late-stage ramp 与稳定性门控（epoch 波动/符号翻转）
+- guardrail 增加自适应阈值与 `selected_ids_after` 全量统计
 
 验证建议：
 - 运行单测：`python -m pytest -q`
@@ -221,6 +242,7 @@
 - 2026-03-13：基于离线回填 CSV（u/k 中位数轨迹）更新策略结论与风险点
 - 2026-03-13：补充异步 agent 的 LLM request/response trace 事件
 - 2026-03-13：补充 `selection_guardrail.lambda_after` 到 `lambda_effective` 回填优先级
+- 2026-03-13：落地条件化 ramp、稳定性门控、自适应 guardrail 与 prompt 结构化约束
 
 ## 9. 证据对照表（关键论断 → 原始数据锚点）
 

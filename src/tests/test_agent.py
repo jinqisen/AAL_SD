@@ -389,6 +389,29 @@ class TestLambdaPolicyWarmupRisk(unittest.TestCase):
         v = float(self.tools.apply_round_lambda_policy())
         self.assertAlmostEqual(v, float(warmup_v) + 0.05, places=12)
 
+    def test_round4_high_volatility_blocks_lambda_up(self):
+        self.controller.current_round = 2
+        self.tools.reset_round_controls()
+        warmup_v = float(self.tools.apply_round_lambda_policy())
+
+        self.controller.current_round = 4
+        self.tools.reset_round_controls()
+        for _ in range(3):
+            self.tools.set_training_state({
+                "last_miou": 0.75,
+                "prev_miou": 0.75,
+                "miou_delta": 0.0,
+                "rollback_flag": False,
+                "current_labeled_count": 10,
+                "total_budget": 100,
+                "overfit_risk": 0.1,
+                "grad_train_val_cos_min": 0.0,
+                "epoch_miou_volatility": 0.08,
+                "tvc_sign_flip_rate": 0.8,
+            })
+        v = float(self.tools.apply_round_lambda_policy())
+        self.assertAlmostEqual(v, float(warmup_v), places=12)
+
 
 class TestAgentObservationContract(unittest.TestCase):
     def test_get_system_status_exposes_observation_contract(self):

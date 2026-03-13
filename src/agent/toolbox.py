@@ -117,6 +117,119 @@ class Toolbox:
             "missing": missing,
         }
 
+    def _score_stats_for_ids(self, sample_ids: List[str], u_low_thresh: float) -> Dict[str, Any]:
+        u_vals: List[float] = []
+        k_vals: List[float] = []
+        missing: List[str] = []
+        for sid in sample_ids:
+            raw = None
+            if isinstance(self.current_scores, dict):
+                raw = self.current_scores.get(str(sid))
+                if raw is None:
+                    try:
+                        alt = str(int(sid))
+                    except Exception:
+                        alt = None
+                    if alt is not None:
+                        raw = self.current_scores.get(alt)
+            if not isinstance(raw, dict):
+                missing.append(str(sid))
+                continue
+            u_val = raw.get("U")
+            k_val = raw.get("K")
+            if u_val is None and k_val is None:
+                missing.append(str(sid))
+                continue
+            try:
+                if u_val is not None:
+                    u_vals.append(float(u_val))
+            except Exception:
+                pass
+            try:
+                if k_val is not None:
+                    k_vals.append(float(k_val))
+            except Exception:
+                pass
+        u_arr = np.asarray(u_vals, dtype=float) if u_vals else np.asarray([], dtype=float)
+        k_arr = np.asarray(k_vals, dtype=float) if k_vals else np.asarray([], dtype=float)
+        u_n = int(u_arr.size)
+        k_n = int(k_arr.size)
+        out: Dict[str, Any] = {
+            "selected_count": int(len(sample_ids or [])),
+            "u_n": int(u_n),
+            "k_n": int(k_n),
+            "missing_count": int(len(missing)),
+            "missing_sample_ids": list(missing),
+            "u_mean": float(np.mean(u_arr)) if u_n > 0 else None,
+            "u_median": float(np.median(u_arr)) if u_n > 0 else None,
+            "u_p75": float(np.quantile(u_arr, 0.75)) if u_n > 0 else None,
+            "k_mean": float(np.mean(k_arr)) if k_n > 0 else None,
+            "k_median": float(np.median(k_arr)) if k_n > 0 else None,
+            "k_p75": float(np.quantile(k_arr, 0.75)) if k_n > 0 else None,
+        }
+        if u_n > 0:
+            out["frac_u_lt"] = float(np.mean(u_arr < float(u_low_thresh)))
+        else:
+            out["frac_u_lt"] = None
+        return out
+
+    def _dynamic_guardrail_thresholds(
+        self,
+        cfg: Dict[str, Any],
+        *,
+        base_u_median_min: float,
+        base_u_low_frac_max: float,
+    ) -> Dict[str, Any]:
+        adaptive_cfg = cfg.get("adaptive_thresholds")
+        enabled = bool(cfg.get("adaptive", False))
+        if isinstance(adaptive_cfg, dict):
+            enabled = bool(adaptive_cfg.get("enabled", enabled))
+        if not enabled:
+            return {
+                "u_median_min": float(base_u_median_min),
+                "u_low_frac_max": float(base_u_low_frac_max),
+                "mode": "fixed",
+            }
+        window = int((adaptive_cfg or {}).get("window", cfg.get("adaptive_window", 5)) or 5)
+        min_samples = int((adaptive_cfg or {}).get("min_samples", cfg.get("adaptive_min_samples", 3)) or 3)
+        q_u = float((adaptive_cfg or {}).get("u_median_quantile", cfg.get("adaptive_u_median_quantile", 0.3)) or 0.3)
+        q_u = min(max(q_u, 0.0), 1.0)
+        q_frac = float((adaptive_cfg or {}).get("u_low_frac_quantile", cfg.get("adaptive_u_low_frac_quantile", 0.8)) or 0.8)
+        q_frac = min(max(q_frac, 0.0), 1.0)
+        hist_u = [float(x) for x in self._get_signal_history("guardrail_selected_u_median", window=window)]
+        hist_frac = [float(x) for x in self._get_signal_history("guardrail_selected_frac_u_lt", window=window)]
+        if len(hist_u) < int(min_samples) or len(hist_frac) < int(min_samples):
+            return {
+                "u_median_min": float(base_u_median_min),
+                "u_low_frac_max": float(base_u_low_frac_max),
+                "mode": "fixed_insufficient_history",
+                "window": int(window),
+                "min_samples": int(min_samples),
+                "history_u_n": int(len(hist_u)),
+                "history_frac_n": int(len(hist_frac)),
+            }
+        dyn_u = float(np.quantile(np.asarray(hist_u, dtype=float), q_u))
+        dyn_frac = float(np.quantile(np.asarray(hist_frac, dtype=float), q_frac))
+        floor_u = (adaptive_cfg or {}).get("u_median_floor", cfg.get("u_median_min_floor", base_u_median_min))
+        ceil_frac = (adaptive_cfg or {}).get("u_low_frac_ceiling", cfg.get("u_low_frac_max_ceiling", base_u_low_frac_max))
+        if floor_u is not None:
+            dyn_u = max(float(dyn_u), float(floor_u))
+        if ceil_frac is not None:
+            dyn_frac = min(float(dyn_frac), float(ceil_frac))
+        return {
+            "u_median_min": float(dyn_u),
+            "u_low_frac_max": float(dyn_frac),
+            "mode": "adaptive_quantile",
+            "window": int(window),
+            "min_samples": int(min_samples),
+            "u_median_quantile": float(q_u),
+            "u_low_frac_quantile": float(q_frac),
+            "history_u_n": int(len(hist_u)),
+            "history_frac_n": int(len(hist_frac)),
+            "u_median_floor": None if floor_u is None else float(floor_u),
+            "u_low_frac_ceiling": None if ceil_frac is None else float(ceil_frac),
+        }
+
     def _rank_candidate_ids_by_lambda(self, lambda_value: float) -> List[str]:
         items: List[tuple[float, str]] = []
         for sid, scores in (self.current_scores or {}).items():
@@ -158,13 +271,20 @@ class Toolbox:
         if expected <= 0:
             return {"applied": False, "sample_ids": list(sample_ids)}
 
-        u_median_min = float(cfg.get("u_median_min", 0.45))
+        base_u_median_min = float(cfg.get("u_median_min", 0.45))
         u_low_thresh = float(cfg.get("u_low_thresh", 0.4))
-        u_low_frac_max = float(cfg.get("u_low_frac_max", 0.2))
+        base_u_low_frac_max = float(cfg.get("u_low_frac_max", 0.2))
         max_steps = int(cfg.get("max_steps", 5) or 0)
         lambda_step_down = float(cfg.get("lambda_step_down", 0.1))
         fallback_u_frac = float(cfg.get("fallback_quota_u_frac", 0.7))
         fallback_u_frac = float(min(max(fallback_u_frac, 0.0), 1.0))
+        threshold_meta = self._dynamic_guardrail_thresholds(
+            cfg,
+            base_u_median_min=base_u_median_min,
+            base_u_low_frac_max=base_u_low_frac_max,
+        )
+        u_median_min = float(threshold_meta.get("u_median_min", base_u_median_min))
+        u_low_frac_max = float(threshold_meta.get("u_low_frac_max", base_u_low_frac_max))
 
         clamp_min = float(self._agent_threshold("LAMBDA_CLAMP_MIN", AgentConstraints.LAMBDA_MIN))
         clamp_max = float(self._agent_threshold("LAMBDA_CLAMP_MAX", AgentConstraints.LAMBDA_MAX))
@@ -234,19 +354,25 @@ class Toolbox:
         lambda_after = float(min(max(lambda_after, clamp_min), clamp_max))
         final_ids = list(chosen.get("sample_ids") or orig)
         final_stats = dict(chosen.get("stats") or {})
+        final_stats_selected_all = self._score_stats_for_ids(final_ids, u_low_thresh=u_low_thresh)
+        self._append_signal_history("guardrail_selected_u_median", final_stats_selected_all.get("u_median"), max_len=32)
+        self._append_signal_history("guardrail_selected_frac_u_lt", final_stats_selected_all.get("frac_u_lt"), max_len=32)
 
         self.control_state["lambda_override_round"] = float(lambda_after)
         self.control_meta["lambda_guardrail"] = {
             "method": method,
             "lambda_before": float(lambda_before),
             "lambda_after": float(lambda_after),
+            "threshold_mode": threshold_meta.get("mode"),
             "thresholds": {
                 "u_median_min": float(u_median_min),
                 "u_low_thresh": float(u_low_thresh),
                 "u_low_frac_max": float(u_low_frac_max),
             },
+            "threshold_adaptive": threshold_meta,
             "stats_before": stats0,
             "stats_after": final_stats,
+            "stats_after_selected_all": final_stats_selected_all,
         }
 
         if hasattr(self.controller, "_append_trace"):
@@ -264,8 +390,11 @@ class Toolbox:
                             "u_low_thresh": float(u_low_thresh),
                             "u_low_frac_max": float(u_low_frac_max),
                         },
+                        "threshold_mode": threshold_meta.get("mode"),
+                        "threshold_adaptive": threshold_meta,
                         "stats_before": stats0,
                         "stats_after": final_stats,
+                        "stats_after_selected_all": final_stats_selected_all,
                         "selected_ids_before": orig,
                         "selected_ids_after": final_ids,
                     }
@@ -283,8 +412,11 @@ class Toolbox:
                             "u_low_thresh": float(u_low_thresh),
                             "u_low_frac_max": float(u_low_frac_max),
                         },
+                        "threshold_mode": threshold_meta.get("mode"),
+                        "threshold_adaptive": threshold_meta,
                         "stats_before": stats0,
                         "stats_after": final_stats,
+                        "stats_after_selected_all": final_stats_selected_all,
                     }
                 )
             except Exception:
@@ -303,6 +435,7 @@ class Toolbox:
                 "u_median_after": final_stats.get("u_median"),
                 "frac_u_lt_before": stats0.get("frac_u_lt"),
                 "frac_u_lt_after": final_stats.get("frac_u_lt"),
+                "threshold_mode": threshold_meta.get("mode"),
             }
             self.controller._selection_context = ctx
 
@@ -313,6 +446,7 @@ class Toolbox:
             "lambda_after": float(lambda_after),
             "stats_before": stats0,
             "stats_after": final_stats,
+            "stats_after_selected_all": final_stats_selected_all,
             "sample_ids": final_ids,
         }
 
@@ -543,6 +677,8 @@ class Toolbox:
                     "overfit_risk_ema": None if risk is None else float(risk),
                     "tvc_key": str(tvc_key),
                     "tvc_value": None if tvc_val is None else float(tvc_val),
+                    "epoch_miou_volatility": self.training_state.get("epoch_miou_volatility"),
+                    "tvc_sign_flip_rate": self.training_state.get("tvc_sign_flip_rate"),
                 },
                 "risk_control": {
                     "severe_logic": str(logic),
@@ -560,6 +696,26 @@ class Toolbox:
         )
 
         if round_num >= risk_control_start_round:
+            epoch_vol = self.training_state.get("epoch_miou_volatility")
+            tvc_flip = self.training_state.get("tvc_sign_flip_rate")
+            vol_hi = float(self._agent_threshold("EPOCH_MIOU_VOLATILITY_HI", 0.03) or 0.03)
+            flip_hi = float(self._agent_threshold("TVC_SIGN_FLIP_RATE_HI", 0.65) or 0.65)
+            vol_hit = False
+            flip_hit = False
+            try:
+                if epoch_vol is not None:
+                    vol_hit = float(epoch_vol) >= float(vol_hi)
+            except Exception:
+                vol_hit = False
+            try:
+                if tvc_flip is not None:
+                    flip_hit = float(tvc_flip) >= float(flip_hi)
+            except Exception:
+                flip_hit = False
+            diagnostics["thresholds"]["epoch_miou_volatility_hi"] = float(vol_hi)
+            diagnostics["thresholds"]["tvc_sign_flip_rate_hi"] = float(flip_hi)
+            diagnostics["risk_control"]["volatility_hit"] = bool(vol_hit)
+            diagnostics["risk_control"]["sign_flip_hit"] = bool(flip_hit)
             if rollback_flag:
                 if delta_down > 0:
                     applied = float(max(float(applied) - float(delta_down), clamp_min))
@@ -613,7 +769,10 @@ class Toolbox:
                 if u_mean is not None and k_mean is not None:
                     diagnostics["inputs"]["k_u_gap"] = float(k_mean) - float(u_mean)
 
-                if (
+                if bool(vol_hit) or bool(flip_hit):
+                    allow_up = False
+                    allow_up_reason = "stability_risk_block_up"
+                elif (
                     risk is not None
                     and miou_delta is not None
                     and u_mean is not None
@@ -625,7 +784,7 @@ class Toolbox:
                     allow_up = True
                     allow_up_reason = "low_risk_k_dominant_up"
 
-                if not allow_up:
+                if (not allow_up) and (not (bool(vol_hit) or bool(flip_hit))):
                     if risk is not None and float(risk) <= float(risk_lo) and int(self._miou_low_gain_streak) >= int(streak_need):
                         allow_up = True
                         allow_up_reason = "low_risk_low_gain_small_up"
@@ -634,7 +793,10 @@ class Toolbox:
                     applied = float(min(float(applied) + float(delta_up), clamp_max))
                     rule = str(allow_up_reason or "low_risk_up")
                 else:
-                    rule = "hold"
+                    if bool(vol_hit) or bool(flip_hit):
+                        rule = "stability_risk_hold"
+                    else:
+                        rule = "hold"
         else:
             rule = "pre_risk_control_hold"
 
@@ -649,6 +811,46 @@ class Toolbox:
                     start, end = end, start
                     v0, v1 = v1, v0
                 if round_num >= start and start > 0:
+                    ramp_conditional = bool(ramp.get("conditional", True))
+                    risk_for_ramp_max = ramp.get("risk_max_for_ramp")
+                    if risk_for_ramp_max is None:
+                        risk_for_ramp_max = self._agent_threshold("OVERFIT_RISK_FOR_RAMP_MAX", 0.4)
+                    tvc_neg_rate_max = ramp.get("tvc_neg_rate_max_for_ramp")
+                    if tvc_neg_rate_max is None:
+                        tvc_neg_rate_max = self._agent_threshold("TVC_NEG_RATE_FOR_RAMP_MAX", 0.5)
+                    miou_delta_max = ramp.get("miou_delta_max_for_ramp")
+                    if miou_delta_max is None:
+                        miou_delta_max = self._agent_threshold("MIOU_LOW_GAIN_THRESH", 0.0)
+                    require_low_gain = bool(ramp.get("require_low_gain", True))
+                    require_stable_tvc = bool(ramp.get("require_stable_tvc", True))
+                    ramp_risk_ok = True
+                    if risk is not None and risk_for_ramp_max is not None:
+                        ramp_risk_ok = float(risk) <= float(risk_for_ramp_max)
+                    ramp_low_gain_ok = True
+                    if require_low_gain:
+                        md = self.training_state.get("miou_delta")
+                        if md is None:
+                            ramp_low_gain_ok = int(self._miou_low_gain_streak) >= max(int(streak_need), 1)
+                        else:
+                            ramp_low_gain_ok = float(md) <= float(miou_delta_max)
+                    ramp_tvc_ok = True
+                    if require_stable_tvc:
+                        tvc_neg = self.training_state.get("grad_train_val_cos_neg_rate")
+                        if tvc_neg is not None:
+                            ramp_tvc_ok = float(tvc_neg) <= float(tvc_neg_rate_max)
+                    ramp_gate_ok = bool(ramp_risk_ok and ramp_low_gain_ok and ramp_tvc_ok)
+                    diagnostics["late_stage_ramp"] = {
+                        "conditional": bool(ramp_conditional),
+                        "risk_max_for_ramp": None if risk_for_ramp_max is None else float(risk_for_ramp_max),
+                        "tvc_neg_rate_max_for_ramp": None if tvc_neg_rate_max is None else float(tvc_neg_rate_max),
+                        "miou_delta_max_for_ramp": None if miou_delta_max is None else float(miou_delta_max),
+                        "require_low_gain": bool(require_low_gain),
+                        "require_stable_tvc": bool(require_stable_tvc),
+                        "risk_ok": bool(ramp_risk_ok),
+                        "low_gain_ok": bool(ramp_low_gain_ok),
+                        "tvc_ok": bool(ramp_tvc_ok),
+                        "gate_ok": bool(ramp_gate_ok),
+                    }
                     if end == start:
                         floor = float(v1)
                     else:
@@ -656,15 +858,20 @@ class Toolbox:
                         t = float(min(max(t, 0.0), 1.0))
                         floor = float(v0 + (v1 - v0) * t)
                     floor = float(min(max(floor, 0.0), 1.0))
-                    if rule not in (
+                    if (
+                        (not ramp_conditional or ramp_gate_ok)
+                        and rule not in (
                         "rollback_lambda_down",
                         "severe_overfit_lambda_down",
                         "severe_overfit_lambda_down_blocked_cooling",
                         "severe_overfit_lambda_down_no_delta",
+                        )
                     ):
                         if float(applied) < float(floor):
                             applied = float(floor)
                             rule = f"{rule}+late_stage_ramp"
+                    elif ramp_conditional and (not ramp_gate_ok):
+                        diagnostics["late_stage_ramp"]["blocked"] = True
             except Exception:
                 pass
 
