@@ -120,6 +120,14 @@
 
 建议把 `epoch_miou_volatility`、`tvc_sign_flip_rate`（设计文档已定义）接入 diagnose→policy 映射：当轮内振荡显著时，下轮限制 λ 上升或减少 epochs（若 epochs 可调）。
 
+### P3：将 guardrail 统计口径从“topk命中子集”改为“最终 selected_ids 全量”
+
+依据：在 `ramp_guardrail` 后期，`coverage_selected_in_top` 在多轮接近 0，`selected_score_stats` 常出现 `n<<selected_count`，导致统计失真。  
+建议：
+- guardrail 触发后，直接在 `current_scores` 上对 `selected_ids_after` 计算 U/K 分布（mean/p50/p75/frac_u_lt）
+- 将该全量统计写入 `selection_guardrail.stats_after_selected_all`
+- `l3_selection` 中由 `top_items` 回推的统计仅保留为“告警信号”，不再用于闭环阈值
+
 ## 4. Prompt 改进空间（前提：LLM 链路可用）
 
 在多个报告中出现 “LLM Client not available”，且 trace 中 `context.llm_mode` 多为空，说明实验中存在 LLM 未参与决策的情况。prompt 优化只有在 LLM 链路稳定可用后才具备收益。
@@ -128,6 +136,12 @@
 - 将输入拆为三块：`diagnostics`、`issues`、`recent_history`，并要求输出“可裁剪的参数建议”（按白名单与范围）
 - 强制输出：主要瓶颈一句话 + 3 条按优先级排序的建议（每条含预期收益与风险）
 - 将“禁止越权/禁止 set_lambda”等权限明确写入 system prompt，并要求给出“在权限内的替代动作”（例如只能通过 finalize_selection 间接影响 λ）
+
+### Prompt 线落地前置（必须先做）
+
+- 在 trace 中稳定记录 `agent_llm_request/agent_llm_response`，并携带 `messages_sha1/response_sha1`
+- 每轮记录 `llm_calls_in_round`、`llm_transport_error_count`、`llm_invalid_format_count`
+- 没有上述事件或计数缺失时，该轮默认判定为“LLM未参与决策”，不纳入 prompt 效果分析
 
 ## 5. 可观测性缺口：l3_selection 与 lambda_effective 的结论与整改
 
@@ -152,9 +166,10 @@
 整改（不改策略，只补 trace）：
 - 在 `_sampler_audit()` 中，当 ranking_meta 缺失时，按优先级从同轮控制事件回填：
   1) `lambda_guard.lambda_after`
-  2) `lambda_override.applied`
-  3) `lambda_policy_apply.applied`
-  4) 最后兜底从 `toolbox.control_state.lambda_override_round` 取值
+  2) `selection_guardrail.lambda_after`
+  3) `lambda_override.applied`
+  4) `lambda_policy_apply.applied`
+  5) 最后兜底从 `toolbox.control_state.lambda_override_round` 取值
 
 落点：[`main.py`](file:///Users/anykong/AD-KUCS/AAL_SD/src/main.py) 的 `_sampler_audit()`。
 
@@ -163,18 +178,51 @@
 已落地改动（不改变策略/训练，仅增强 trace 观测）：
 - `selection` 事件补齐 `lambda_effective/lambda_source` 的回填逻辑
 - 新增 `l3_selection_stats` 轻量事件（便于形成 u/k trajectory）
+- 异步 agent 路径补齐 `agent_llm_request/agent_llm_response` 事件，确保 prompt 可审计
 
 验证建议：
 - 运行单测：`python -m pytest -q`
-- 对任意 run 的 trace，grep `l3_selection_stats` 应每轮可见；grep `selection` 的 `lambda_effective` 不应在 agent 路径下为 null
+- 对任意 run 的 trace，grep `l3_selection_stats` 应每轮可见；grep `selection` 的 `lambda_effective` 不应在 guardrail 触发轮次为 null
+- 对异步实验 trace，grep `agent_llm_request|agent_llm_response` 应每轮可见并可按 `session_id+round+step` 配对
 
-## 7. 进展
+## 7. policy 与 prompt 两条线的可落地执行方案（两周）
+
+### Week 1（先修证据链）
+
+- Policy 线：
+  - 在 `selection_guardrail` 事件补 `selected_ids_after` 的全量 U/K 统计字段
+  - 给 `lambda_policy_apply` 增加 `lambda_before_policy/lambda_after_policy/ramp_phase` 字段
+  - 产出一次 dry-run λ 轨迹（固定训练态输入）用于核对 ramp 与 guardrail 次序
+- Prompt 线：
+  - 强制打开 `enable_agent_prompt_logging`
+  - 统计并输出每轮 LLM 可用性（calls、transport error、format invalid）
+  - 形成 “LLM参与率” 指标：`rounds_with_llm_response / rounds_total`
+
+### Week 2（做可证伪消融）
+
+- Policy 线：
+  - 协议统一为 `train_holdout` TVC（不使用 official val 标签梯度）
+  - 跑 3 组：`full_model` / `ramp_guardrail` / `ramp_guardrail + selected_all_stats`
+  - 每组至少 5 seeds，报告 mean±std 与 paired 差值
+- Prompt 线：
+  - 同 seed 严格 A/B：`prompt_v1` vs `prompt_v2`
+  - 控制变量：同模型、同温度、同预算、同策略权限
+  - 只在 `LLM参与率>=95%` 的轮次统计 prompt 影响
+
+### 通过门槛（Go/No-Go）
+
+- Policy：`ramp_guardrail` 在 5 seeds 上相对 `full_model` 的 `final_miou` 平均提升 > 0 且方差不扩大
+- Prompt：在 LLM参与率达标前，不对 prompt 结论作因果陈述；达标后才报告 A/B 结果
+
+## 8. 进展
 
 - 2026-03-13：完成 trace 观测缺口整改（lambda_effective 回填、l3_selection_stats 事件）
 - 2026-03-13：完成本报告初版输出
 - 2026-03-13：基于离线回填 CSV（u/k 中位数轨迹）更新策略结论与风险点
+- 2026-03-13：补充异步 agent 的 LLM request/response trace 事件
+- 2026-03-13：补充 `selection_guardrail.lambda_after` 到 `lambda_effective` 回填优先级
 
-## 8. 证据对照表（关键论断 → 原始数据锚点）
+## 9. 证据对照表（关键论断 → 原始数据锚点）
 
 本节把报告中的关键论断逐条映射到可复核的数据文件与字段/检索锚点，便于审稿式核查。
 

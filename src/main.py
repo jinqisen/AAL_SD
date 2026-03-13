@@ -632,6 +632,7 @@ class ActiveLearningPipeline:
             try:
                 for key, src in (
                     ("lambda_guard", "lambda_guard"),
+                    ("selection_guardrail", "selection_guardrail"),
                     ("lambda_override", "lambda_override"),
                     ("lambda_policy_apply", "lambda_policy"),
                 ):
@@ -640,6 +641,8 @@ class ActiveLearningPipeline:
                         continue
                     cand = None
                     if key in ("lambda_guard",):
+                        cand = ev.get("lambda_after")
+                    elif key in ("selection_guardrail",):
                         cand = ev.get("lambda_after")
                     elif key in ("lambda_override", "lambda_policy_apply"):
                         cand = ev.get("applied")
