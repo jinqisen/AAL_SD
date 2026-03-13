@@ -88,6 +88,8 @@ def load_trace(trace_path: str) -> pd.DataFrame:
                 r = entry.get("round")
                 row = _row(r)
                 row["final_epoch"] = entry.get("epoch")
+                row["val_miou"] = entry.get("mIoU")
+                row["val_f1"] = entry.get("f1")
                 row["final_miou"] = entry.get("mIoU")
                 row["final_f1"] = entry.get("f1")
                 row["labeled_size"] = entry.get("labeled_size")
@@ -484,7 +486,7 @@ def plot_run_miou_compare(combined_round_df: pd.DataFrame, output_dir: str):
         return
     if "round" not in combined_round_df.columns:
         return
-    if "final_miou" not in combined_round_df.columns:
+    if "val_miou" not in combined_round_df.columns and "final_miou" not in combined_round_df.columns:
         return
 
     df = combined_round_df.copy()
@@ -493,12 +495,14 @@ def plot_run_miou_compare(combined_round_df: pd.DataFrame, output_dir: str):
     if df.empty:
         return
 
-    df["final_miou"] = pd.to_numeric(df["final_miou"], errors="coerce").astype(float)
-    if df["final_miou"].isna().all():
+    if "val_miou" not in df.columns and "final_miou" in df.columns:
+        df["val_miou"] = df["final_miou"]
+    df["val_miou"] = pd.to_numeric(df["val_miou"], errors="coerce").astype(float)
+    if df["val_miou"].isna().all():
         return
 
     pivot = (
-        df.pivot_table(index="round", columns="experiment_name", values="final_miou", aggfunc="mean")
+        df.pivot_table(index="round", columns="experiment_name", values="val_miou", aggfunc="mean")
         .sort_index()
     )
     if pivot.empty or pivot.shape[1] == 0:
@@ -510,7 +514,7 @@ def plot_run_miou_compare(combined_round_df: pd.DataFrame, output_dir: str):
         if y.isna().all():
             continue
         plt.plot(pivot.index.astype(int), y, marker="o", linewidth=2.0, alpha=0.9, label=str(col))
-    plt.title("mIoU Trajectory Comparison (Run)", fontsize=14)
+    plt.title("Val mIoU Trajectory Comparison (Run)", fontsize=14)
     plt.xlabel("Round", fontsize=12)
     plt.ylabel("mIoU", fontsize=12)
     plt.grid(True, linestyle="--", alpha=0.6)
@@ -533,10 +537,14 @@ def export_run_experiment_summary(combined_round_df: pd.DataFrame, output_dir: s
     if df.empty:
         return
 
-    if "final_miou" in df.columns:
-        df["final_miou"] = pd.to_numeric(df["final_miou"], errors="coerce").astype(float)
-    if "final_f1" in df.columns:
-        df["final_f1"] = pd.to_numeric(df["final_f1"], errors="coerce").astype(float)
+    if "val_miou" not in df.columns and "final_miou" in df.columns:
+        df["val_miou"] = df["final_miou"]
+    if "val_f1" not in df.columns and "final_f1" in df.columns:
+        df["val_f1"] = df["final_f1"]
+    if "val_miou" in df.columns:
+        df["val_miou"] = pd.to_numeric(df["val_miou"], errors="coerce").astype(float)
+    if "val_f1" in df.columns:
+        df["val_f1"] = pd.to_numeric(df["val_f1"], errors="coerce").astype(float)
     df["lambda_eff"] = _effective_lambda(df)
 
     rows: List[Dict[str, Any]] = []
@@ -544,13 +552,13 @@ def export_run_experiment_summary(combined_round_df: pd.DataFrame, output_dir: s
         g = g.sort_values("round")
         last_round = int(pd.to_numeric(g["round"], errors="coerce").max())
         last_miou = None
-        if "final_miou" in g.columns:
-            gm = g.dropna(subset=["final_miou"])
+        if "val_miou" in g.columns:
+            gm = g.dropna(subset=["val_miou"])
             if not gm.empty:
-                last_miou = float(gm.sort_values("round")["final_miou"].iloc[-1])
+                last_miou = float(gm.sort_values("round")["val_miou"].iloc[-1])
         best_miou = None
-        if "final_miou" in g.columns and pd.to_numeric(g["final_miou"], errors="coerce").notna().any():
-            best_miou = float(pd.to_numeric(g["final_miou"], errors="coerce").max())
+        if "val_miou" in g.columns and pd.to_numeric(g["val_miou"], errors="coerce").notna().any():
+            best_miou = float(pd.to_numeric(g["val_miou"], errors="coerce").max())
         last_lambda = None
         gl = g.dropna(subset=["lambda_eff"])
         if not gl.empty:

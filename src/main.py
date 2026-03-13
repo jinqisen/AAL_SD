@@ -2310,22 +2310,49 @@ class ActiveLearningPipeline:
                 final_report_f1 = float(final_report.get("f1_score", 0.0))
             except Exception:
                 final_report_f1 = None
+        selected_final_miou = None
+        selected_final_f1 = None
+        if performance_history:
+            try:
+                selected_final_miou = float(performance_history[-1].get("mIoU", 0.0))
+            except Exception:
+                selected_final_miou = None
+            try:
+                selected_final_f1 = float(performance_history[-1].get("f1_score", 0.0))
+            except Exception:
+                selected_final_f1 = None
+        final_miou_source = "final_report"
+        if final_report_miou is None:
+            final_miou_source = "selected_val_fallback"
+        final_f1_source = "final_report"
+        if final_report_f1 is None:
+            final_f1_source = "selected_val_fallback"
         result = {
             "performance_history": performance_history,
             "budget_history": budget_history,
             "alc": float(alc),
             "final_miou": float(final_report_miou)
             if final_report_miou is not None
-            else float(performance_history[-1]["mIoU"]),
+            else float(selected_final_miou or 0.0),
             "final_f1": float(final_report_f1)
             if final_report_f1 is not None
-            else float(performance_history[-1]["f1_score"]),
+            else float(selected_final_f1 or 0.0),
+            "final_miou_source": str(final_miou_source),
+            "final_f1_source": str(final_f1_source),
+            "final_selected_miou": float(selected_final_miou)
+            if selected_final_miou is not None
+            else None,
+            "final_selected_f1": float(selected_final_f1) if selected_final_f1 is not None else None,
+            "final_report_miou": float(final_report_miou)
+            if final_report_miou is not None
+            else None,
+            "final_report_f1": float(final_report_f1) if final_report_f1 is not None else None,
             "test_split": test_split,
             "final_report": final_report,
         }
         self._append_md(
             log_path,
-            f"\n## 实验汇总\n\n预算历史: {budget_history}\nALC: {result['alc']:.4f}\n最终 mIoU: {result['final_miou']:.4f}\n最终 F1: {result['final_f1']:.4f}\n最终 Test Split: {result['test_split']}\n最终 Report: {result['final_report']}\n",
+            f"\n## 实验汇总\n\n预算历史: {budget_history}\nALC(基于每轮选模val mIoU): {result['alc']:.4f}\n最后一轮选模 mIoU(val): {result['final_selected_miou']}\n最后一轮选模 F1(val): {result['final_selected_f1']}\n最终报告 mIoU({result['test_split']}): {result['final_report_miou']}\n最终报告 F1({result['test_split']}): {result['final_report_f1']}\n最终输出 mIoU: {result['final_miou']:.4f} (source={result['final_miou_source']})\n最终输出 F1: {result['final_f1']:.4f} (source={result['final_f1_source']})\n最终 Test Split: {result['test_split']}\n最终 Report: {result['final_report']}\n",
         )
         self._write_status(
             {

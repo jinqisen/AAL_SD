@@ -47,6 +47,43 @@ def _extract_vals(items: Any, key: str) -> List[float]:
     return out
 
 
+def _as_id_str(x: Any) -> Optional[str]:
+    if x is None:
+        return None
+    if isinstance(x, bool):
+        return str(int(x))
+    if isinstance(x, (int, float)):
+        try:
+            if isinstance(x, float) and (not math.isfinite(float(x))):
+                return None
+        except Exception:
+            return None
+        try:
+            return str(int(x))
+        except Exception:
+            return str(x)
+    s = str(x).strip()
+    if not s:
+        return None
+    try:
+        return str(int(s))
+    except Exception:
+        return s
+
+
+def _extract_id_list(xs: Any, limit: Optional[int] = None) -> List[str]:
+    if not isinstance(xs, list) or not xs:
+        return []
+    out: List[str] = []
+    seq = xs[: int(limit)] if limit is not None else xs
+    for v in seq:
+        sid = _as_id_str(v)
+        if sid is None:
+            continue
+        out.append(sid)
+    return out
+
+
 def _parse_trace(trace_path: str) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
     per_round: Dict[int, Dict[str, Any]] = {}
     meta: Dict[str, Any] = {"trace_path": trace_path}
@@ -74,6 +111,7 @@ def _parse_trace(trace_path: str) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]
                 row = _row(r)
                 row["lambda_effective"] = _safe_float(entry.get("lambda_effective"))
                 row["lambda_source"] = entry.get("lambda_source")
+                row["selected_ids"] = _extract_id_list(entry.get("selected_ids"))
                 ctx = entry.get("context") if isinstance(entry.get("context"), dict) else {}
                 sel_stats = None
                 if isinstance(ctx, dict):
@@ -93,6 +131,9 @@ def _parse_trace(trace_path: str) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]
                 row["k_median_selected"] = _safe_float(entry.get("k_median_selected"))
                 row["u_median_top"] = _safe_float(entry.get("u_median_top"))
                 row["k_median_top"] = _safe_float(entry.get("k_median_top"))
+                row["coverage_selected_in_top"] = None
+                row["selected_scored_frac_u"] = None
+                row["selected_scored_frac_k"] = None
                 row["stats_method"] = "l3_selection_stats"
 
             if etype == "l3_selection":
@@ -107,6 +148,52 @@ def _parse_trace(trace_path: str) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]
                 row["selected_limit"] = entry.get("selected_limit")
                 top_items = entry.get("top_items")
                 selected_items = entry.get("selected_items")
+                top_ids = []
+                if isinstance(top_items, list):
+                    for it in top_items:
+                        if not isinstance(it, dict):
+                            continue
+                        sid = _as_id_str(it.get("sample_id"))
+                        if sid is not None:
+                            top_ids.append(sid)
+                selected_ids = list(row.get("selected_ids") or [])
+                if selected_ids:
+                    top_set = set(top_ids)
+                    hit = sum(1 for sid in selected_ids if sid in top_set)
+                    row["coverage_selected_in_top"] = float(hit) / float(max(1, len(selected_ids)))
+                else:
+                    row["coverage_selected_in_top"] = None
+
+                max_selected = None
+                try:
+                    max_selected = int(row.get("selected_limit")) if row.get("selected_limit") is not None else None
+                except Exception:
+                    max_selected = None
+                denom = len(selected_ids) if selected_ids else None
+                if denom is None:
+                    try:
+                        denom = len(selected_items) if isinstance(selected_items, list) else None
+                    except Exception:
+                        denom = None
+                if max_selected is not None and denom is not None:
+                    denom = min(int(denom), int(max_selected))
+
+                scored_u = 0
+                scored_k = 0
+                if isinstance(selected_items, list):
+                    for it in selected_items[: max_selected] if max_selected is not None else selected_items:
+                        if not isinstance(it, dict):
+                            continue
+                        if _safe_float(it.get("uncertainty")) is not None:
+                            scored_u += 1
+                        if _safe_float(it.get("knowledge_gain")) is not None:
+                            scored_k += 1
+                if denom is not None and denom > 0:
+                    row["selected_scored_frac_u"] = float(scored_u) / float(denom)
+                    row["selected_scored_frac_k"] = float(scored_k) / float(denom)
+                else:
+                    row["selected_scored_frac_u"] = None
+                    row["selected_scored_frac_k"] = None
                 row["u_median_selected"] = _median(_extract_vals(selected_items, "uncertainty"))
                 row["k_median_selected"] = _median(_extract_vals(selected_items, "knowledge_gain"))
                 row["u_median_top"] = _median(_extract_vals(top_items, "uncertainty"))
@@ -152,6 +239,9 @@ def _write_csv(csv_path: str, rows: List[Dict[str, Any]]) -> None:
         "source",
         "topk",
         "selected_limit",
+        "coverage_selected_in_top",
+        "selected_scored_frac_u",
+        "selected_scored_frac_k",
         "u_median_selected",
         "k_median_selected",
         "u_median_top",
@@ -204,6 +294,7 @@ def main() -> int:
             rows, _ = _parse_trace(trace_path)
             out_rows: List[Dict[str, Any]] = []
             with_stats = 0
+            with_coverage = 0
             for row in rows:
                 rr = {
                     "run_id": run_id,
@@ -212,6 +303,9 @@ def main() -> int:
                     "source": row.get("source"),
                     "topk": row.get("topk"),
                     "selected_limit": row.get("selected_limit"),
+                    "coverage_selected_in_top": row.get("coverage_selected_in_top"),
+                    "selected_scored_frac_u": row.get("selected_scored_frac_u"),
+                    "selected_scored_frac_k": row.get("selected_scored_frac_k"),
                     "u_median_selected": row.get("u_median_selected"),
                     "k_median_selected": row.get("k_median_selected"),
                     "u_median_top": row.get("u_median_top"),
@@ -225,6 +319,8 @@ def main() -> int:
                     pass
                 if rr.get("u_median_selected") is not None or rr.get("k_median_selected") is not None:
                     with_stats += 1
+                if rr.get("coverage_selected_in_top") is not None:
+                    with_coverage += 1
                 else:
                     sel_stats = row.get("selected_score_stats")
                     u50 = _infer_lambda_from_selected_stats(sel_stats, "uncertainty")
@@ -249,6 +345,7 @@ def main() -> int:
                     "csv_path": csv_path,
                     "rounds_total": len(out_rows),
                     "rounds_with_stats": with_stats,
+                    "rounds_with_coverage": with_coverage,
                 }
             )
             print(
@@ -268,6 +365,7 @@ def main() -> int:
                     "csv_path",
                     "rounds_total",
                     "rounds_with_stats",
+                    "rounds_with_coverage",
                 ],
             )
             w.writeheader()
@@ -281,4 +379,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-
