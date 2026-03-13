@@ -610,6 +610,61 @@ class ActiveLearningPipeline:
         ranking_lambda_source = (
             ranking_meta.get("lambda_source") if isinstance(ranking_meta, dict) else None
         )
+        if ranking_lambda_eff is None:
+            round_idx = getattr(self, "current_round", None)
+            try:
+                round_idx = int(round_idx) if round_idx is not None else None
+            except Exception:
+                round_idx = None
+
+            def _match_round(ev) -> bool:
+                if round_idx is None:
+                    return True
+                if not isinstance(ev, dict):
+                    return False
+                try:
+                    return int(ev.get("round") or -1) == int(round_idx)
+                except Exception:
+                    return False
+
+            inferred = None
+            inferred_source = None
+            try:
+                for key, src in (
+                    ("lambda_guard", "lambda_guard"),
+                    ("lambda_override", "lambda_override"),
+                    ("lambda_policy_apply", "lambda_policy"),
+                ):
+                    ev = self._last_control_events.get(key)
+                    if not (isinstance(ev, dict) and _match_round(ev)):
+                        continue
+                    cand = None
+                    if key in ("lambda_guard",):
+                        cand = ev.get("lambda_after")
+                    elif key in ("lambda_override", "lambda_policy_apply"):
+                        cand = ev.get("applied")
+                    if cand is None:
+                        continue
+                    inferred = float(cand)
+                    inferred_source = str(src)
+                    break
+            except Exception:
+                inferred = None
+                inferred_source = None
+
+            if inferred is None and hasattr(self, "toolbox"):
+                try:
+                    state = getattr(self.toolbox, "control_state", None)
+                    if isinstance(state, dict) and state.get("lambda_override_round") is not None:
+                        inferred = float(state.get("lambda_override_round"))
+                        inferred_source = "agent_control_state"
+                except Exception:
+                    inferred = None
+                    inferred_source = None
+
+            if inferred is not None:
+                ranking_lambda_eff = inferred
+                ranking_lambda_source = inferred_source
         lambda_ctrl = (
             self.exp_config.get("lambda_controller")
             if isinstance(getattr(self, "exp_config", None), dict)
@@ -844,6 +899,48 @@ class ActiveLearningPipeline:
                     "lambda_t": item.get("lambda_t"),
                 }
             )
+        selected_u = []
+        selected_k = []
+        for row in selected_rows:
+            if not isinstance(row, dict):
+                continue
+            if row.get("uncertainty") is not None:
+                try:
+                    selected_u.append(float(row.get("uncertainty")))
+                except Exception:
+                    pass
+            if row.get("knowledge_gain") is not None:
+                try:
+                    selected_k.append(float(row.get("knowledge_gain")))
+                except Exception:
+                    pass
+        top_u = []
+        top_k = []
+        for row in top_rows:
+            if not isinstance(row, dict):
+                continue
+            if row.get("uncertainty") is not None:
+                try:
+                    top_u.append(float(row.get("uncertainty")))
+                except Exception:
+                    pass
+            if row.get("knowledge_gain") is not None:
+                try:
+                    top_k.append(float(row.get("knowledge_gain")))
+                except Exception:
+                    pass
+        u_median_selected = (
+            float(np.median(np.asarray(selected_u, dtype=float)))
+            if selected_u
+            else None
+        )
+        k_median_selected = (
+            float(np.median(np.asarray(selected_k, dtype=float)))
+            if selected_k
+            else None
+        )
+        u_median_top = float(np.median(np.asarray(top_u, dtype=float))) if top_u else None
+        k_median_top = float(np.median(np.asarray(top_k, dtype=float))) if top_k else None
         self._append_trace(
             {
                 "type": "l3_selection",
@@ -855,6 +952,21 @@ class ActiveLearningPipeline:
                 "selected_limit": int(max_selected),
                 "top_items": top_rows,
                 "selected_items": selected_rows,
+            }
+        )
+        self._append_trace(
+            {
+                "type": "l3_selection_stats",
+                "round": int(self.current_round)
+                if self.current_round is not None
+                else None,
+                "source": source,
+                "topk": int(topk),
+                "selected_limit": int(max_selected),
+                "u_median_selected": u_median_selected,
+                "k_median_selected": k_median_selected,
+                "u_median_top": u_median_top,
+                "k_median_top": k_median_top,
             }
         )
 
