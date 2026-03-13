@@ -1,5 +1,7 @@
-
 # experiments/ablation_config.py
+
+import json
+import os
 
 ABLATION_SETTINGS = {
     "full_model_A_lambda_policy": {
@@ -9,7 +11,7 @@ ABLATION_SETTINGS = {
         "lambda_override": None,
         "acquisition_protocol": {
             "uncertainty_aggregation": "mean",
-            "diversity_postprocess": "none",
+            "diversity_postprocess": "none"
         },
         "agent_threshold_overrides": {
             "OVERFIT_RISK_HI": 1.2,
@@ -58,7 +60,7 @@ ABLATION_SETTINGS = {
             "set_query_size": False,
             "set_epochs_per_round": False,
             "set_alpha": False
-        }
+        },
     },
     "full_model_A_lambda_policy_u_guardrail": {
         "description": "A1：仅加 U 底线安全阀（不改 λ 日程；用于验证失效模式是否消失与稳定性改善）",
@@ -67,7 +69,7 @@ ABLATION_SETTINGS = {
         "lambda_override": None,
         "acquisition_protocol": {
             "uncertainty_aggregation": "mean",
-            "diversity_postprocess": "none",
+            "diversity_postprocess": "none"
         },
         "agent_threshold_overrides": {
             "OVERFIT_RISK_HI": 1.2,
@@ -113,19 +115,19 @@ ABLATION_SETTINGS = {
                 "lambda_step_down": 0.10,
                 "max_steps": 5,
                 "fallback_quota_u_frac": 0.70
-            }
+            },
         },
         "rollback_config": {
             "mode": "adaptive_threshold",
             "std_factor": 1.5,
-            "tau_min": 0.005
+            "tau_min": 0.005,
         },
         "control_permissions": {
             "set_lambda": False,
             "set_query_size": False,
             "set_epochs_per_round": False,
-            "set_alpha": False
-        }
+            "set_alpha": False,
+        },
     },
     "full_model_A_lambda_policy_ramp_guardrail": {
         "description": "A2：后期 λ_ramp + U 底线安全阀（用于在不引入失效模式前提下追 test gap）",
@@ -149,7 +151,7 @@ ABLATION_SETTINGS = {
             "LAMBDA_DELTA_UP": 0.15,
             "LAMBDA_DELTA_DOWN": 0.10,
             "OVERFIT_RISK_EMA_ALPHA": 0.6,
-            "LAMBDA_DOWN_COOLING_ROUNDS": 2
+            "LAMBDA_DOWN_COOLING_ROUNDS": 2,
         },
         "enable_l3_selection_logging": True,
         "enable_agent_prompt_logging": True,
@@ -186,19 +188,19 @@ ABLATION_SETTINGS = {
                 "lambda_step_down": 0.10,
                 "max_steps": 5,
                 "fallback_quota_u_frac": 0.70
-            }
+            },
         },
         "rollback_config": {
             "mode": "adaptive_threshold",
             "std_factor": 1.5,
-            "tau_min": 0.005
+            "tau_min": 0.005,
         },
         "control_permissions": {
             "set_lambda": False,
             "set_query_size": False,
             "set_epochs_per_round": False,
-            "set_alpha": False
-        }
+            "set_alpha": False,
+        },
     },
     "full_model_A_lambda_policy_ramp_guardrail_train_probe": {
         "description": "A2+：后期 λ_ramp + U 底线安全阀 + train-holdout probe 计算TVC（论文协议版；不使用 official val 的标签梯度信号）",
@@ -225,7 +227,7 @@ ABLATION_SETTINGS = {
             "LAMBDA_DELTA_UP": 0.15,
             "LAMBDA_DELTA_DOWN": 0.10,
             "OVERFIT_RISK_EMA_ALPHA": 0.6,
-            "LAMBDA_DOWN_COOLING_ROUNDS": 2
+            "LAMBDA_DOWN_COOLING_ROUNDS": 2,
         },
         "enable_l3_selection_logging": True,
         "enable_agent_prompt_logging": True,
@@ -262,19 +264,19 @@ ABLATION_SETTINGS = {
                 "lambda_step_down": 0.10,
                 "max_steps": 5,
                 "fallback_quota_u_frac": 0.70
-            }
+            },
         },
         "rollback_config": {
             "mode": "adaptive_threshold",
             "std_factor": 1.5,
-            "tau_min": 0.005
+            "tau_min": 0.005,
         },
         "control_permissions": {
             "set_lambda": False,
             "set_query_size": False,
             "set_epochs_per_round": False,
-            "set_alpha": False
-        }
+            "set_alpha": False,
+        },
     },
     "full_model_A_lambda_policy_ramp_guardrail_train_probe_ramp055": {
         "description": "A2+(branch)：从中后期起仅降低λ_ramp强度（end_lambda 0.70→0.55），用于隔离ramp影响",
@@ -301,7 +303,7 @@ ABLATION_SETTINGS = {
             "LAMBDA_DELTA_UP": 0.15,
             "LAMBDA_DELTA_DOWN": 0.10,
             "OVERFIT_RISK_EMA_ALPHA": 0.6,
-            "LAMBDA_DOWN_COOLING_ROUNDS": 2
+            "LAMBDA_DOWN_COOLING_ROUNDS": 2,
         },
         "enable_l3_selection_logging": True,
         "enable_agent_prompt_logging": True,
@@ -338,19 +340,19 @@ ABLATION_SETTINGS = {
                 "lambda_step_down": 0.10,
                 "max_steps": 5,
                 "fallback_quota_u_frac": 0.70
-            }
+            },
         },
         "rollback_config": {
             "mode": "adaptive_threshold",
             "std_factor": 1.5,
-            "tau_min": 0.005
+            "tau_min": 0.005,
         },
         "control_permissions": {
             "set_lambda": False,
             "set_query_size": False,
             "set_epochs_per_round": False,
-            "set_alpha": False
-        }
+            "set_alpha": False,
+        },
     },
     "full_model_A_lambda_policy_ramp_guardrail_train_probe_guardrail_u30": {
         "description": "A2+(branch)：从中后期起仅放宽U安全阀（u_median_min 0.45→0.30），用于隔离guardrail影响",
@@ -377,7 +379,7 @@ ABLATION_SETTINGS = {
             "LAMBDA_DELTA_UP": 0.15,
             "LAMBDA_DELTA_DOWN": 0.10,
             "OVERFIT_RISK_EMA_ALPHA": 0.6,
-            "LAMBDA_DOWN_COOLING_ROUNDS": 2
+            "LAMBDA_DOWN_COOLING_ROUNDS": 2,
         },
         "enable_l3_selection_logging": True,
         "enable_agent_prompt_logging": True,
@@ -414,19 +416,19 @@ ABLATION_SETTINGS = {
                 "lambda_step_down": 0.10,
                 "max_steps": 5,
                 "fallback_quota_u_frac": 0.70
-            }
+            },
         },
         "rollback_config": {
             "mode": "adaptive_threshold",
             "std_factor": 1.5,
-            "tau_min": 0.005
+            "tau_min": 0.005,
         },
         "control_permissions": {
             "set_lambda": False,
             "set_query_size": False,
             "set_epochs_per_round": False,
-            "set_alpha": False
-        }
+            "set_alpha": False,
+        },
     },
     "full_model_B_lambda_agent": {
         "description": "对照B：授权LLM/Agent 在显式约束下逐轮 set_lambda（并记录到trace）；启用CI阈值+AND严重判定+回撤禁升+EMA/冷却/限步长；禁止使用policy自动填充本轮λ（必须显式set_lambda）；不调整query_size/epochs",
@@ -451,7 +453,7 @@ ABLATION_SETTINGS = {
             "LAMBDA_DELTA_DOWN": 0.10,
             "OVERFIT_RISK_EMA_ALPHA": 0.6,
             "LAMBDA_DOWN_COOLING_ROUNDS": 2,
-            "LAMBDA_ADJUST_RANGE": 0.15
+            "LAMBDA_ADJUST_RANGE": 0.15,
         },
         "enable_l3_selection_logging": True,
         "enable_agent_prompt_logging": True,
@@ -473,19 +475,19 @@ ABLATION_SETTINGS = {
             "risk_ci_min_samples": 3,
             "lambda_smoothing": "ema",
             "lambda_smoothing_alpha": 0.85,
-            "lambda_max_step": 0.15
+            "lambda_max_step": 0.15,
         },
         "rollback_config": {
             "mode": "adaptive_threshold",
             "std_factor": 1.5,
-            "tau_min": 0.005
+            "tau_min": 0.005,
         },
         "control_permissions": {
             "set_lambda": True,
             "set_query_size": False,
             "set_epochs_per_round": False,
-            "set_alpha": False
-        }
+            "set_alpha": False,
+        },
     },
     "full_model_A_lambda_policy_ab_tune_lo": {
         "description": "A/B调参(Lo)：更快λ上调、更小EMA惰性、更大单步；cooling=1；epochs=8（仅影响该实验）",
@@ -852,7 +854,7 @@ ABLATION_SETTINGS = {
         },
         "agent_threshold_overrides": {
             "OVERFIT_RISK_HI": 0.9,
-            "OVERFIT_TVC_MIN_HI": 0.6
+            "OVERFIT_TVC_MIN_HI": 0.6,
         },
         "enable_l3_selection_logging": True,
         "enable_agent_prompt_logging": True,
@@ -865,19 +867,19 @@ ABLATION_SETTINGS = {
             "warmup_start_round": 1,
             "warmup_rounds": 0,
             "warmup_lambda": 0.0,
-            "risk_control_start_round": 1
+            "risk_control_start_round": 1,
         },
         "rollback_config": {
             "mode": "adaptive_threshold",
             "std_factor": 1.5,
-            "tau_min": 0.005
+            "tau_min": 0.005,
         },
         "control_permissions": {
             "set_lambda": False,
             "set_query_size": False,
             "set_epochs_per_round": False,
-            "set_alpha": False
-        }
+            "set_alpha": False,
+        },
     },
     "fixed_k": {
         "description": "消融：Fixed K（K(x)固定相对初始标注池计算），其余保持与full_model一致",
@@ -891,7 +893,7 @@ ABLATION_SETTINGS = {
         },
         "agent_threshold_overrides": {
             "OVERFIT_RISK_HI": 0.9,
-            "OVERFIT_TVC_MIN_HI": 0.6
+            "OVERFIT_TVC_MIN_HI": 0.6,
         },
         "enable_l3_selection_logging": True,
         "enable_agent_prompt_logging": True,
@@ -904,25 +906,25 @@ ABLATION_SETTINGS = {
             "warmup_start_round": 3,
             "warmup_rounds": 1,
             "warmup_lambda": 0.2,
-            "risk_control_start_round": 4
+            "risk_control_start_round": 4,
         },
         "rollback_config": {
             "mode": "adaptive_threshold",
             "std_factor": 1.5,
-            "tau_min": 0.005
+            "tau_min": 0.005,
         },
         "control_permissions": {
             "set_lambda": False,
             "set_query_size": False,
             "set_epochs_per_round": False,
-            "set_alpha": False
-        }
+            "set_alpha": False,
+        },
     },
     "no_agent": {
         "description": "消融：移除Agent；λ由sigmoid自适应(随标注进度变化)，仅使用AD-KUCS数值策略选样",
         "use_agent": False,
         "sampler_type": "ad_kucs",
-        "lambda_override": None
+        "lambda_override": None,
     },
     "random_lambda": {
         "description": "消融：随机λ控制（无LLM）",
@@ -933,11 +935,7 @@ ABLATION_SETTINGS = {
             "uncertainty_aggregation": "mean",
             "diversity_postprocess": "none",
         },
-        "lambda_controller": {
-            "mode": "random",
-            "lambda_min": 0.0,
-            "lambda_max": 1.0
-        }
+        "lambda_controller": {"mode": "random", "lambda_min": 0.0, "lambda_max": 1.0},
     },
     "rule_based_controller_r1": {
         "description": "消融：Rule-based Controller R1（性能驱动）",
@@ -959,8 +957,8 @@ ABLATION_SETTINGS = {
             "step_up": 0.05,
             "step_down": 0.1,
             "miou_delta_threshold": 0.0,
-            "rollback_priority": True
-        }
+            "rollback_priority": True,
+        },
     },
     "rule_based_controller_r2": {
         "description": "消融：Rule-based Controller R2（轮次日程）",
@@ -982,9 +980,9 @@ ABLATION_SETTINGS = {
             "schedule": [
                 {"round": 1, "lambda": 0.2},
                 {"round": 4, "lambda": 0.5},
-                {"round": 8, "lambda": 0.8}
-            ]
-        }
+                {"round": 8, "lambda": 0.8},
+            ],
+        },
     },
     "rule_based_controller_r3": {
         "description": "消融：Rule-based Controller R3（日程+性能微调）",
@@ -1006,31 +1004,31 @@ ABLATION_SETTINGS = {
             "schedule": [
                 {"round": 1, "lambda": 0.2},
                 {"round": 4, "lambda": 0.5},
-                {"round": 8, "lambda": 0.8}
+                {"round": 8, "lambda": 0.8},
             ],
             "step_up": 0.05,
             "step_down": 0.1,
             "miou_delta_threshold": 0.0,
-            "rollback_priority": True
-        }
+            "rollback_priority": True,
+        },
     },
     "uncertainty_only": {
         "description": "固定λ=0，仅使用不确定性",
         "use_agent": False,
         "sampler_type": "ad_kucs",
-        "lambda_override": 0.0
+        "lambda_override": 0.0,
     },
     "knowledge_only": {
         "description": "固定λ=1，仅使用知识增益",
         "use_agent": False,
         "sampler_type": "ad_kucs",
-        "lambda_override": 1.0
+        "lambda_override": 1.0,
     },
     "fixed_lambda": {
         "description": "消融：固定λ=0.5（对应方案A1：No LLM Agent）",
         "use_agent": False,
         "sampler_type": "ad_kucs",
-        "lambda_override": 0.5
+        "lambda_override": 0.5,
     },
     "no_normalization": {
         "description": "消融：不进行U/K归一化",
@@ -1043,7 +1041,7 @@ ABLATION_SETTINGS = {
         },
         "agent_threshold_overrides": {
             "OVERFIT_RISK_HI": 0.9,
-            "OVERFIT_TVC_MIN_HI": 0.6
+            "OVERFIT_TVC_MIN_HI": 0.6,
         },
         "enable_l3_selection_logging": True,
         "enable_agent_prompt_logging": True,
@@ -1056,20 +1054,20 @@ ABLATION_SETTINGS = {
             "warmup_start_round": 3,
             "warmup_rounds": 1,
             "warmup_lambda": 0.2,
-            "risk_control_start_round": 4
+            "risk_control_start_round": 4,
         },
         "rollback_config": {
             "mode": "adaptive_threshold",
             "std_factor": 1.5,
-            "tau_min": 0.005
+            "tau_min": 0.005,
         },
         "score_normalization": False,
         "control_permissions": {
             "set_lambda": False,
             "set_query_size": False,
             "set_epochs_per_round": False,
-            "set_alpha": False
-        }
+            "set_alpha": False,
+        },
     },
     "baseline_random": {
         "description": "随机采样基线",
@@ -1122,7 +1120,7 @@ ABLATION_SETTINGS = {
         },
         "enable_l3_selection_logging": True,
         "l3_topk": 256,
-        "l3_max_selected": 256
+        "l3_max_selected": 256,
     },
     "baseline_wang_style": {
         "description": "Wang-style基线：两阶段U→K重排",
@@ -1135,7 +1133,7 @@ ABLATION_SETTINGS = {
         },
         "enable_l3_selection_logging": True,
         "l3_topk": 256,
-        "l3_max_selected": 256
+        "l3_max_selected": 256,
     },
     "bald_uncertainty": {
         "description": "消融：BALD不确定性（AD-KUCS中用BALD互信息替换熵作为U），其余保持与full_model一致",
@@ -1148,7 +1146,7 @@ ABLATION_SETTINGS = {
         },
         "agent_threshold_overrides": {
             "OVERFIT_RISK_HI": 0.9,
-            "OVERFIT_TVC_MIN_HI": 0.6
+            "OVERFIT_TVC_MIN_HI": 0.6,
         },
         "enable_l3_selection_logging": True,
         "enable_agent_prompt_logging": True,
@@ -1163,19 +1161,19 @@ ABLATION_SETTINGS = {
             "warmup_start_round": 3,
             "warmup_rounds": 1,
             "warmup_lambda": 0.2,
-            "risk_control_start_round": 4
+            "risk_control_start_round": 4,
         },
         "rollback_config": {
             "mode": "adaptive_threshold",
             "std_factor": 1.5,
-            "tau_min": 0.005
+            "tau_min": 0.005,
         },
         "control_permissions": {
             "set_lambda": False,
             "set_query_size": False,
             "set_epochs_per_round": False,
-            "set_alpha": False
-        }
+            "set_alpha": False,
+        },
     },
     "baseline_llm_us": {
         "description": "LLM-US对照：仅用不确定性分数（不使用LLM推理）",
@@ -1214,8 +1212,8 @@ ABLATION_SETTINGS = {
             "set_lambda": True,
             "set_query_size": False,
             "set_epochs_per_round": False,
-            "set_alpha": False
-        }
+            "set_alpha": False,
+        },
     },
     "protocol_aligned_full_model_A": {
         "description": "补充：A协议对照（高熵聚焦+FPS去冗余），其余同对照A",
@@ -1241,7 +1239,7 @@ ABLATION_SETTINGS = {
             "LAMBDA_DELTA_UP": 0.05,
             "LAMBDA_DELTA_DOWN": 0.10,
             "OVERFIT_RISK_EMA_ALPHA": 0.6,
-            "LAMBDA_DOWN_COOLING_ROUNDS": 2
+            "LAMBDA_DOWN_COOLING_ROUNDS": 2,
         },
         "enable_l3_selection_logging": True,
         "enable_agent_prompt_logging": True,
@@ -1263,19 +1261,19 @@ ABLATION_SETTINGS = {
             "risk_ci_min_samples": 3,
             "lambda_smoothing": "ema",
             "lambda_smoothing_alpha": 0.7,
-            "lambda_max_step": 0.10
+            "lambda_max_step": 0.10,
         },
         "rollback_config": {
             "mode": "adaptive_threshold",
             "std_factor": 1.5,
-            "tau_min": 0.005
+            "tau_min": 0.005,
         },
         "control_permissions": {
             "set_lambda": False,
             "set_query_size": False,
             "set_epochs_per_round": False,
-            "set_alpha": False
-        }
+            "set_alpha": False,
+        },
     },
     "protocol_aligned_full_model_B": {
         "description": "补充：B协议对照（高熵聚焦+FPS去冗余），其余同对照B",
@@ -1302,7 +1300,7 @@ ABLATION_SETTINGS = {
             "LAMBDA_DELTA_DOWN": 0.10,
             "OVERFIT_RISK_EMA_ALPHA": 0.6,
             "LAMBDA_DOWN_COOLING_ROUNDS": 2,
-            "LAMBDA_ADJUST_RANGE": 0.10
+            "LAMBDA_ADJUST_RANGE": 0.10,
         },
         "enable_l3_selection_logging": True,
         "enable_agent_prompt_logging": True,
@@ -1324,19 +1322,19 @@ ABLATION_SETTINGS = {
             "risk_ci_min_samples": 3,
             "lambda_smoothing": "ema",
             "lambda_smoothing_alpha": 0.7,
-            "lambda_max_step": 0.10
+            "lambda_max_step": 0.10,
         },
         "rollback_config": {
             "mode": "adaptive_threshold",
             "std_factor": 1.5,
-            "tau_min": 0.005
+            "tau_min": 0.005,
         },
         "control_permissions": {
             "set_lambda": True,
             "set_query_size": False,
             "set_epochs_per_round": False,
-            "set_alpha": False
-        }
+            "set_alpha": False,
+        },
     },
     "protocol_aligned_baseline_entropy": {
         "description": "补充：Entropy协议对照（高熵聚焦+FPS去冗余）",
@@ -1375,7 +1373,7 @@ ABLATION_SETTINGS = {
         },
         "enable_l3_selection_logging": True,
         "l3_topk": 256,
-        "l3_max_selected": 256
+        "l3_max_selected": 256,
     },
     "protocol_aligned_baseline_dial_style": {
         "description": "补充：DIAL-style协议对照（高熵聚焦+FPS去冗余）",
@@ -1390,7 +1388,7 @@ ABLATION_SETTINGS = {
         },
         "enable_l3_selection_logging": True,
         "l3_topk": 256,
-        "l3_max_selected": 256
+        "l3_max_selected": 256,
     },
 }
 
@@ -1437,3 +1435,21 @@ def build_spec_from_legacy_dict(experiment_name: str, legacy_cfg: dict):
         description=description,
         legacy_config=legacy_cfg,
     )
+
+
+_AUTO_TUNE_CONFIGS_PATH = os.path.join(
+    os.path.dirname(__file__), "auto_tune_configs.json"
+)
+
+
+def load_auto_tune_configs() -> dict:
+    if os.path.exists(_AUTO_TUNE_CONFIGS_PATH):
+        try:
+            with open(_AUTO_TUNE_CONFIGS_PATH, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            pass
+    return {}
+
+
+ABLATION_SETTINGS.update(load_auto_tune_configs())

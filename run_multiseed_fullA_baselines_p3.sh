@@ -54,7 +54,7 @@ except Exception:
 PY
 )"
 fi
-SEEDS="${SEEDS:-42 43 44}"
+SEEDS="${SEEDS:-42 43 44 45 46}"
 WORKERS="${WORKERS:-2}"
 EXP_WORKERS="${EXP_WORKERS:-4}"
 N_ROUNDS="${N_ROUNDS:-}"
