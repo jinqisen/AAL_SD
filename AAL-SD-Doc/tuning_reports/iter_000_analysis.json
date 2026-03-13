@@ -1,0 +1,155 @@
+{
+  "iteration": 0,
+  "timestamp": "2026-03-13T18:36:03.361522",
+  "analysis": {
+    "issues": [
+      {
+        "type": "over_conservative",
+        "severity": "medium",
+        "evidence": "lambda_max=0.00, no rollbacks",
+        "suggestion": "增加 DELTA_UP, 降低 RISK_LO"
+      },
+      {
+        "type": "late_stage_plateau",
+        "severity": "high",
+        "evidence": "late_gain=-0.0017",
+        "suggestion": "启用 late_stage_ramp, 提高 CLAMP_MAX"
+      },
+      {
+        "type": "exploration_degradation",
+        "severity": "medium",
+        "evidence": "u_median_trend=-0.0358",
+        "suggestion": "启用 guardrail 或降低 CLAMP_MAX"
+      },
+      {
+        "type": "intra_round_overfit",
+        "severity": "high",
+        "evidence": "tvc_sign_flip_rate=0.87",
+        "suggestion": "减少 epochs 或降低 LR"
+      }
+    ],
+    "diagnostics": {
+      "final_miou": 0.6889982839722201,
+      "peak_miou": 0.7468751214983619,
+      "peak_round": 13,
+      "miou_trend": 0.006529823233063154,
+      "rollback_count": 0,
+      "rollback_rate": 0.0,
+      "max_consecutive_rollback": 0,
+      "miou_cv": 0.059551166103006356,
+      "lambda_trajectory": [],
+      "lambda_mean": 0.0,
+      "lambda_final": 0.0,
+      "lambda_max_reached": 0.0,
+      "lambda_volatility": 0.0,
+      "warmup_exit_miou": 0.6133286695826039,
+      "mid_stage_miou": 0.6907374169788977,
+      "late_stage_gain": -0.0017391330066776067,
+      "epoch_miou_volatility": 0.053381614511634506,
+      "avg_best_val_epoch": 7.133333333333334,
+      "tvc_sign_flip_rate": 0.8666666666666667,
+      "avg_loss_convergence_ratio": 0.2846753536866258,
+      "severe_overfit_count": 2,
+      "tvc_mean_avg": 0.3601670781284094,
+      "tvc_last_min": -0.7456558805502821,
+      "alc": 0.6039172375226449,
+      "fallback_count": 0,
+      "budget_history": [
+        189,
+        277,
+        365,
+        453,
+        541,
+        629,
+        717,
+        805,
+        893,
+        981,
+        1069,
+        1157,
+        1245,
+        1333,
+        1421,
+        1509
+      ],
+      "experiment_completed": true,
+      "test_miou": null,
+      "test_f1": null,
+      "u_median_trajectory": [
+        0.7120148539543152,
+        0.698538601398468,
+        0.7404847145080566,
+        0.7593029141426086,
+        0.6739593148231506,
+        0.7542175948619843,
+        0.5105611085891724,
+        0.5636593997478485,
+        0.5206299126148224,
+        0.520335853099823,
+        0.6986830830574036,
+        0.55549356341362,
+        0.006176264025270939,
+        0.5370980203151703,
+        0.115705706179142
+      ],
+      "u_median_trend": -0.035761109110899275,
+      "k_median_trajectory": [
+        0.48787359740455316,
+        0.602859801334599,
+        0.631776787744569,
+        0.5518805532461937,
+        0.7156424304488505,
+        0.4414222503556162,
+        0.5781653151826819,
+        0.5241688150211252,
+        0.5880317636296554,
+        0.6461986398009683,
+        0.648995578289032,
+        0.5842752058385103,
+        0.9056274238602772,
+        0.7220125097561946,
+        0.9077037502541875
+      ],
+      "k_median_trend": 0.01918584922243944
+    },
+    "best_miou": 0.6889982839722201
+  },
+  "proposed_experiments": [
+    "ramp_on_best",
+    "high_clamp",
+    "ramp_guard",
+    "more_epochs"
+  ],
+  "configs": [
+    {
+      "direction": "ramp_on_best",
+      "late_stage_ramp": {
+        "start_round": 8,
+        "end_round": 13,
+        "start_lambda": 0.35,
+        "end_lambda": 0.7
+      }
+    },
+    {
+      "direction": "high_clamp",
+      "LAMBDA_CLAMP_MAX": 0.92
+    },
+    {
+      "direction": "ramp_guard",
+      "late_stage_ramp": {
+        "start_round": 8,
+        "end_round": 13,
+        "start_lambda": 0.35,
+        "end_lambda": 0.65
+      },
+      "selection_guardrail": {
+        "enabled": true,
+        "u_median_min": 0.4
+      }
+    },
+    {
+      "direction": "more_epochs",
+      "epochs_per_round_override": 12
+    }
+  ]
+}
