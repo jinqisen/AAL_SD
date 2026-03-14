@@ -1,5 +1,5 @@
 {
-  "auto_tune_iter01_ramp_fix_00": {
+  "auto_tune_iter02_ramp_fix_00": {
     "use_agent": true,
     "sampler_type": "ad_kucs",
     "lambda_override": null,
@@ -31,7 +31,7 @@
       "MIOU_LOW_GAIN_STREAK": 1,
       "LAMBDA_UP_K_U_GAP_MIN": 0.0,
       "LAMBDA_CLAMP_MIN": 0.05,
-      "LAMBDA_CLAMP_MAX": 0.8,
+      "LAMBDA_CLAMP_MAX": 0.92,
       "LAMBDA_DELTA_UP": 0.15,
       "LAMBDA_DELTA_DOWN": 0.1,
       "OVERFIT_RISK_EMA_ALPHA": 0.6,
@@ -80,9 +80,9 @@
         }
       }
     },
-    "description": "AutoTune: ramp_fix — rule-based proposal"
+    "description": "AutoTuneOpt: ramp_fix"
   },
-  "auto_tune_iter01_reduce_epochs_01": {
+  "auto_tune_iter02_reduce_epochs_01": {
     "use_agent": true,
     "sampler_type": "ad_kucs",
     "lambda_override": null,
@@ -105,7 +105,6 @@
       "set_epochs_per_round": false,
       "set_alpha": false
     },
-    "epochs_per_round_override": 8,
     "agent_threshold_overrides": {
       "OVERFIT_RISK_HI": 1.2,
       "OVERFIT_RISK_LO": 0.6,
@@ -115,7 +114,7 @@
       "MIOU_LOW_GAIN_STREAK": 1,
       "LAMBDA_UP_K_U_GAP_MIN": 0.0,
       "LAMBDA_CLAMP_MIN": 0.05,
-      "LAMBDA_CLAMP_MAX": 0.8,
+      "LAMBDA_CLAMP_MAX": 0.92,
       "LAMBDA_DELTA_UP": 0.15,
       "LAMBDA_DELTA_DOWN": 0.1,
       "OVERFIT_RISK_EMA_ALPHA": 0.6,
@@ -164,6 +163,7 @@
         }
       }
     },
-    "description": "AutoTune: reduce_epochs — rule-based proposal"
+    "description": "AutoTuneOpt: reduce_epochs",
+    "epochs_per_round_override": 8
   }
 }
