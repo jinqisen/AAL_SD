@@ -1,0 +1,105 @@
+{
+  "iteration": 2,
+  "timestamp": "2026-03-14T14:04:57.282629",
+  "analysis": {
+    "issues": [
+      {
+        "type": "late_stage_plateau",
+        "severity": "high",
+        "evidence": "late_gain=0.0090",
+        "suggestion": "启用 late_stage_ramp, 提高 CLAMP_MAX"
+      },
+      {
+        "type": "lambda_oscillation",
+        "severity": "medium",
+        "evidence": "volatility=0.254",
+        "suggestion": "降低 smoothing_alpha, 增加 COOLING_ROUNDS"
+      },
+      {
+        "type": "intra_round_overfit",
+        "severity": "high",
+        "evidence": "tvc_sign_flip_rate=0.78",
+        "suggestion": "减少 epochs 或降低 LR"
+      }
+    ],
+    "diagnostics": {
+      "final_miou": 0.7189411145165526,
+      "peak_miou": 0.7227914491548133,
+      "peak_round": 14,
+      "miou_trend": 0.002754803658382111,
+      "rollback_count": 0,
+      "rollback_rate": 0.0,
+      "max_consecutive_rollback": 0,
+      "miou_cv": 0.020918073632226426,
+      "lambda_trajectory": [
+        0.2,
+        0.2,
+        0.05,
+        0.4775,
+        0.05,
+        0.39249999999999996,
+        0.05,
+        0.39249999999999996,
+        0.39249999999999996
+      ],
+      "lambda_mean": 0.245,
+      "lambda_final": 0.39249999999999996,
+      "lambda_max_reached": 0.4775,
+      "lambda_volatility": 0.25406249999999997,
+      "warmup_exit_miou": 0.6832274886952447,
+      "mid_stage_miou": 0.7099793774293853,
+      "late_stage_gain": 0.008961737087167299,
+      "epoch_miou_volatility": 0.05258197389451741,
+      "avg_best_val_epoch": 7.666666666666667,
+      "tvc_sign_flip_rate": 0.7777777777777778,
+      "avg_loss_convergence_ratio": 0.32600971317188193,
+      "severe_overfit_count": 2,
+      "tvc_mean_avg": 0.4293605905652341,
+      "tvc_last_min": -0.8702024875510777,
+      "u_median_trajectory": [
+        0.6323257088661194,
+        0.7348453998565674,
+        0.3729683607816696,
+        0.5861351490020752,
+        0.4358014911413193,
+        0.5387256443500519,
+        0.3730955570936203,
+        0.7360299229621887,
+        0.6765638589859009
+      ],
+      "u_median_trend": 0.0022225176294644734,
+      "k_median_trajectory": [
+        0.6191559609648338,
+        0.61422545620898,
+        0.6605537066611976,
+        0.5952996668398182,
+        0.4958500266075134,
+        0.7156483957557914,
+        0.7358540353712395,
+        0.5981843719856983,
+        0.7131741770013676
+      ],
+      "k_median_trend": 0.009981649963539126
+    },
+    "best_miou": 0.7189411145165526
+  },
+  "proposed_experiments": [
+    "ramp_fix",
+    "reduce_epochs"
+  ],
+  "configs": [
+    {
+      "direction": "ramp_fix",
+      "late_stage_ramp": {
+        "start_round": 9,
+        "end_round": 12,
+        "start_lambda": 0.4,
+        "end_lambda": 0.7
+      }
+    },
+    {
+      "direction": "reduce_epochs",
+      "epochs_per_round_override": 8
+    }
+  ]
+}
