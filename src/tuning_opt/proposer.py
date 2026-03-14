@@ -13,6 +13,9 @@ class Proposal:
     parameter_changes: Dict[str, Any]
     description: str = ""
     priority: int = 99
+    risk: str = ""
+    expected_gain: float = 0.0
+    constraints: Optional[Dict[str, Any]] = None
 
 
 _SYSTEM_PROMPT = """你是 AAL-SD 自动调参助手。你只能输出严格 JSON，不能输出多余文本。
@@ -21,6 +24,9 @@ _SYSTEM_PROMPT = """你是 AAL-SD 自动调参助手。你只能输出严格 JSO
 - direction: 简短方向名（字符串）
 - priority: 越小越优先（整数）
 - description: 一句话说明（字符串）
+- risk: 该方向的潜在风险描述（字符串，例如"可能导致过拟合"）
+- expected_gain: 预期 mIoU 提升量（浮点数，例如 0.005）
+- constraints: 硬约束触发条件（对象，可为空 {}，例如 {"overfit_risk_max": 1.5}）
 - parameter_changes: 参数改动（对象），只允许以下 key（可以是子集）：
   - agent_threshold_overrides.LAMBDA_DELTA_UP
   - agent_threshold_overrides.LAMBDA_DELTA_DOWN
@@ -84,10 +90,18 @@ class LLMProposer:
                 continue
             direction = str(s.get("direction", "") or "").strip() or "unknown"
             desc = str(s.get("description", "") or "").strip()
+            risk = str(s.get("risk", "") or "").strip()
             try:
                 priority = int(s.get("priority", 99) or 99)
             except Exception:
                 priority = 99
+            try:
+                expected_gain = float(s.get("expected_gain", 0.0) or 0.0)
+            except Exception:
+                expected_gain = 0.0
+            constraints = s.get("constraints")
+            if not isinstance(constraints, dict):
+                constraints = {}
             changes = s.get("parameter_changes")
             if not isinstance(changes, dict):
                 changes = {}
@@ -97,8 +111,10 @@ class LLMProposer:
                     parameter_changes=dict(changes),
                     description=desc,
                     priority=priority,
+                    risk=risk,
+                    expected_gain=expected_gain,
+                    constraints=dict(constraints),
                 )
             )
         out.sort(key=lambda p: p.priority)
         return out
-

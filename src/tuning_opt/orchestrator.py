@@ -2,12 +2,13 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import os
 import random
 import re
 import subprocess
 import sys
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
@@ -18,7 +19,11 @@ if str(_SRC_DIR) not in sys.path:
 
 from experiments.ablation_config import ABLATION_SETTINGS, EXPERIMENT_NAME_ALIASES
 
-from tuning_opt.evaluator import ExperimentEvaluator, parse_final_miou_from_md
+from tuning_opt.evaluator import (
+    ExperimentEvaluator,
+    MultiSeedResult,
+    parse_final_miou_from_md,
+)
 from tuning_opt.llm_client import TuningLLMClient
 from tuning_opt.llm_config import TuningLLMConfig
 from tuning_opt.pool_resume import PoolResumeManager
@@ -60,7 +65,9 @@ def _load_final_miou(repo_root: Path, run_id: str, exp_name: str) -> Optional[fl
     return parse_final_miou_from_md(md)
 
 
-def _load_incumbent_cfg(repo_root: Path, run_id: str, exp_name: str) -> Optional[Dict[str, Any]]:
+def _load_incumbent_cfg(
+    repo_root: Path, run_id: str, exp_name: str
+) -> Optional[Dict[str, Any]]:
     manifest = _read_json(repo_root / "results" / "runs" / run_id / "manifest.json")
     if isinstance(manifest, dict):
         exps = manifest.get("experiments")
@@ -81,6 +88,11 @@ def _write_sidecar(repo_root: Path, configs: Dict[str, Dict[str, Any]]) -> Path:
     return sidecar
 
 
+_PLATEAU_WINDOW = 3
+_PLATEAU_EPS = 1e-4
+_TR_COLLAPSE_PATIENCE = 3
+
+
 @dataclass
 class IterationResult:
     iteration: int
@@ -88,6 +100,28 @@ class IterationResult:
     best_exp: str
     best_miou: float
     best_overrides: Dict[str, Any]
+    stop_reason: str = ""
+
+
+def _statistically_better(
+    candidate: float,
+    incumbent: float,
+    candidate_std: Optional[float],
+    n_seeds: int,
+    z: float = 1.645,
+) -> bool:
+    if n_seeds < 2 or candidate_std is None:
+        return candidate > incumbent + 1e-6
+    se = candidate_std / math.sqrt(n_seeds)
+    return (candidate - se * z) > incumbent
+
+
+def _plateau_detected(history: List[IterationResult], window: int, eps: float) -> bool:
+    if len(history) < window:
+        return False
+    recent = [h.best_miou for h in history[-window:]]
+    mean_gain = (recent[-1] - recent[0]) / max(window - 1, 1)
+    return mean_gain < eps
 
 
 class MultiFidelityTuningOrchestrator:
@@ -124,19 +158,33 @@ class MultiFidelityTuningOrchestrator:
 
         self.history: List[IterationResult] = []
         self._radius = 0.10
+        self._no_improve_streak = 0
 
     def run(self, *, initial_run_id: str, initial_exp: str) -> List[IterationResult]:
         incumbent_run = str(initial_run_id)
         incumbent_exp = str(initial_exp)
-        incumbent_miou = _load_final_miou(self.repo_root, incumbent_run, incumbent_exp) or 0.0
+        incumbent_miou = (
+            _load_final_miou(self.repo_root, incumbent_run, incumbent_exp) or 0.0
+        )
 
         for it in range(self.max_iterations):
             if float(incumbent_miou) >= float(self.target_miou):
                 break
+            if _plateau_detected(self.history, _PLATEAU_WINDOW, _PLATEAU_EPS):
+                break
+            if (
+                self._radius <= 0.02
+                and self._no_improve_streak >= _TR_COLLAPSE_PATIENCE
+            ):
+                break
 
-            incumbent_cfg = _load_incumbent_cfg(self.repo_root, incumbent_run, incumbent_exp)
+            incumbent_cfg = _load_incumbent_cfg(
+                self.repo_root, incumbent_run, incumbent_exp
+            )
             if not isinstance(incumbent_cfg, dict):
-                raise RuntimeError(f"Unable to load incumbent config: run_id={incumbent_run} exp={incumbent_exp}")
+                raise RuntimeError(
+                    f"Unable to load incumbent config: run_id={incumbent_run} exp={incumbent_exp}"
+                )
 
             center = self.space.flatten_from_ablation_cfg(incumbent_cfg)
             rng = random.Random(1337 + it)
@@ -147,7 +195,9 @@ class MultiFidelityTuningOrchestrator:
                 incumbent_miou=float(incumbent_miou),
                 center=center,
             )
-            tr_samples = self.space.trust_region_sample(center=center, radius=self._radius, rng=rng, n=6)
+            tr_samples = self.space.trust_region_sample(
+                center=center, radius=self._radius, rng=rng, n=6
+            )
             candidates = self.space.deduplicate(llm_overrides + tr_samples)
             candidates = candidates[:8]
             if not candidates:
@@ -159,7 +209,9 @@ class MultiFidelityTuningOrchestrator:
             exp_names: List[str] = []
             for j, ov in enumerate(candidates):
                 direction = str(ov.get("_direction", f"cand{j}"))
-                safe_dir = re.sub(r"[^a-zA-Z0-9_]+", "_", direction).strip("_") or f"cand{j}"
+                safe_dir = (
+                    re.sub(r"[^a-zA-Z0-9_]+", "_", direction).strip("_") or f"cand{j}"
+                )
                 exp_name = f"auto_opt_iter{it:02d}_{safe_dir}_{j:02d}"
                 exp_names.append(exp_name)
                 cleaned = {k: v for k, v in ov.items() if not str(k).startswith("_")}
@@ -178,6 +230,8 @@ class MultiFidelityTuningOrchestrator:
             )
 
             phase_a_seed = int(self.seeds[0])
+
+            # F1: cheap screening
             self.evaluator.run_batch(
                 run_id=run_id,
                 exp_names=exp_names,
@@ -195,6 +249,7 @@ class MultiFidelityTuningOrchestrator:
             )
             top = [name for name, _ in ranked[: max(1, min(2, len(ranked)))]]
 
+            # F2: full confirmation on top-k
             self.evaluator.run_batch(
                 run_id=run_id,
                 exp_names=top,
@@ -205,18 +260,55 @@ class MultiFidelityTuningOrchestrator:
                 resume=True,
             )
             full = self.evaluator.collect_results(run_id=run_id, exp_names=top)
-            best_exp, best_miou = max(
+            best_exp, best_miou_f2 = max(
                 ((name, r.miou or -1.0) for name, r in full.items()),
                 key=lambda x: x[1],
             )
-            best_overrides = {k: v for k, v in candidates[exp_names.index(best_exp)].items() if not str(k).startswith("_")}
 
-            improved = float(best_miou) > float(incumbent_miou) + 1e-6
+            # F3: multi-seed statistical review (only when multiple seeds configured)
+            best_miou: float = float(best_miou_f2)
+            best_std: Optional[float] = None
+            if len(self.seeds) > 1:
+                self.evaluator.run_multi_seed(
+                    run_id=run_id,
+                    exp_names=[best_exp],
+                    seeds=self.seeds[1:],
+                    max_concurrent=1,
+                    n_rounds=16,
+                    epochs_per_round=None,
+                    resume=True,
+                )
+                ms_results = self.evaluator.collect_multi_seed_results(
+                    run_id=run_id, exp_names=[best_exp], seeds=self.seeds
+                )
+                ms = ms_results.get(best_exp)
+                if ms is not None and ms.mean is not None:
+                    best_miou = ms.mean
+                    best_std = ms.std
+
+            best_overrides = {
+                k: v
+                for k, v in candidates[exp_names.index(best_exp)].items()
+                if not str(k).startswith("_")
+            }
+
+            improved = _statistically_better(
+                candidate=best_miou,
+                incumbent=float(incumbent_miou),
+                candidate_std=best_std,
+                n_seeds=len(self.seeds),
+            )
             if improved:
-                incumbent_run, incumbent_exp, incumbent_miou = run_id, best_exp, float(best_miou)
+                incumbent_run, incumbent_exp, incumbent_miou = (
+                    run_id,
+                    best_exp,
+                    float(best_miou),
+                )
                 self._radius = min(0.25, self._radius * 1.25)
+                self._no_improve_streak = 0
             else:
                 self._radius = max(0.02, self._radius * 0.70)
+                self._no_improve_streak += 1
 
             self.history.append(
                 IterationResult(
@@ -243,7 +335,11 @@ class MultiFidelityTuningOrchestrator:
             return []
         ctx = {
             "iteration": int(iteration),
-            "incumbent": {"run_id": incumbent_run, "exp": incumbent_exp, "miou": float(incumbent_miou)},
+            "incumbent": {
+                "run_id": incumbent_run,
+                "exp": incumbent_exp,
+                "miou": float(incumbent_miou),
+            },
             "center": dict(center),
             "target_miou": float(self.target_miou),
         }
@@ -271,7 +367,11 @@ def main() -> None:
 
     repo_root = Path(__file__).resolve().parents[2]
     seeds = [int(x.strip()) for x in str(args.seeds).split(",") if x.strip()]
-    llm_cfg_path = Path(args.llm_config).expanduser().resolve() if str(args.llm_config).strip() else None
+    llm_cfg_path = (
+        Path(args.llm_config).expanduser().resolve()
+        if str(args.llm_config).strip()
+        else None
+    )
 
     orch = MultiFidelityTuningOrchestrator(
         repo_root=repo_root,
@@ -283,7 +383,9 @@ def main() -> None:
         enable_llm=not bool(args.no_llm),
         llm_config_path=llm_cfg_path,
     )
-    history = orch.run(initial_run_id=str(args.initial_run_id), initial_exp=str(args.initial_exp))
+    history = orch.run(
+        initial_run_id=str(args.initial_run_id), initial_exp=str(args.initial_exp)
+    )
     print(json.dumps([h.__dict__ for h in history], ensure_ascii=False, indent=2))
 
 
