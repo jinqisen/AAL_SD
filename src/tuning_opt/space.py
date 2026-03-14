@@ -87,7 +87,9 @@ class ParameterSpace:
                 continue
         return out
 
-    def apply_overrides(self, base_cfg: Mapping[str, Any], overrides: Mapping[str, Any]) -> Dict[str, Any]:
+    def apply_overrides(
+        self, base_cfg: Mapping[str, Any], overrides: Mapping[str, Any]
+    ) -> Dict[str, Any]:
         merged = copy.deepcopy(dict(base_cfg))
         for k, v in overrides.items():
             if k not in self._index:
@@ -104,7 +106,9 @@ class ParameterSpace:
             if path and path[0] == "epochs_per_round_override":
                 merged["epochs_per_round_override"] = int(round(fv))
             else:
-                _set_nested(merged, path, int(round(fv)) if k.endswith("_round") else fv)
+                _set_nested(
+                    merged, path, int(round(fv)) if k.endswith("_round") else fv
+                )
         return merged
 
     def trust_region_sample(
@@ -114,15 +118,23 @@ class ParameterSpace:
         radius: float,
         rng,
         n: int,
+        n_active: int = 4,
     ) -> List[Dict[str, float]]:
         out: List[Dict[str, float]] = []
         for _ in range(int(n)):
             cand: Dict[str, float] = {}
+            active = set(
+                p.key
+                for p in rng.sample(self.params, k=min(int(n_active), len(self.params)))
+            )
             for p in self.params:
                 c = float(center.get(p.key, (p.lo + p.hi) / 2))
-                width = (p.hi - p.lo) * float(radius)
-                v = c + rng.uniform(-width, width)
-                v = p.clip(v)
+                if p.key in active:
+                    width = (p.hi - p.lo) * float(radius)
+                    v = c + rng.uniform(-width, width)
+                    v = p.clip(v)
+                else:
+                    v = c
                 if p.key.endswith(".start_round") or p.key.endswith(".end_round"):
                     v = int(round(v))
                 if p.key == "epochs_per_round_override":
@@ -131,7 +143,9 @@ class ParameterSpace:
             out.append(cand)
         return out
 
-    def deduplicate(self, candidates: Iterable[Mapping[str, Any]]) -> List[Dict[str, float]]:
+    def deduplicate(
+        self, candidates: Iterable[Mapping[str, Any]]
+    ) -> List[Dict[str, float]]:
         seen = set()
         unique: List[Dict[str, float]] = []
         for c in candidates:
@@ -141,4 +155,3 @@ class ParameterSpace:
             seen.add(frozen)
             unique.append({k: float(v) for k, v in c.items()})
         return unique
-

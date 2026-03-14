@@ -33,7 +33,7 @@ def test_tuning_llm_config_expands_env_var():
 
 
 def test_parse_final_miou_from_md():
-    from tuning_opt.evaluator import parse_final_miou_from_md
+    from tuning_opt.evaluator import parse_final_miou_from_md, parse_last_val_miou_from_md
 
     with tempfile.TemporaryDirectory() as td:
         p = Path(td) / "x.md"
@@ -41,3 +41,6 @@ def test_parse_final_miou_from_md():
         v = parse_final_miou_from_md(p)
         assert abs(v - 0.7189) < 1e-9
 
+        p.write_text("最后一轮选模 mIoU(val): 0.7124753599\n", encoding="utf-8")
+        vv = parse_last_val_miou_from_md(p)
+        assert abs(vv - 0.7124753599) < 1e-9

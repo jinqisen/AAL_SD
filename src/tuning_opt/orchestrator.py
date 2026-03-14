@@ -88,8 +88,8 @@ def _write_sidecar(repo_root: Path, configs: Dict[str, Dict[str, Any]]) -> Path:
     return sidecar
 
 
-_PLATEAU_WINDOW = 3
-_PLATEAU_EPS = 1e-4
+_PLATEAU_WINDOW = 5
+_PLATEAU_EPS = 5e-4
 _TR_COLLAPSE_PATIENCE = 3
 
 
@@ -136,6 +136,7 @@ class MultiFidelityTuningOrchestrator:
         max_concurrent: int,
         enable_llm: bool,
         llm_config_path: Optional[Path],
+        objective: str = "val",
     ):
         self.repo_root = repo_root
         self.results_dir = str(results_dir)
@@ -143,6 +144,7 @@ class MultiFidelityTuningOrchestrator:
         self.max_iterations = int(max_iterations)
         self.seeds = list(seeds) if seeds else [42]
         self.max_concurrent = int(max_concurrent)
+        self.objective = str(objective or "val").strip().lower()
 
         self.space = ParameterSpace.default()
         self.pool_mgr = PoolResumeManager(results_dir=self.results_dir)
@@ -238,10 +240,12 @@ class MultiFidelityTuningOrchestrator:
                 seed=phase_a_seed,
                 max_concurrent=self.max_concurrent,
                 n_rounds=10,
-                epochs_per_round=6,
+                epochs_per_round=8,
                 resume=True,
             )
-            screen = self.evaluator.collect_results(run_id=run_id, exp_names=exp_names)
+            screen = self.evaluator.collect_results(
+                run_id=run_id, exp_names=exp_names, objective=self.objective
+            )
             ranked = sorted(
                 [(name, r.miou or -1.0) for name, r in screen.items()],
                 key=lambda x: x[1],
@@ -259,7 +263,9 @@ class MultiFidelityTuningOrchestrator:
                 epochs_per_round=None,
                 resume=True,
             )
-            full = self.evaluator.collect_results(run_id=run_id, exp_names=top)
+            full = self.evaluator.collect_results(
+                run_id=run_id, exp_names=top, objective=self.objective
+            )
             best_exp, best_miou_f2 = max(
                 ((name, r.miou or -1.0) for name, r in full.items()),
                 key=lambda x: x[1],
@@ -269,17 +275,31 @@ class MultiFidelityTuningOrchestrator:
             best_miou: float = float(best_miou_f2)
             best_std: Optional[float] = None
             if len(self.seeds) > 1:
-                self.evaluator.run_multi_seed(
-                    run_id=run_id,
-                    exp_names=[best_exp],
-                    seeds=self.seeds[1:],
-                    max_concurrent=1,
-                    n_rounds=16,
-                    epochs_per_round=None,
-                    resume=True,
-                )
+                run_ids_by_seed: Dict[int, str] = {int(self.seeds[0]): str(run_id)}
+                for seed in self.seeds[1:]:
+                    seed_run_id = f"{run_id}_seed{int(seed)}"
+                    run_ids_by_seed[int(seed)] = seed_run_id
+                    self.pool_mgr.branch_from_round(
+                        source_run_id=incumbent_run,
+                        source_exp=incumbent_exp,
+                        target_run_id=seed_run_id,
+                        target_exps=[best_exp],
+                        branch_round=7,
+                    )
+                    self.evaluator.run_batch(
+                        run_id=seed_run_id,
+                        exp_names=[best_exp],
+                        seed=int(seed),
+                        max_concurrent=1,
+                        n_rounds=16,
+                        epochs_per_round=None,
+                        resume=True,
+                    )
+
                 ms_results = self.evaluator.collect_multi_seed_results(
-                    run_id=run_id, exp_names=[best_exp], seeds=self.seeds
+                    run_ids_by_seed=run_ids_by_seed,
+                    exp_names=[best_exp],
+                    objective=self.objective,
                 )
                 ms = ms_results.get(best_exp)
                 if ms is not None and ms.mean is not None:
@@ -356,10 +376,11 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--initial-run-id", required=True)
     parser.add_argument("--initial-exp", required=True)
-    parser.add_argument("--target-miou", type=float, default=0.74)
+    parser.add_argument("--target-miou", type=float, default=0.725)
     parser.add_argument("--max-iterations", type=int, default=10)
     parser.add_argument("--seeds", type=str, default="42")
     parser.add_argument("--max-concurrent", type=int, default=1)
+    parser.add_argument("--objective", type=str, default="val")
     parser.add_argument("--no-llm", action="store_true", default=False)
     parser.add_argument("--llm-config", type=str, default="")
     parser.add_argument("--results-dir", type=str, default="results")
@@ -382,6 +403,7 @@ def main() -> None:
         max_concurrent=int(args.max_concurrent),
         enable_llm=not bool(args.no_llm),
         llm_config_path=llm_cfg_path,
+        objective=str(args.objective),
     )
     history = orch.run(
         initial_run_id=str(args.initial_run_id), initial_exp=str(args.initial_exp)

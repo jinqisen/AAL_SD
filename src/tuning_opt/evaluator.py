@@ -11,6 +11,7 @@ from typing import Dict, Iterable, List, Optional, Tuple
 
 _RE_FINAL_TEST = re.compile(r"最终报告 mIoU\(test\):\s*([0-9.]+)")
 _RE_FINAL_OUT = re.compile(r"最终输出 mIoU:\s*([0-9.]+)")
+_RE_LAST_VAL = re.compile(r"最后一轮选模 mIoU\(val\):\s*([0-9.]+)")
 
 
 @dataclass(frozen=True)
@@ -77,6 +78,32 @@ def parse_final_miou_from_md(md_path: Path) -> Optional[float]:
     return None
 
 
+def parse_last_val_miou_from_md(md_path: Path) -> Optional[float]:
+    if not md_path.exists():
+        return None
+    try:
+        text = md_path.read_text(encoding="utf-8", errors="ignore")
+    except Exception:
+        return None
+    m = _RE_LAST_VAL.search(text)
+    if not m:
+        return None
+    try:
+        return float(m.group(1))
+    except Exception:
+        return None
+
+
+def parse_objective_miou_from_md(md_path: Path, objective: str) -> Optional[float]:
+    obj = str(objective or "").strip().lower()
+    if obj in ("val", "best_val", "last_val"):
+        v = parse_last_val_miou_from_md(md_path)
+        if v is not None:
+            return v
+        return parse_final_miou_from_md(md_path)
+    return parse_final_miou_from_md(md_path)
+
+
 class ExperimentEvaluator:
     def __init__(self, *, repo_root: Path):
         self.repo_root = repo_root
@@ -138,28 +165,32 @@ class ExperimentEvaluator:
             )
 
     def collect_results(
-        self, *, run_id: str, exp_names: Iterable[str]
+        self, *, run_id: str, exp_names: Iterable[str], objective: str = "test"
     ) -> Dict[str, EvalResult]:
         out: Dict[str, EvalResult] = {}
         run_dir = self.repo_root / "results" / "runs" / run_id
         for exp_name in exp_names:
             md_path = run_dir / f"{exp_name}.md"
-            miou = parse_final_miou_from_md(md_path)
+            miou = parse_objective_miou_from_md(md_path, objective)
             out[exp_name] = EvalResult(
                 exp_name=str(exp_name), miou=miou, md_path=str(md_path)
             )
         return out
 
     def collect_multi_seed_results(
-        self, *, run_id: str, exp_names: Iterable[str], seeds: List[int]
+        self,
+        *,
+        run_ids_by_seed: Dict[int, str],
+        exp_names: Iterable[str],
+        objective: str = "test",
     ) -> Dict[str, MultiSeedResult]:
         out: Dict[str, MultiSeedResult] = {}
-        run_dir = self.repo_root / "results" / "runs" / run_id
         for exp_name in exp_names:
             seed_mious: List[float] = []
-            for seed in seeds:
+            for seed, run_id in sorted(run_ids_by_seed.items(), key=lambda x: x[0]):
+                run_dir = self.repo_root / "results" / "runs" / str(run_id)
                 md_path = run_dir / f"{exp_name}.md"
-                miou = parse_final_miou_from_md(md_path)
+                miou = parse_objective_miou_from_md(md_path, objective)
                 if miou is not None:
                     seed_mious.append(miou)
             out[exp_name] = MultiSeedResult(
