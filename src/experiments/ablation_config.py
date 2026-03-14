@@ -1437,3 +1437,24 @@ def build_spec_from_legacy_dict(experiment_name: str, legacy_cfg: dict):
         description=description,
         legacy_config=legacy_cfg,
     )
+
+
+def _merge_auto_tune_sidecar_into_ablation_settings():
+    try:
+        import json
+        from pathlib import Path
+
+        sidecar_path = Path(__file__).resolve().parent / "auto_tune_configs.json"
+        if not sidecar_path.exists():
+            return
+        payload = json.loads(sidecar_path.read_text(encoding="utf-8"))
+        if not isinstance(payload, dict):
+            return
+        for exp_name, cfg in payload.items():
+            if isinstance(exp_name, str) and exp_name.strip() and isinstance(cfg, dict):
+                ABLATION_SETTINGS[exp_name.strip()] = cfg
+    except Exception:
+        return
+
+
+_merge_auto_tune_sidecar_into_ablation_settings()
