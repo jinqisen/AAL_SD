@@ -376,7 +376,7 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--initial-run-id", required=True)
     parser.add_argument("--initial-exp", required=True)
-    parser.add_argument("--target-miou", type=float, default=0.725)
+    parser.add_argument("--target-miou", type=float, default=0.722)
     parser.add_argument("--max-iterations", type=int, default=10)
     parser.add_argument("--seeds", type=str, default="42")
     parser.add_argument("--max-concurrent", type=int, default=1)

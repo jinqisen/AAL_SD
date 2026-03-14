@@ -8,7 +8,7 @@ import numpy as np
 import math
 
 class Trainer:
-    def __init__(self, model, config, device):
+    def __init__(self, model, config, device, training_state=None):
         self.model = model
         self.config = config
         self.device = device
@@ -37,6 +37,20 @@ class Trainer:
             except Exception:
                 pass
         self._grad_probe_param_names = self._select_grad_probe_param_names()
+        if isinstance(training_state, dict):
+            self.training_state = training_state
+        else:
+            self.training_state = {
+                "train_u_median_history": [],
+                "train_k_median_history": [],
+                "max_history_length": 5,
+            }
+        if "train_u_median_history" not in self.training_state:
+            self.training_state["train_u_median_history"] = []
+        if "train_k_median_history" not in self.training_state:
+            self.training_state["train_k_median_history"] = []
+        if "max_history_length" not in self.training_state:
+            self.training_state["max_history_length"] = 5
 
     def cleanup(self):
         """显式释放资源，防止内存泄漏"""
@@ -51,6 +65,24 @@ class Trainer:
             del self.model
         if self.device != "cpu" and torch.cuda.is_available():
             torch.cuda.empty_cache()
+
+    def _update_uncertainty_history(self, round_num: int):
+        u_median = self.training_state.get("train_u_median_selected")
+        k_median = self.training_state.get("train_k_median_selected")
+        max_len = int(self.training_state.get("max_history_length", 5) or 5)
+        max_len = max(int(max_len), 0)
+        if u_median is not None:
+            self.training_state["train_u_median_history"].append(
+                (int(round_num), float(u_median))
+            )
+            if max_len > 0 and len(self.training_state["train_u_median_history"]) > max_len:
+                self.training_state["train_u_median_history"].pop(0)
+        if k_median is not None:
+            self.training_state["train_k_median_history"].append(
+                (int(round_num), float(k_median))
+            )
+            if max_len > 0 and len(self.training_state["train_k_median_history"]) > max_len:
+                self.training_state["train_k_median_history"].pop(0)
 
     def _select_grad_probe_param_names(self) -> list:
         candidates = []

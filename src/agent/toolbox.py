@@ -1,4 +1,3 @@
-
 import json
 import hashlib
 import numpy as np
@@ -8,8 +7,9 @@ from .exceptions import (
     StateError,
     DataError,
     InvalidParameterError,
-    ConstraintViolationError
+    ConstraintViolationError,
 )
+
 
 class Toolbox:
     def __init__(self, agent_controller: Any, query_strategy: Any, model: Any) -> None:
@@ -27,7 +27,9 @@ class Toolbox:
         self.candidates_cache: List[Dict[str, Any]] = []
         self.training_state: Dict[str, Any] = {}
         cfg = getattr(agent_controller, "config", None)
-        self.alpha: float = float(getattr(cfg, "ALPHA", 5.0) if cfg is not None else 5.0)
+        self.alpha: float = float(
+            getattr(cfg, "ALPHA", 5.0) if cfg is not None else 5.0
+        )
         self.control_state: Dict[str, Any] = {}
         self.control_meta: Dict[str, Any] = {}
         self.control_permissions: Dict[str, bool] = {
@@ -39,7 +41,7 @@ class Toolbox:
             "get_sample_details": True,
             "get_score_distribution": True,
             "get_system_status": True,
-            "finalize_selection": True
+            "finalize_selection": True,
         }
         self.SCHEMA_VERSION: int = 1
         self.last_score_error: Optional[Dict[str, Any]] = None
@@ -50,13 +52,12 @@ class Toolbox:
         self._last_overfit_risk_raw: Optional[float] = None
         self._last_lambda_down_round: int = -999
         self._signal_history: Dict[str, List[float]] = {}
+        # P2: U/K 中位数历史（用于自适应 lambda 调整）
+        self._u_median_history: List[tuple] = []
+        self._k_median_history: List[tuple] = []
 
     def _success_response(self, result: Any, meta: Optional[Dict] = None) -> str:
-        return json.dumps({
-            "status": "success",
-            "result": result,
-            "meta": meta or {}
-        })
+        return json.dumps({"status": "success", "result": result, "meta": meta or {}})
 
     def _current_round(self) -> int:
         try:
@@ -84,7 +85,9 @@ class Toolbox:
             return None
         return dict(cfg)
 
-    def _guardrail_u_stats(self, sample_ids: List[str], u_low_thresh: float) -> Dict[str, Any]:
+    def _guardrail_u_stats(
+        self, sample_ids: List[str], u_low_thresh: float
+    ) -> Dict[str, Any]:
         u_vals: List[float] = []
         missing: List[str] = []
         for sid in sample_ids:
@@ -96,7 +99,11 @@ class Toolbox:
                     alt = str(int(sid))
                 except Exception:
                     alt = None
-                if alt and isinstance(self.current_scores, dict) and alt in self.current_scores:
+                if (
+                    alt
+                    and isinstance(self.current_scores, dict)
+                    and alt in self.current_scores
+                ):
                     v = (self.current_scores.get(alt) or {}).get("U")
             if v is None:
                 missing.append(str(sid))
@@ -109,7 +116,9 @@ class Toolbox:
         if n <= 0:
             return {"n": 0, "u_median": None, "frac_u_lt": None, "missing": missing}
         u_median = float(np.median(np.array(u_vals, dtype=np.float32)))
-        frac_u_lt = float(sum(1 for x in u_vals if float(x) < float(u_low_thresh))) / float(n)
+        frac_u_lt = float(
+            sum(1 for x in u_vals if float(x) < float(u_low_thresh))
+        ) / float(n)
         return {
             "n": n,
             "u_median": u_median,
@@ -117,7 +126,9 @@ class Toolbox:
             "missing": missing,
         }
 
-    def _score_stats_for_ids(self, sample_ids: List[str], u_low_thresh: float) -> Dict[str, Any]:
+    def _score_stats_for_ids(
+        self, sample_ids: List[str], u_low_thresh: float
+    ) -> Dict[str, Any]:
         u_vals: List[float] = []
         k_vals: List[float] = []
         missing: List[str] = []
@@ -150,8 +161,12 @@ class Toolbox:
                     k_vals.append(float(k_val))
             except Exception:
                 pass
-        u_arr = np.asarray(u_vals, dtype=float) if u_vals else np.asarray([], dtype=float)
-        k_arr = np.asarray(k_vals, dtype=float) if k_vals else np.asarray([], dtype=float)
+        u_arr = (
+            np.asarray(u_vals, dtype=float) if u_vals else np.asarray([], dtype=float)
+        )
+        k_arr = (
+            np.asarray(k_vals, dtype=float) if k_vals else np.asarray([], dtype=float)
+        )
         u_n = int(u_arr.size)
         k_n = int(k_arr.size)
         out: Dict[str, Any] = {
@@ -190,14 +205,39 @@ class Toolbox:
                 "u_low_frac_max": float(base_u_low_frac_max),
                 "mode": "fixed",
             }
-        window = int((adaptive_cfg or {}).get("window", cfg.get("adaptive_window", 5)) or 5)
-        min_samples = int((adaptive_cfg or {}).get("min_samples", cfg.get("adaptive_min_samples", 3)) or 3)
-        q_u = float((adaptive_cfg or {}).get("u_median_quantile", cfg.get("adaptive_u_median_quantile", 0.3)) or 0.3)
+        window = int(
+            (adaptive_cfg or {}).get("window", cfg.get("adaptive_window", 5)) or 5
+        )
+        min_samples = int(
+            (adaptive_cfg or {}).get("min_samples", cfg.get("adaptive_min_samples", 3))
+            or 3
+        )
+        q_u = float(
+            (adaptive_cfg or {}).get(
+                "u_median_quantile", cfg.get("adaptive_u_median_quantile", 0.3)
+            )
+            or 0.3
+        )
         q_u = min(max(q_u, 0.0), 1.0)
-        q_frac = float((adaptive_cfg or {}).get("u_low_frac_quantile", cfg.get("adaptive_u_low_frac_quantile", 0.8)) or 0.8)
+        q_frac = float(
+            (adaptive_cfg or {}).get(
+                "u_low_frac_quantile", cfg.get("adaptive_u_low_frac_quantile", 0.8)
+            )
+            or 0.8
+        )
         q_frac = min(max(q_frac, 0.0), 1.0)
-        hist_u = [float(x) for x in self._get_signal_history("guardrail_selected_u_median", window=window)]
-        hist_frac = [float(x) for x in self._get_signal_history("guardrail_selected_frac_u_lt", window=window)]
+        hist_u = [
+            float(x)
+            for x in self._get_signal_history(
+                "guardrail_selected_u_median", window=window
+            )
+        ]
+        hist_frac = [
+            float(x)
+            for x in self._get_signal_history(
+                "guardrail_selected_frac_u_lt", window=window
+            )
+        ]
         if len(hist_u) < int(min_samples) or len(hist_frac) < int(min_samples):
             return {
                 "u_median_min": float(base_u_median_min),
@@ -210,8 +250,12 @@ class Toolbox:
             }
         dyn_u = float(np.quantile(np.asarray(hist_u, dtype=float), q_u))
         dyn_frac = float(np.quantile(np.asarray(hist_frac, dtype=float), q_frac))
-        floor_u = (adaptive_cfg or {}).get("u_median_floor", cfg.get("u_median_min_floor", base_u_median_min))
-        ceil_frac = (adaptive_cfg or {}).get("u_low_frac_ceiling", cfg.get("u_low_frac_max_ceiling", base_u_low_frac_max))
+        floor_u = (adaptive_cfg or {}).get(
+            "u_median_floor", cfg.get("u_median_min_floor", base_u_median_min)
+        )
+        ceil_frac = (adaptive_cfg or {}).get(
+            "u_low_frac_ceiling", cfg.get("u_low_frac_max_ceiling", base_u_low_frac_max)
+        )
         if floor_u is not None:
             dyn_u = max(float(dyn_u), float(floor_u))
         if ceil_frac is not None:
@@ -245,7 +289,9 @@ class Toolbox:
         items.sort(key=lambda x: (float(x[0]), x[1]), reverse=True)
         return [sid for _, sid in items]
 
-    def _pick_top_k(self, ranked_ids: List[str], k: int, exclude: Optional[set[str]] = None) -> List[str]:
+    def _pick_top_k(
+        self, ranked_ids: List[str], k: int, exclude: Optional[set[str]] = None
+    ) -> List[str]:
         out: List[str] = []
         ex = exclude or set()
         for sid in ranked_ids:
@@ -284,10 +330,16 @@ class Toolbox:
             base_u_low_frac_max=base_u_low_frac_max,
         )
         u_median_min = float(threshold_meta.get("u_median_min", base_u_median_min))
-        u_low_frac_max = float(threshold_meta.get("u_low_frac_max", base_u_low_frac_max))
+        u_low_frac_max = float(
+            threshold_meta.get("u_low_frac_max", base_u_low_frac_max)
+        )
 
-        clamp_min = float(self._agent_threshold("LAMBDA_CLAMP_MIN", AgentConstraints.LAMBDA_MIN))
-        clamp_max = float(self._agent_threshold("LAMBDA_CLAMP_MAX", AgentConstraints.LAMBDA_MAX))
+        clamp_min = float(
+            self._agent_threshold("LAMBDA_CLAMP_MIN", AgentConstraints.LAMBDA_MIN)
+        )
+        clamp_max = float(
+            self._agent_threshold("LAMBDA_CLAMP_MAX", AgentConstraints.LAMBDA_MAX)
+        )
 
         lambda_before = self.control_state.get("lambda_override_round")
         if lambda_before is None:
@@ -345,7 +397,9 @@ class Toolbox:
             ranked_h = self._rank_candidate_ids_by_lambda(lam)
             first = self._pick_top_k(ranked_u, u_k)
             ex = set(first)
-            second = self._pick_top_k(ranked_h, int(expected) - int(len(first)), exclude=ex)
+            second = self._pick_top_k(
+                ranked_h, int(expected) - int(len(first)), exclude=ex
+            )
             cand = list(first) + list(second)
             st = self._guardrail_u_stats(cand, u_low_thresh=u_low_thresh)
             chosen = {"sample_ids": cand, "stats": st, "lambda_after": lam}
@@ -354,9 +408,19 @@ class Toolbox:
         lambda_after = float(min(max(lambda_after, clamp_min), clamp_max))
         final_ids = list(chosen.get("sample_ids") or orig)
         final_stats = dict(chosen.get("stats") or {})
-        final_stats_selected_all = self._score_stats_for_ids(final_ids, u_low_thresh=u_low_thresh)
-        self._append_signal_history("guardrail_selected_u_median", final_stats_selected_all.get("u_median"), max_len=32)
-        self._append_signal_history("guardrail_selected_frac_u_lt", final_stats_selected_all.get("frac_u_lt"), max_len=32)
+        final_stats_selected_all = self._score_stats_for_ids(
+            final_ids, u_low_thresh=u_low_thresh
+        )
+        self._append_signal_history(
+            "guardrail_selected_u_median",
+            final_stats_selected_all.get("u_median"),
+            max_len=32,
+        )
+        self._append_signal_history(
+            "guardrail_selected_frac_u_lt",
+            final_stats_selected_all.get("frac_u_lt"),
+            max_len=32,
+        )
 
         self.control_state["lambda_override_round"] = float(lambda_after)
         self.control_meta["lambda_guardrail"] = {
@@ -492,12 +556,41 @@ class Toolbox:
     def _agent_threshold(self, name: str, fallback: Any) -> Any:
         controller = getattr(self, "controller", None)
         exp_cfg = getattr(controller, "exp_config", None)
-        overrides = exp_cfg.get("agent_threshold_overrides") if isinstance(exp_cfg, dict) else None
+        overrides = (
+            exp_cfg.get("agent_threshold_overrides")
+            if isinstance(exp_cfg, dict)
+            else None
+        )
         if isinstance(overrides, dict) and name in overrides:
             return overrides[name]
         return getattr(AgentThresholds, name, fallback)
 
-    def _compute_policy_lambda_for_round(self, round_num: int, policy: Dict[str, Any]) -> Dict[str, Any]:
+    def _get_delta_adaptive(
+        self, round_num: int, policy: Dict[str, Any], risk: float | None
+    ):
+        if not bool(policy.get("u_adaptive", False)):
+            return None, None
+        u_history = self.training_state.get("train_u_median_history", [])
+        if not isinstance(u_history, list) or len(u_history) < 2:
+            return None, None
+        u_curr = u_history[-1][1]
+        u_prev = u_history[-2][1]
+        u_delta = float(u_curr) - float(u_prev)
+        u_delta_down_threshold = float(policy.get("u_delta_down_threshold", -0.3))
+        u_delta_up_threshold = float(policy.get("u_delta_up_threshold", 0.1))
+        if u_delta < u_delta_down_threshold:
+            delta = -0.2
+            rule = f"u_quality_degradation_aggressive_down_u_delta={u_delta:.3f}"
+            return float(delta), str(rule)
+        if u_delta > u_delta_up_threshold:
+            delta = +0.1
+            rule = f"u_quality_improvement_aggressive_up_u_delta={u_delta:.3f}"
+            return float(delta), str(rule)
+        return None, None
+
+    def _compute_policy_lambda_for_round(
+        self, round_num: int, policy: Dict[str, Any]
+    ) -> Dict[str, Any]:
         mode = str(policy.get("mode") or "")
         if mode != "warmup_risk_closed_loop":
             raise ValueError(f"Unsupported lambda_policy mode: {mode}")
@@ -507,17 +600,56 @@ class Toolbox:
         warmup_rounds = int(policy.get("warmup_rounds", 1))
         warmup_lambda = policy.get("warmup_lambda", 0.22)
         warmup_lambda_range = policy.get("warmup_lambda_range")
-        risk_control_start_round = int(policy.get("risk_control_start_round", warmup_start_round + warmup_rounds))
+        risk_control_start_round = int(
+            policy.get("risk_control_start_round", warmup_start_round + warmup_rounds)
+        )
         uncertainty_only_rounds = int(policy.get("uncertainty_only_rounds", 1))
 
-        clamp_min = float(self._agent_threshold("LAMBDA_CLAMP_MIN", AgentConstraints.LAMBDA_MIN))
-        clamp_max = float(self._agent_threshold("LAMBDA_CLAMP_MAX", AgentConstraints.LAMBDA_MAX))
+        clamp_min = float(
+            self._agent_threshold("LAMBDA_CLAMP_MIN", AgentConstraints.LAMBDA_MIN)
+        )
+        clamp_max = float(
+            self._agent_threshold("LAMBDA_CLAMP_MAX", AgentConstraints.LAMBDA_MAX)
+        )
         delta_down = float(self._agent_threshold("LAMBDA_DELTA_DOWN", 0.1) or 0.0)
         delta_up = float(self._agent_threshold("LAMBDA_DELTA_UP", 0.05) or 0.0)
         risk_hi = float(self._agent_threshold("OVERFIT_RISK_HI", 0.8) or 0.0)
         risk_lo = float(self._agent_threshold("OVERFIT_RISK_LO", 0.2) or 0.0)
         tvc_min_hi = float(self._agent_threshold("OVERFIT_TVC_MIN_HI", 0.5) or 0.0)
         streak_need = int(self._agent_threshold("MIOU_LOW_GAIN_STREAK", 0) or 0)
+
+        stage_aware = bool(policy.get("stage_aware", False))
+        stage_meta = None
+        if stage_aware:
+            boundaries = policy.get("stage_boundaries", [])
+            deltas = policy.get("stage_deltas", {})
+            stage = None
+            b = (
+                [int(x) for x in boundaries]
+                if isinstance(boundaries, (list, tuple))
+                else []
+            )
+            b = [int(x) for x in b if x is not None]
+            b = sorted(b)
+            if len(b) >= 1 and int(round_num) <= int(b[0]):
+                stage = "early"
+            elif len(b) >= 2 and int(round_num) <= int(b[1]):
+                stage = "mid"
+            else:
+                stage = "late"
+            if isinstance(deltas, dict):
+                sd = deltas.get(stage)
+                if isinstance(sd, dict):
+                    if sd.get("delta_up") is not None:
+                        delta_up = float(sd.get("delta_up"))
+                    if sd.get("delta_down") is not None:
+                        delta_down = float(sd.get("delta_down"))
+            stage_meta = {
+                "enabled": True,
+                "stage": str(stage),
+                "stage_boundaries": b,
+                "stage_deltas": deltas if isinstance(deltas, dict) else None,
+            }
 
         diagnostics = {
             "round": int(round_num),
@@ -539,6 +671,8 @@ class Toolbox:
                 "overfit_tvc_min_hi": float(tvc_min_hi),
                 "miou_low_gain_streak_need": int(streak_need),
             },
+            "stage_aware": stage_meta if stage_meta is not None else {"enabled": False},
+            "phase_aware": stage_meta if stage_meta is not None else {"enabled": False},
         }
 
         if round_num <= max(1, int(uncertainty_only_rounds)):
@@ -559,19 +693,28 @@ class Toolbox:
                 "diagnostics": diagnostics,
             }
 
-        if warmup_rounds > 0 and warmup_start_round <= round_num < (warmup_start_round + warmup_rounds):
+        if warmup_rounds > 0 and warmup_start_round <= round_num < (
+            warmup_start_round + warmup_rounds
+        ):
             applied = None
             rule = "warmup_fixed_lambda"
             if warmup_lambda_range is not None:
-                if not (isinstance(warmup_lambda_range, (list, tuple)) and len(warmup_lambda_range) == 2):
-                    raise ValueError("warmup_lambda_range must be a 2-item list/tuple when provided")
+                if not (
+                    isinstance(warmup_lambda_range, (list, tuple))
+                    and len(warmup_lambda_range) == 2
+                ):
+                    raise ValueError(
+                        "warmup_lambda_range must be a 2-item list/tuple when provided"
+                    )
                 lo = float(warmup_lambda_range[0])
                 hi = float(warmup_lambda_range[1])
                 if lo > hi:
                     lo, hi = hi, lo
                 seed = getattr(self.controller, "seed", None)
                 if seed is None:
-                    seed = getattr(getattr(self.controller, "config", None), "RANDOM_SEED", None)
+                    seed = getattr(
+                        getattr(self.controller, "config", None), "RANDOM_SEED", None
+                    )
                 seed = str(seed if seed is not None else "")
                 # Proposal A: Remove run_id and exp_name to ensure consistent lambda sequence
                 salt = f"fixed_warmup|{seed}|round={int(round_num)}"
@@ -600,7 +743,9 @@ class Toolbox:
 
         base = self._last_lambda_applied
         if base is None:
-            base = float(warmup_lambda) if warmup_lambda is not None else float(clamp_min)
+            base = (
+                float(warmup_lambda) if warmup_lambda is not None else float(clamp_min)
+            )
         base = float(base)
 
         applied = float(base)
@@ -609,16 +754,23 @@ class Toolbox:
         rollback_flag = bool(self.training_state.get("rollback_flag", False))
         risk_raw = self.training_state.get("overfit_risk")
         risk = risk_raw
-        
+
         ema_alpha = float(self._agent_threshold("OVERFIT_RISK_EMA_ALPHA", 1.0))
-        diagnostics["thresholds"]["overfit_risk_ema_alpha"] = float(min(max(ema_alpha, 0.0), 1.0))
+        diagnostics["thresholds"]["overfit_risk_ema_alpha"] = float(
+            min(max(ema_alpha, 0.0), 1.0)
+        )
         if risk is not None:
             risk = float(risk)
-            if self._last_ema_update_round != round_num or self._last_overfit_risk_raw != risk:
+            if (
+                self._last_ema_update_round != round_num
+                or self._last_overfit_risk_raw != risk
+            ):
                 if self._ema_overfit_risk is None:
                     self._ema_overfit_risk = risk
                 else:
-                    self._ema_overfit_risk = ema_alpha * risk + (1.0 - ema_alpha) * self._ema_overfit_risk
+                    self._ema_overfit_risk = (
+                        ema_alpha * risk + (1.0 - ema_alpha) * self._ema_overfit_risk
+                    )
                 self._last_ema_update_round = round_num
                 self._last_overfit_risk_raw = risk
             if self._ema_overfit_risk is not None:
@@ -629,10 +781,16 @@ class Toolbox:
             tvc_key = "grad_train_val_cos_min"
         tvc_val = self.training_state.get(tvc_key)
         risk_policy = self._risk_policy_config() or {}
-        risk_trigger = str(policy.get("risk_trigger", risk_policy.get("trigger", "")) or "").strip().lower()
+        risk_trigger = (
+            str(policy.get("risk_trigger", risk_policy.get("trigger", "")) or "")
+            .strip()
+            .lower()
+        )
         risk_ci_window = policy.get("risk_ci_window", risk_policy.get("window"))
         risk_ci_quantile = policy.get("risk_ci_quantile", risk_policy.get("quantile"))
-        risk_ci_min_samples = policy.get("risk_ci_min_samples", risk_policy.get("min_samples", 3))
+        risk_ci_min_samples = policy.get(
+            "risk_ci_min_samples", risk_policy.get("min_samples", 3)
+        )
         logic = str(policy.get("severe_logic", "or")).strip().lower()
         risk_hit = False
         tvc_hit = False
@@ -640,7 +798,9 @@ class Toolbox:
         tvc_thresh = None
         if risk is not None:
             if risk_trigger == "ci":
-                history = self._get_signal_history("overfit_risk", window=risk_ci_window)
+                history = self._get_signal_history(
+                    "overfit_risk", window=risk_ci_window
+                )
                 if len(history) >= int(risk_ci_min_samples or 0):
                     q = float(risk_ci_quantile if risk_ci_quantile is not None else 0.1)
                     q = min(max(q, 0.0), 1.0)
@@ -667,25 +827,37 @@ class Toolbox:
 
         diagnostics.update(
             {
-                "phase": "risk_control" if int(round_num) >= int(risk_control_start_round) else "pre_risk_control",
+                "phase": "risk_control"
+                if int(round_num) >= int(risk_control_start_round)
+                else "pre_risk_control",
                 "base": float(base),
                 "inputs": {
                     "rollback_flag": bool(rollback_flag),
                     "miou_delta": self.training_state.get("miou_delta"),
-                    "miou_low_gain_streak": self.training_state.get("miou_low_gain_streak"),
+                    "miou_low_gain_streak": self.training_state.get(
+                        "miou_low_gain_streak"
+                    ),
                     "overfit_risk_raw": None if risk_raw is None else float(risk_raw),
                     "overfit_risk_ema": None if risk is None else float(risk),
                     "tvc_key": str(tvc_key),
                     "tvc_value": None if tvc_val is None else float(tvc_val),
-                    "epoch_miou_volatility": self.training_state.get("epoch_miou_volatility"),
+                    "epoch_miou_volatility": self.training_state.get(
+                        "epoch_miou_volatility"
+                    ),
                     "tvc_sign_flip_rate": self.training_state.get("tvc_sign_flip_rate"),
                 },
                 "risk_control": {
                     "severe_logic": str(logic),
                     "risk_trigger": str(risk_trigger),
-                    "risk_ci_window": None if risk_ci_window is None else int(risk_ci_window),
-                    "risk_ci_quantile": None if risk_ci_quantile is None else float(risk_ci_quantile),
-                    "risk_ci_min_samples": None if risk_ci_min_samples is None else int(risk_ci_min_samples),
+                    "risk_ci_window": None
+                    if risk_ci_window is None
+                    else int(risk_ci_window),
+                    "risk_ci_quantile": None
+                    if risk_ci_quantile is None
+                    else float(risk_ci_quantile),
+                    "risk_ci_min_samples": None
+                    if risk_ci_min_samples is None
+                    else int(risk_ci_min_samples),
                     "risk_hit": bool(risk_hit),
                     "tvc_hit": bool(tvc_hit),
                     "risk_thresh": risk_thresh,
@@ -694,12 +866,57 @@ class Toolbox:
                 },
             }
         )
+        if bool(policy.get("u_adaptive", False)) and int(round_num) >= int(
+            risk_control_start_round
+        ):
+            u_history = self.training_state.get("train_u_median_history", [])
+            u_hist_len = len(u_history) if isinstance(u_history, list) else 0
+            if u_hist_len >= 2:
+                u_curr = u_history[-1][1]
+                u_prev = u_history[-2][1]
+                u_delta = float(u_curr) - float(u_prev)
+            else:
+                u_curr = None
+                u_prev = None
+                u_delta = None
+            diagnostics["u_adaptive"] = {
+                "enabled": True,
+                "history_len": int(u_hist_len),
+                "u_curr": u_curr,
+                "u_prev": u_prev,
+                "u_delta": u_delta,
+                "threshold_down": float(policy.get("u_delta_down_threshold", -0.3)),
+                "threshold_up": float(policy.get("u_delta_up_threshold", 0.1)),
+            }
+            adaptive_delta, adaptive_rule = self._get_delta_adaptive(
+                round_num, policy, risk
+            )
+            if adaptive_delta is not None and adaptive_rule is not None:
+                applied = float(min(max(float(applied) + float(adaptive_delta), clamp_min), clamp_max))
+                rule = str(adaptive_rule)
+                diagnostics["u_adaptive"]["triggered"] = True
+                diagnostics["u_adaptive"]["applied_delta"] = float(adaptive_delta)
+                diagnostics["u_adaptive"]["rule"] = str(adaptive_rule)
+                return {
+                    "applied": float(applied),
+                    "bounds": {"min": float(clamp_min), "max": float(clamp_max)},
+                    "rule": str(rule),
+                    "base": float(base),
+                    "diagnostics": diagnostics,
+                }
+            diagnostics["u_adaptive"]["triggered"] = False
+        else:
+            diagnostics["u_adaptive"] = {"enabled": False}
 
         if round_num >= risk_control_start_round:
             epoch_vol = self.training_state.get("epoch_miou_volatility")
             tvc_flip = self.training_state.get("tvc_sign_flip_rate")
-            vol_hi = float(self._agent_threshold("EPOCH_MIOU_VOLATILITY_HI", 0.03) or 0.03)
-            flip_hi = float(self._agent_threshold("TVC_SIGN_FLIP_RATE_HI", 0.65) or 0.65)
+            vol_hi = float(
+                self._agent_threshold("EPOCH_MIOU_VOLATILITY_HI", 0.03) or 0.03
+            )
+            flip_hi = float(
+                self._agent_threshold("TVC_SIGN_FLIP_RATE_HI", 0.65) or 0.65
+            )
             vol_hit = False
             flip_hit = False
             try:
@@ -722,11 +939,17 @@ class Toolbox:
                     self._last_lambda_down_round = round_num
                 rule = "rollback_lambda_down"
             elif severe:
-                cooling_rounds = int(self._agent_threshold("LAMBDA_DOWN_COOLING_ROUNDS", 0))
-                in_cooling = (round_num - self._last_lambda_down_round) <= cooling_rounds
-                diagnostics["thresholds"]["lambda_down_cooling_rounds"] = int(cooling_rounds)
+                cooling_rounds = int(
+                    self._agent_threshold("LAMBDA_DOWN_COOLING_ROUNDS", 0)
+                )
+                in_cooling = (
+                    round_num - self._last_lambda_down_round
+                ) <= cooling_rounds
+                diagnostics["thresholds"]["lambda_down_cooling_rounds"] = int(
+                    cooling_rounds
+                )
                 diagnostics["risk_control"]["in_cooling"] = bool(in_cooling)
-                
+
                 if in_cooling:
                     rule = "severe_overfit_lambda_down_blocked_cooling"
                 elif delta_down > 0:
@@ -758,11 +981,21 @@ class Toolbox:
                         k_mean = None
 
                 miou_delta = self.training_state.get("miou_delta")
-                low_gain_thresh = float(self._agent_threshold("MIOU_LOW_GAIN_THRESH", 0.0) or 0.0)
-                risk_up_max = float(self._agent_threshold("OVERFIT_RISK_LAMBDA_UP_MAX", 0.0) or 0.0)
-                k_u_gap_min = float(self._agent_threshold("LAMBDA_UP_K_U_GAP_MIN", 0.0) or 0.0)
-                diagnostics["thresholds"]["miou_low_gain_thresh"] = float(low_gain_thresh)
-                diagnostics["thresholds"]["overfit_risk_lambda_up_max"] = float(risk_up_max)
+                low_gain_thresh = float(
+                    self._agent_threshold("MIOU_LOW_GAIN_THRESH", 0.0) or 0.0
+                )
+                risk_up_max = float(
+                    self._agent_threshold("OVERFIT_RISK_LAMBDA_UP_MAX", 0.0) or 0.0
+                )
+                k_u_gap_min = float(
+                    self._agent_threshold("LAMBDA_UP_K_U_GAP_MIN", 0.0) or 0.0
+                )
+                diagnostics["thresholds"]["miou_low_gain_thresh"] = float(
+                    low_gain_thresh
+                )
+                diagnostics["thresholds"]["overfit_risk_lambda_up_max"] = float(
+                    risk_up_max
+                )
                 diagnostics["thresholds"]["lambda_up_k_u_gap_min"] = float(k_u_gap_min)
                 diagnostics["inputs"]["u_mean"] = u_mean
                 diagnostics["inputs"]["k_mean"] = k_mean
@@ -785,7 +1018,11 @@ class Toolbox:
                     allow_up_reason = "low_risk_k_dominant_up"
 
                 if (not allow_up) and (not (bool(vol_hit) or bool(flip_hit))):
-                    if risk is not None and float(risk) <= float(risk_lo) and int(self._miou_low_gain_streak) >= int(streak_need):
+                    if (
+                        risk is not None
+                        and float(risk) <= float(risk_lo)
+                        and int(self._miou_low_gain_streak) >= int(streak_need)
+                    ):
                         allow_up = True
                         allow_up_reason = "low_risk_low_gain_small_up"
 
@@ -805,7 +1042,9 @@ class Toolbox:
             try:
                 start = int(ramp.get("start_round", 0) or 0)
                 end = int(ramp.get("end_round", start) or start)
-                v0 = float(ramp.get("start_lambda", ramp.get("lambda_start", 0.0)) or 0.0)
+                v0 = float(
+                    ramp.get("start_lambda", ramp.get("lambda_start", 0.0)) or 0.0
+                )
                 v1 = float(ramp.get("end_lambda", ramp.get("lambda_end", v0)) or v0)
                 if end < start:
                     start, end = end, start
@@ -814,13 +1053,19 @@ class Toolbox:
                     ramp_conditional = bool(ramp.get("conditional", True))
                     risk_for_ramp_max = ramp.get("risk_max_for_ramp")
                     if risk_for_ramp_max is None:
-                        risk_for_ramp_max = self._agent_threshold("OVERFIT_RISK_FOR_RAMP_MAX", 0.4)
+                        risk_for_ramp_max = self._agent_threshold(
+                            "OVERFIT_RISK_FOR_RAMP_MAX", 0.4
+                        )
                     tvc_neg_rate_max = ramp.get("tvc_neg_rate_max_for_ramp")
                     if tvc_neg_rate_max is None:
-                        tvc_neg_rate_max = self._agent_threshold("TVC_NEG_RATE_FOR_RAMP_MAX", 0.5)
+                        tvc_neg_rate_max = self._agent_threshold(
+                            "TVC_NEG_RATE_FOR_RAMP_MAX", 0.5
+                        )
                     miou_delta_max = ramp.get("miou_delta_max_for_ramp")
                     if miou_delta_max is None:
-                        miou_delta_max = self._agent_threshold("MIOU_LOW_GAIN_THRESH", 0.0)
+                        miou_delta_max = self._agent_threshold(
+                            "MIOU_LOW_GAIN_THRESH", 0.0
+                        )
                     require_low_gain = bool(ramp.get("require_low_gain", True))
                     require_stable_tvc = bool(ramp.get("require_stable_tvc", True))
                     ramp_risk_ok = True
@@ -830,7 +1075,9 @@ class Toolbox:
                     if require_low_gain:
                         md = self.training_state.get("miou_delta")
                         if md is None:
-                            ramp_low_gain_ok = int(self._miou_low_gain_streak) >= max(int(streak_need), 1)
+                            ramp_low_gain_ok = int(self._miou_low_gain_streak) >= max(
+                                int(streak_need), 1
+                            )
                         else:
                             ramp_low_gain_ok = float(md) <= float(miou_delta_max)
                     ramp_tvc_ok = True
@@ -838,12 +1085,20 @@ class Toolbox:
                         tvc_neg = self.training_state.get("grad_train_val_cos_neg_rate")
                         if tvc_neg is not None:
                             ramp_tvc_ok = float(tvc_neg) <= float(tvc_neg_rate_max)
-                    ramp_gate_ok = bool(ramp_risk_ok and ramp_low_gain_ok and ramp_tvc_ok)
+                    ramp_gate_ok = bool(
+                        ramp_risk_ok and ramp_low_gain_ok and ramp_tvc_ok
+                    )
                     diagnostics["late_stage_ramp"] = {
                         "conditional": bool(ramp_conditional),
-                        "risk_max_for_ramp": None if risk_for_ramp_max is None else float(risk_for_ramp_max),
-                        "tvc_neg_rate_max_for_ramp": None if tvc_neg_rate_max is None else float(tvc_neg_rate_max),
-                        "miou_delta_max_for_ramp": None if miou_delta_max is None else float(miou_delta_max),
+                        "risk_max_for_ramp": None
+                        if risk_for_ramp_max is None
+                        else float(risk_for_ramp_max),
+                        "tvc_neg_rate_max_for_ramp": None
+                        if tvc_neg_rate_max is None
+                        else float(tvc_neg_rate_max),
+                        "miou_delta_max_for_ramp": None
+                        if miou_delta_max is None
+                        else float(miou_delta_max),
                         "require_low_gain": bool(require_low_gain),
                         "require_stable_tvc": bool(require_stable_tvc),
                         "risk_ok": bool(ramp_risk_ok),
@@ -858,14 +1113,11 @@ class Toolbox:
                         t = float(min(max(t, 0.0), 1.0))
                         floor = float(v0 + (v1 - v0) * t)
                     floor = float(min(max(floor, 0.0), 1.0))
-                    if (
-                        (not ramp_conditional or ramp_gate_ok)
-                        and rule not in (
+                    if (not ramp_conditional or ramp_gate_ok) and rule not in (
                         "rollback_lambda_down",
                         "severe_overfit_lambda_down",
                         "severe_overfit_lambda_down_blocked_cooling",
                         "severe_overfit_lambda_down_no_delta",
-                        )
                     ):
                         if float(applied) < float(floor):
                             applied = float(floor)
@@ -881,15 +1133,21 @@ class Toolbox:
             alpha = float(policy.get("lambda_smoothing_alpha", 0.7))
             alpha = min(max(alpha, 0.0), 1.0)
             diagnostics["smoothing"]["alpha"] = float(alpha)
-            applied = alpha * float(applied) + (1.0 - alpha) * float(self._last_lambda_applied)
+            applied = alpha * float(applied) + (1.0 - alpha) * float(
+                self._last_lambda_applied
+            )
         max_step = policy.get("lambda_max_step")
-        diagnostics["smoothing"]["max_step"] = None if max_step is None else float(max_step)
+        diagnostics["smoothing"]["max_step"] = (
+            None if max_step is None else float(max_step)
+        )
         if max_step is not None and self._last_lambda_applied is not None:
             step = abs(float(max_step))
             if step > 0:
                 delta = float(applied) - float(self._last_lambda_applied)
                 if abs(delta) > step:
-                    applied = float(self._last_lambda_applied) + step * (1.0 if delta > 0 else -1.0)
+                    applied = float(self._last_lambda_applied) + step * (
+                        1.0 if delta > 0 else -1.0
+                    )
         late_start = int(policy.get("late_u_bias_start_round", 0) or 0)
         late_strength = float(policy.get("late_u_bias_strength", 0.0) or 0.0)
         diagnostics["late_u_bias"] = {
@@ -898,7 +1156,9 @@ class Toolbox:
         }
         if late_strength > 0 and round_num >= late_start:
             late_strength = min(max(late_strength, 0.0), 1.0)
-            applied = (1.0 - late_strength) * float(applied) + late_strength * float(clamp_min)
+            applied = (1.0 - late_strength) * float(applied) + late_strength * float(
+                clamp_min
+            )
         applied = float(min(max(applied, clamp_min), clamp_max))
         diagnostics.update({"applied": float(applied), "rule": str(rule)})
         return {
@@ -931,25 +1191,49 @@ class Toolbox:
         }
         self._last_lambda_applied = float(applied)
         if hasattr(self.controller, "_append_trace"):
-            self.controller._append_trace({
-                "type": "lambda_policy_apply",
-                "round": int(round_num),
-                "applied": float(applied),
-                "rule": payload.get("rule"),
-                "base": payload.get("base"),
-                "bounds": payload.get("bounds"),
-                "policy_mode": str(policy.get("mode")),
-                "diagnostics": diagnostics if isinstance(diagnostics, dict) else None,
-            })
+            ts = self.training_state if isinstance(self.training_state, dict) else {}
+            u_hist = ts.get("train_u_median_history")
+            k_hist = ts.get("train_k_median_history")
+            ts_snapshot = {
+                "grad_probe_source": ts.get("grad_probe_source"),
+                "u_median_selected": ts.get("u_median_selected"),
+                "k_median_selected": ts.get("k_median_selected"),
+                "u_median_top": ts.get("u_median_top"),
+                "k_median_top": ts.get("k_median_top"),
+                "train_u_median_selected": ts.get("train_u_median_selected"),
+                "train_k_median_selected": ts.get("train_k_median_selected"),
+                "train_u_median_history": list(u_hist) if isinstance(u_hist, list) else [],
+                "train_k_median_history": list(k_hist) if isinstance(k_hist, list) else [],
+                "max_history_length": ts.get("max_history_length"),
+            }
+            self.controller._append_trace(
+                {
+                    "type": "lambda_policy_apply",
+                    "round": int(round_num),
+                    "applied": float(applied),
+                    "rule": payload.get("rule"),
+                    "base": payload.get("base"),
+                    "bounds": payload.get("bounds"),
+                    "policy_mode": str(policy.get("mode")),
+                    "diagnostics": diagnostics
+                    if isinstance(diagnostics, dict)
+                    else None,
+                    "training_state": ts_snapshot,
+                }
+            )
         return float(applied)
 
-    def _error_response(self, error_type: str, message: str, meta: Optional[Dict] = None) -> str:
-        return json.dumps({
-            "status": "error",
-            "error_type": error_type,
-            "message": message,
-            "meta": meta or {}
-        })
+    def _error_response(
+        self, error_type: str, message: str, meta: Optional[Dict] = None
+    ) -> str:
+        return json.dumps(
+            {
+                "status": "error",
+                "error_type": error_type,
+                "message": message,
+                "meta": meta or {},
+            }
+        )
 
     def _parse_response(self, response_str: str) -> Dict[str, Any]:
         """
@@ -966,25 +1250,21 @@ class Toolbox:
                 "status": "error",
                 "error_type": "ParseError",
                 "message": "Invalid JSON response",
-                "meta": {}
+                "meta": {},
             }
-        
+
         if not isinstance(parsed, dict):
             return {
                 "status": "error",
                 "error_type": "ParseError",
                 "message": "Response is not a dict",
-                "meta": {}
+                "meta": {},
             }
-        
+
         if "status" in parsed:
             return parsed
-        
-        return {
-            "status": "success",
-            "result": parsed,
-            "meta": {}
-        }
+
+        return {"status": "success", "result": parsed, "meta": {}}
 
     def precalculate_scores(self) -> None:
         """
@@ -996,7 +1276,9 @@ class Toolbox:
 
         print("Pre-calculating scores for all unlabeled samples...")
         cfg = getattr(self.controller, "config", None)
-        dataset = getattr(self.controller, 'dataset', None) or getattr(self.controller, 'full_dataset', None)
+        dataset = getattr(self.controller, "dataset", None) or getattr(
+            self.controller, "full_dataset", None
+        )
         if hasattr(self.strategy, "set_round"):
             self.strategy.set_round(self._current_round())
         if dataset is None:
@@ -1004,55 +1286,59 @@ class Toolbox:
             self.controller._last_score_precalc_error = {
                 "phase": "score_precalc",
                 "exception": "DatasetMissing",
-                "message": "Dataset not found in controller"
+                "message": "Dataset not found in controller",
             }
             if hasattr(self.controller, "_append_trace"):
-                self.controller._append_trace({
-                    "type": "ranking_degraded",
-                    "round": int(getattr(self.controller, "current_round", 0) or 0),
-                    "degraded": {
-                        "source": "toolbox",
-                        "reason_type": "dataset_missing",
-                        "policy": "no_scores"
+                self.controller._append_trace(
+                    {
+                        "type": "ranking_degraded",
+                        "round": int(getattr(self.controller, "current_round", 0) or 0),
+                        "degraded": {
+                            "source": "toolbox",
+                            "reason_type": "dataset_missing",
+                            "policy": "no_scores",
+                        },
                     }
-                })
+                )
             raise RuntimeError("Dataset not found in controller")
         try:
             u_norm, k_norm = self.strategy.calculate_scores(
                 self.model,
                 dataset,
                 self.controller.unlabeled_indices,
-                self.controller.labeled_indices
+                self.controller.labeled_indices,
             )
         except Exception as e:
             err = {
                 "phase": "score_precalc",
                 "exception": e.__class__.__name__,
-                "message": str(e)
+                "message": str(e),
             }
             self.last_score_error = dict(err)
             if hasattr(self.controller, "_last_score_precalc_error"):
                 self.controller._last_score_precalc_error = dict(err)
             self.current_scores = {}
             if hasattr(self.controller, "_append_trace"):
-                self.controller._append_trace({
-                    "type": "ranking_degraded",
-                    "round": int(getattr(self.controller, "current_round", 0) or 0),
-                    "degraded": {
-                        "source": "toolbox",
-                        "reason_type": "score_precalc_failed",
-                        "policy": "no_scores",
-                        "exception": e.__class__.__name__,
-                        "message": str(e)
+                self.controller._append_trace(
+                    {
+                        "type": "ranking_degraded",
+                        "round": int(getattr(self.controller, "current_round", 0) or 0),
+                        "degraded": {
+                            "source": "toolbox",
+                            "reason_type": "score_precalc_failed",
+                            "policy": "no_scores",
+                            "exception": e.__class__.__name__,
+                            "message": str(e),
+                        },
                     }
-                })
+                )
             raise
 
         self.current_scores = {}
         for i, idx in enumerate(self.controller.unlabeled_indices):
             self.current_scores[str(idx)] = {
-                'U': float(u_norm[i]),
-                'K': float(k_norm[i])
+                "U": float(u_norm[i]),
+                "K": float(k_norm[i]),
             }
         print("Score calculation completed.")
 
@@ -1065,50 +1351,73 @@ class Toolbox:
             raise RuntimeError("PermissionDenied: get_system_status")
         try:
             t = len(self.controller.labeled_indices)
-            dataset = getattr(self.controller, 'dataset', None) or getattr(self.controller, 'full_dataset', None)
+            dataset = getattr(self.controller, "dataset", None) or getattr(
+                self.controller, "full_dataset", None
+            )
             if dataset is None:
-                raise StateError("Dataset not found in controller", {"controller_type": type(self.controller).__name__})
+                raise StateError(
+                    "Dataset not found in controller",
+                    {"controller_type": type(self.controller).__name__},
+                )
             total = len(dataset)
-            total_budget = getattr(self.controller, 'config', None)
-            t_max = getattr(total_budget, 'TOTAL_BUDGET', None) if total_budget is not None else None
+            total_budget = getattr(self.controller, "config", None)
+            t_max = (
+                getattr(total_budget, "TOTAL_BUDGET", None)
+                if total_budget is not None
+                else None
+            )
             if t_max in (None, 0):
                 t_max = int(total * 0.1)
             if t_max == 0:
                 t_max = 1
-            
+
             progress = t / t_max
             policy = self._lambda_policy_config()
             if isinstance(policy, dict):
-                if self._check_permission("set_lambda") and self._require_explicit_lambda():
-                    payload = self._compute_policy_lambda_for_round(self._current_round(), policy)
+                if (
+                    self._check_permission("set_lambda")
+                    and self._require_explicit_lambda()
+                ):
+                    payload = self._compute_policy_lambda_for_round(
+                        self._current_round(), policy
+                    )
                     lambda_t = float(payload.get("applied"))
                 else:
                     lambda_t = self.apply_round_lambda_policy()
                     if lambda_t is None:
-                        raise RuntimeError("lambda_policy is enabled but apply_round_lambda_policy returned None")
+                        raise RuntimeError(
+                            "lambda_policy is enabled but apply_round_lambda_policy returned None"
+                        )
             else:
                 lambda_t = AgentThresholds.calculate_lambda_t(progress, self.alpha)
-            late_stage_ratio = float(self._agent_threshold("LATE_STAGE_RATIO", getattr(AgentThresholds, "LATE_STAGE_RATIO", 0.2)))
-            
-            last_miou = self.training_state.get('last_miou', 0.0)
-            prev_miou = self.training_state.get('prev_miou', 0.0)
+            late_stage_ratio = float(
+                self._agent_threshold(
+                    "LATE_STAGE_RATIO",
+                    getattr(AgentThresholds, "LATE_STAGE_RATIO", 0.2),
+                )
+            )
+
+            last_miou = self.training_state.get("last_miou", 0.0)
+            prev_miou = self.training_state.get("prev_miou", 0.0)
             miou_delta = last_miou - prev_miou
-            
+
             if np.isnan(miou_delta) or np.isinf(miou_delta):
                 raise RuntimeError("miou_delta is NaN/Inf")
-            
-            rollback_flag = self.training_state.get('rollback_flag', False)
-            rollback_mode = self.training_state.get('rollback_mode', None)
-            rollback_threshold = self.training_state.get('rollback_threshold', None)
-            k_definition = self.training_state.get('k_definition', None)
+
+            rollback_flag = self.training_state.get("rollback_flag", False)
+            rollback_mode = self.training_state.get("rollback_mode", None)
+            rollback_threshold = self.training_state.get("rollback_threshold", None)
+            k_definition = self.training_state.get("k_definition", None)
             remaining_budget = max(0, t_max - t)
-            
+
             status = {
                 "current_labeled_count": t,
                 "total_budget": t_max,
                 "progress_ratio": round(progress, 4),
                 "lambda_t": round(lambda_t, 4),
-                "stage_description": "Early Stage" if progress < (1 - late_stage_ratio) else ("Late Stage" if progress > late_stage_ratio else "Middle Stage"),
+                "stage_description": "Early Stage"
+                if progress < (1 - late_stage_ratio)
+                else ("Late Stage" if progress > late_stage_ratio else "Middle Stage"),
                 "last_miou": round(last_miou, 4),
                 "prev_miou": round(prev_miou, 4),
                 "miou_delta": round(miou_delta, 4),
@@ -1117,14 +1426,24 @@ class Toolbox:
                 "rollback_threshold": rollback_threshold,
                 "k_definition": k_definition,
                 "remaining_budget": int(remaining_budget),
-                "grad_train_val_cos_mean": self.training_state.get("grad_train_val_cos_mean"),
-                "grad_train_val_cos_min": self.training_state.get("grad_train_val_cos_min"),
-                "grad_train_val_cos_max": self.training_state.get("grad_train_val_cos_max"),
-                "grad_train_val_cos_last": self.training_state.get("grad_train_val_cos_last"),
-                "grad_train_val_cos_neg_rate": self.training_state.get("grad_train_val_cos_neg_rate"),
+                "grad_train_val_cos_mean": self.training_state.get(
+                    "grad_train_val_cos_mean"
+                ),
+                "grad_train_val_cos_min": self.training_state.get(
+                    "grad_train_val_cos_min"
+                ),
+                "grad_train_val_cos_max": self.training_state.get(
+                    "grad_train_val_cos_max"
+                ),
+                "grad_train_val_cos_last": self.training_state.get(
+                    "grad_train_val_cos_last"
+                ),
+                "grad_train_val_cos_neg_rate": self.training_state.get(
+                    "grad_train_val_cos_neg_rate"
+                ),
                 "overfit_risk": self.training_state.get("overfit_risk"),
             }
-            
+
             meta = {
                 "schema_version": self.SCHEMA_VERSION,
                 "observation_contract": {
@@ -1144,15 +1463,45 @@ class Toolbox:
                     ],
                 },
                 "overfit_thresholds": {
-                    "tvc_warn": float(self._agent_threshold("OVERFIT_TVC_WARN", getattr(AgentThresholds, "OVERFIT_TVC_WARN", 0.0))),
-                    "tvc_severe": float(self._agent_threshold("OVERFIT_TVC_SEVERE", getattr(AgentThresholds, "OVERFIT_TVC_SEVERE", 0.0))),
-                    "lambda_cap_warn": float(self._agent_threshold("OVERFIT_LAMBDA_CAP_WARN", getattr(AgentThresholds, "OVERFIT_LAMBDA_CAP_WARN", 0.0))),
-                    "lambda_cap_severe": float(self._agent_threshold("OVERFIT_LAMBDA_CAP_SEVERE", getattr(AgentThresholds, "OVERFIT_LAMBDA_CAP_SEVERE", 0.0))),
-                    "query_ratio_warn": float(self._agent_threshold("OVERFIT_QUERY_RATIO_WARN", getattr(AgentThresholds, "OVERFIT_QUERY_RATIO_WARN", 0.0))),
-                    "query_ratio_severe": float(self._agent_threshold("OVERFIT_QUERY_RATIO_SEVERE", getattr(AgentThresholds, "OVERFIT_QUERY_RATIO_SEVERE", 0.0))),
+                    "tvc_warn": float(
+                        self._agent_threshold(
+                            "OVERFIT_TVC_WARN",
+                            getattr(AgentThresholds, "OVERFIT_TVC_WARN", 0.0),
+                        )
+                    ),
+                    "tvc_severe": float(
+                        self._agent_threshold(
+                            "OVERFIT_TVC_SEVERE",
+                            getattr(AgentThresholds, "OVERFIT_TVC_SEVERE", 0.0),
+                        )
+                    ),
+                    "lambda_cap_warn": float(
+                        self._agent_threshold(
+                            "OVERFIT_LAMBDA_CAP_WARN",
+                            getattr(AgentThresholds, "OVERFIT_LAMBDA_CAP_WARN", 0.0),
+                        )
+                    ),
+                    "lambda_cap_severe": float(
+                        self._agent_threshold(
+                            "OVERFIT_LAMBDA_CAP_SEVERE",
+                            getattr(AgentThresholds, "OVERFIT_LAMBDA_CAP_SEVERE", 0.0),
+                        )
+                    ),
+                    "query_ratio_warn": float(
+                        self._agent_threshold(
+                            "OVERFIT_QUERY_RATIO_WARN",
+                            getattr(AgentThresholds, "OVERFIT_QUERY_RATIO_WARN", 0.0),
+                        )
+                    ),
+                    "query_ratio_severe": float(
+                        self._agent_threshold(
+                            "OVERFIT_QUERY_RATIO_SEVERE",
+                            getattr(AgentThresholds, "OVERFIT_QUERY_RATIO_SEVERE", 0.0),
+                        )
+                    ),
                 },
             }
-            
+
             return self._success_response(status, meta)
         except StateError as e:
             raise RuntimeError(f"{e.error_type}: {str(e)}")
@@ -1170,19 +1519,30 @@ class Toolbox:
             permissions: Dict[str, bool] - Key为工具名，Value为是否允许
         """
         # Setter 类默认为 False (需显式开启)
-        setter_keys = {"set_lambda", "set_query_size", "set_epochs_per_round", "set_alpha"}
+        setter_keys = {
+            "set_lambda",
+            "set_query_size",
+            "set_epochs_per_round",
+            "set_alpha",
+        }
         # Getter 类默认为 True (需显式关闭)
-        getter_keys = {"get_top_k_samples", "get_sample_details", "get_score_distribution", "get_system_status", "finalize_selection"}
-        
+        getter_keys = {
+            "get_top_k_samples",
+            "get_sample_details",
+            "get_score_distribution",
+            "get_system_status",
+            "finalize_selection",
+        }
+
         valid_keys = setter_keys | getter_keys
-        
+
         # 重置为默认状态
         self.control_permissions = {}
         for k in setter_keys:
             self.control_permissions[k] = False
         for k in getter_keys:
             self.control_permissions[k] = True
-            
+
         # 应用用户配置
         for key, value in (permissions or {}).items():
             if key in valid_keys:
@@ -1206,14 +1566,18 @@ class Toolbox:
         if isinstance(policy, dict):
             v = self.apply_round_lambda_policy()
             if v is None:
-                raise RuntimeError("lambda_policy is enabled but apply_round_lambda_policy returned None")
+                raise RuntimeError(
+                    "lambda_policy is enabled but apply_round_lambda_policy returned None"
+                )
             return float(v)
         try:
             labeled = len(getattr(self.controller, "labeled_indices", []) or [])
-            dataset = getattr(self.controller, 'dataset', None) or getattr(self.controller, 'full_dataset', None)
+            dataset = getattr(self.controller, "dataset", None) or getattr(
+                self.controller, "full_dataset", None
+            )
             total = len(dataset) if dataset is not None else 0
-            cfg = getattr(self.controller, 'config', None)
-            t_max = getattr(cfg, 'TOTAL_BUDGET', None) if cfg is not None else None
+            cfg = getattr(self.controller, "config", None)
+            t_max = getattr(cfg, "TOTAL_BUDGET", None) if cfg is not None else None
             if t_max in (None, 0):
                 t_max = int(total * 0.1) if total > 0 else 0
             if t_max == 0:
@@ -1223,13 +1587,15 @@ class Toolbox:
         except Exception:
             return 0.5
 
-    def get_candidate_samples(self, top_k: int = 10, sort_by: str = 'U', lambda_param: Optional[float] = None) -> str:
+    def get_candidate_samples(
+        self, top_k: int = 10, sort_by: str = "U", lambda_param: Optional[float] = None
+    ) -> str:
         """
         Tool: 获取候选样本列表（已弃用，请使用 get_top_k_samples）
         Args:
             top_k: 返回前 K 个
             sort_by: 'U' (Uncertainty), 'K' (Knowledge), 'Hybrid' (Legacy, defaults to lambda=0.5)
-            lambda_param: float (0.0 - 1.0). If provided, overrides sort_by. 
+            lambda_param: float (0.0 - 1.0). If provided, overrides sort_by.
                           Score = (1 - lambda) * U + lambda * K
         """
         # Determine lambda
@@ -1239,40 +1605,46 @@ class Toolbox:
         elif lambda_param is not None:
             final_lambda = float(lambda_param)
         else:
-            if sort_by == 'U':
+            if sort_by == "U":
                 final_lambda = 0.0
-            elif sort_by == 'K':
+            elif sort_by == "K":
                 final_lambda = 1.0
-            elif sort_by == 'Hybrid':
+            elif sort_by == "Hybrid":
                 final_lambda = 0.5
             else:
                 final_lambda = 0.5
-                
+
         # 将 scores 转为 list 用于排序
         score_list = []
         for idx, scores in self.current_scores.items():
-            item = {'id': idx, 'U': scores['U'], 'K': scores['K']}
+            item = {"id": idx, "U": scores["U"], "K": scores["K"]}
             # Score = (1 - lambda) * U + lambda * K
-            item['score'] = (1 - final_lambda) * scores['U'] + final_lambda * scores['K']
+            item["score"] = (1 - final_lambda) * scores["U"] + final_lambda * scores[
+                "K"
+            ]
             score_list.append(item)
-            
+
         # 降序排列
-        score_list.sort(key=lambda x: x['score'], reverse=True)
-        
-        candidates = score_list[:int(top_k)]
-        self.candidates_cache = candidates # 缓存，供后续选择验证
+        score_list.sort(key=lambda x: x["score"], reverse=True)
+
+        candidates = score_list[: int(top_k)]
+        self.candidates_cache = candidates  # 缓存，供后续选择验证
         meta = {
-            'schema_version': self.SCHEMA_VERSION,
-            'deprecated': True,
-            'replacement': 'get_top_k_samples'
+            "schema_version": self.SCHEMA_VERSION,
+            "deprecated": True,
+            "replacement": "get_top_k_samples",
         }
         return self._success_response(candidates, meta)
 
-    def get_top_k_samples(self, k: int = 5, lambda_param: Optional[float] = None) -> str:
+    def get_top_k_samples(
+        self, k: int = 5, lambda_param: Optional[float] = None
+    ) -> str:
         if not self._check_permission("get_top_k_samples"):
             raise RuntimeError("PermissionDenied: get_top_k_samples")
         if not self.current_scores:
-            raise RuntimeError("No scores available: call precalculate_scores() before get_top_k_samples")
+            raise RuntimeError(
+                "No scores available: call precalculate_scores() before get_top_k_samples"
+            )
 
         if not self._check_permission("set_lambda"):
             final_lambda = self._default_lambda()
@@ -1288,15 +1660,27 @@ class Toolbox:
                     )
                 final_lambda = float(existing)
 
-        clamp_min = float(self._agent_threshold("LAMBDA_CLAMP_MIN", AgentConstraints.LAMBDA_MIN))
-        clamp_max = float(self._agent_threshold("LAMBDA_CLAMP_MAX", AgentConstraints.LAMBDA_MAX))
+        clamp_min = float(
+            self._agent_threshold("LAMBDA_CLAMP_MIN", AgentConstraints.LAMBDA_MIN)
+        )
+        clamp_max = float(
+            self._agent_threshold("LAMBDA_CLAMP_MAX", AgentConstraints.LAMBDA_MAX)
+        )
         if not self._check_permission("set_lambda"):
             policy = self._lambda_policy_config()
             if isinstance(policy, dict):
-                payload = self._compute_policy_lambda_for_round(self._current_round(), policy)
+                payload = self._compute_policy_lambda_for_round(
+                    self._current_round(), policy
+                )
                 bounds = payload.get("bounds")
-                if not isinstance(bounds, dict) or ("min" not in bounds) or ("max" not in bounds):
-                    raise RuntimeError("lambda_policy bounds missing: expected dict with min/max")
+                if (
+                    not isinstance(bounds, dict)
+                    or ("min" not in bounds)
+                    or ("max" not in bounds)
+                ):
+                    raise RuntimeError(
+                        "lambda_policy bounds missing: expected dict with min/max"
+                    )
                 b_min = float(bounds.get("min"))
                 b_max = float(bounds.get("max"))
                 if b_min > b_max:
@@ -1316,20 +1700,22 @@ class Toolbox:
 
         items = []
         for idx, scores in self.current_scores.items():
-            u = float(scores['U'])
-            k_score = float(scores['K'])
+            u = float(scores["U"])
+            k_score = float(scores["K"])
             s = (1 - float(final_lambda)) * u + float(final_lambda) * k_score
-            items.append({'id': idx, 'U_score': u, 'K_score': k_score, 'final_score': float(s)})
+            items.append(
+                {"id": idx, "U_score": u, "K_score": k_score, "final_score": float(s)}
+            )
 
-        items.sort(key=lambda x: x['final_score'], reverse=True)
-        result = items[:int(k)]
+        items.sort(key=lambda x: x["final_score"], reverse=True)
+        result = items[: int(k)]
         self.candidates_cache = result
         meta = {
-            'schema_version': self.SCHEMA_VERSION,
-            'lambda_param': float(final_lambda),
-            'lambda_before_clamp': float(lambda_before),
-            'lambda_clamped': bool(lambda_clamped),
-            'k': int(k),
+            "schema_version": self.SCHEMA_VERSION,
+            "lambda_param": float(final_lambda),
+            "lambda_before_clamp": float(lambda_before),
+            "lambda_clamped": bool(lambda_clamped),
+            "k": int(k),
         }
         return self._success_response(result, meta)
 
@@ -1359,15 +1745,28 @@ class Toolbox:
         suggested_lambda = None
         delta_from_suggested = None
         exceeds_suggested_range = None
-        t = len(getattr(self.controller, 'labeled_indices', []) or [])
-        total_budget = int(self.training_state.get('total_budget') or 0)
+        t = len(getattr(self.controller, "labeled_indices", []) or [])
+        total_budget = int(self.training_state.get("total_budget") or 0)
         if total_budget <= 0:
-            total_budget = int(getattr(getattr(self.controller, 'config', None), 'TOTAL_BUDGET', 0) or 0)
+            total_budget = int(
+                getattr(getattr(self.controller, "config", None), "TOTAL_BUDGET", 0)
+                or 0
+            )
         if total_budget > 0:
             progress = float(t) / float(max(1, total_budget))
-            suggested_lambda = float(AgentThresholds.calculate_lambda_t(progress, self.alpha))
+            suggested_lambda = float(
+                AgentThresholds.calculate_lambda_t(progress, self.alpha)
+            )
             delta_from_suggested = float(v_req) - float(suggested_lambda)
-            exceeds_suggested_range = bool(abs(delta_from_suggested) > float(self._agent_threshold("LAMBDA_ADJUST_RANGE", getattr(AgentThresholds, "LAMBDA_ADJUST_RANGE", 0.0))))
+            exceeds_suggested_range = bool(
+                abs(delta_from_suggested)
+                > float(
+                    self._agent_threshold(
+                        "LAMBDA_ADJUST_RANGE",
+                        getattr(AgentThresholds, "LAMBDA_ADJUST_RANGE", 0.0),
+                    )
+                )
+            )
 
         if v_req < AgentConstraints.LAMBDA_MIN:
             raise ValueError(f"lambda {v_req} < min {AgentConstraints.LAMBDA_MIN}")
@@ -1377,14 +1776,23 @@ class Toolbox:
         v = float(v_req)
         clamped = False
         clamp_reason = None
-        clamp_min = float(self._agent_threshold("LAMBDA_CLAMP_MIN", AgentConstraints.LAMBDA_MIN))
-        clamp_max = float(self._agent_threshold("LAMBDA_CLAMP_MAX", AgentConstraints.LAMBDA_MAX))
+        clamp_min = float(
+            self._agent_threshold("LAMBDA_CLAMP_MIN", AgentConstraints.LAMBDA_MIN)
+        )
+        clamp_max = float(
+            self._agent_threshold("LAMBDA_CLAMP_MAX", AgentConstraints.LAMBDA_MAX)
+        )
         policy = self._lambda_policy_config()
         in_uncertainty_phase = False
-        if isinstance(policy, dict) and str(policy.get("mode") or "") == "warmup_risk_closed_loop":
+        if (
+            isinstance(policy, dict)
+            and str(policy.get("mode") or "") == "warmup_risk_closed_loop"
+        ):
             try:
                 r1_lambda = float(policy.get("r1_lambda", 0.0))
-                uncertainty_only_rounds = int(policy.get("uncertainty_only_rounds", 0) or 0)
+                uncertainty_only_rounds = int(
+                    policy.get("uncertainty_only_rounds", 0) or 0
+                )
                 round_num = int(getattr(self.controller, "current_round", 0) or 0)
                 if round_num > 0 and round_num <= max(1, uncertainty_only_rounds):
                     in_uncertainty_phase = True
@@ -1400,8 +1808,19 @@ class Toolbox:
             clamped = True
             clamp_reason = f"policy_clamp_max:{clamp_max}"
 
-        adjust_range = float(self._agent_threshold("LAMBDA_ADJUST_RANGE", getattr(AgentThresholds, "LAMBDA_ADJUST_RANGE", 0.0) or 0.0) or 0.0)
-        if (not in_uncertainty_phase) and suggested_lambda is not None and np.isfinite(float(suggested_lambda)) and float(adjust_range) > 0:
+        adjust_range = float(
+            self._agent_threshold(
+                "LAMBDA_ADJUST_RANGE",
+                getattr(AgentThresholds, "LAMBDA_ADJUST_RANGE", 0.0) or 0.0,
+            )
+            or 0.0
+        )
+        if (
+            (not in_uncertainty_phase)
+            and suggested_lambda is not None
+            and np.isfinite(float(suggested_lambda))
+            and float(adjust_range) > 0
+        ):
             lo = float(suggested_lambda) - float(adjust_range)
             hi = float(suggested_lambda) + float(adjust_range)
             if lo > hi:
@@ -1445,7 +1864,9 @@ class Toolbox:
             overfit_guard["overfit_risk"] = risk
             overfit_guard["rollback_flag"] = rollback_flag
 
-        signals_available = (tvc_last is not None) or (tvc_min is not None) or (risk is not None)
+        signals_available = (
+            (tvc_last is not None) or (tvc_min is not None) or (risk is not None)
+        )
         if signals_available:
             severe = False
             risk_hit = False
@@ -1458,27 +1879,65 @@ class Toolbox:
             try:
                 policy_cfg = self._lambda_policy_config() or {}
                 risk_policy = self._risk_policy_config() or {}
-                tvc_key = str(policy_cfg.get("severe_tvc_key") or "grad_train_val_cos_last").strip() or "grad_train_val_cos_last"
+                tvc_key = (
+                    str(
+                        policy_cfg.get("severe_tvc_key") or "grad_train_val_cos_last"
+                    ).strip()
+                    or "grad_train_val_cos_last"
+                )
                 tvc_val = self.training_state.get(tvc_key)
-                risk_trigger = str(policy_cfg.get("risk_trigger", risk_policy.get("trigger", "")) or "").strip().lower()
-                risk_ci_window = policy_cfg.get("risk_ci_window", risk_policy.get("window"))
-                risk_ci_quantile = policy_cfg.get("risk_ci_quantile", risk_policy.get("quantile"))
-                risk_ci_min_samples = policy_cfg.get("risk_ci_min_samples", risk_policy.get("min_samples", 3))
-                logic = str(policy_cfg.get("severe_logic", "or") or "or").strip().lower()
+                risk_trigger = (
+                    str(
+                        policy_cfg.get("risk_trigger", risk_policy.get("trigger", ""))
+                        or ""
+                    )
+                    .strip()
+                    .lower()
+                )
+                risk_ci_window = policy_cfg.get(
+                    "risk_ci_window", risk_policy.get("window")
+                )
+                risk_ci_quantile = policy_cfg.get(
+                    "risk_ci_quantile", risk_policy.get("quantile")
+                )
+                risk_ci_min_samples = policy_cfg.get(
+                    "risk_ci_min_samples", risk_policy.get("min_samples", 3)
+                )
+                logic = (
+                    str(policy_cfg.get("severe_logic", "or") or "or").strip().lower()
+                )
 
                 overfit_guard["tvc_key"] = tvc_key
                 overfit_guard["tvc_value"] = None if tvc_val is None else float(tvc_val)
                 overfit_guard["risk_trigger"] = risk_trigger
                 overfit_guard["severe_logic"] = logic
 
-                risk_hi = float(self._agent_threshold("OVERFIT_RISK_HI", getattr(AgentThresholds, "OVERFIT_RISK_HI", 0.0)) or 0.0)
-                tvc_min_hi = float(self._agent_threshold("OVERFIT_TVC_MIN_HI", getattr(AgentThresholds, "OVERFIT_TVC_MIN_HI", 0.0)) or 0.0)
+                risk_hi = float(
+                    self._agent_threshold(
+                        "OVERFIT_RISK_HI",
+                        getattr(AgentThresholds, "OVERFIT_RISK_HI", 0.0),
+                    )
+                    or 0.0
+                )
+                tvc_min_hi = float(
+                    self._agent_threshold(
+                        "OVERFIT_TVC_MIN_HI",
+                        getattr(AgentThresholds, "OVERFIT_TVC_MIN_HI", 0.0),
+                    )
+                    or 0.0
+                )
 
                 if risk is not None:
                     if risk_trigger == "ci":
-                        history = self._get_signal_history("overfit_risk", window=risk_ci_window)
+                        history = self._get_signal_history(
+                            "overfit_risk", window=risk_ci_window
+                        )
                         if len(history) >= int(risk_ci_min_samples or 0):
-                            q = float(risk_ci_quantile if risk_ci_quantile is not None else 0.2)
+                            q = float(
+                                risk_ci_quantile
+                                if risk_ci_quantile is not None
+                                else 0.2
+                            )
                             q = min(max(q, 0.0), 1.0)
                             thresh = float(np.quantile(history, 1.0 - q))
                             risk_hit = float(risk) >= float(thresh)
@@ -1489,9 +1948,15 @@ class Toolbox:
 
                 if tvc_val is not None:
                     if risk_trigger == "ci":
-                        history = self._get_signal_history(tvc_key, window=risk_ci_window)
+                        history = self._get_signal_history(
+                            tvc_key, window=risk_ci_window
+                        )
                         if len(history) >= int(risk_ci_min_samples or 0):
-                            q = float(risk_ci_quantile if risk_ci_quantile is not None else 0.2)
+                            q = float(
+                                risk_ci_quantile
+                                if risk_ci_quantile is not None
+                                else 0.2
+                            )
                             q = min(max(q, 0.0), 1.0)
                             thresh = float(np.quantile(history, q))
                             tvc_hit = float(tvc_val) <= float(thresh)
@@ -1516,17 +1981,52 @@ class Toolbox:
             overfit_guard["risk_hit"] = bool(risk_hit)
             overfit_guard["tvc_hit"] = bool(tvc_hit)
 
-            delta_down = float(self._agent_threshold("LAMBDA_DELTA_DOWN", getattr(AgentThresholds, "LAMBDA_DELTA_DOWN", 0.0)) or 0.0)
-            delta_up = float(self._agent_threshold("LAMBDA_DELTA_UP", getattr(AgentThresholds, "LAMBDA_DELTA_UP", 0.0)) or 0.0)
+            delta_down = float(
+                self._agent_threshold(
+                    "LAMBDA_DELTA_DOWN",
+                    getattr(AgentThresholds, "LAMBDA_DELTA_DOWN", 0.0),
+                )
+                or 0.0
+            )
+            delta_up = float(
+                self._agent_threshold(
+                    "LAMBDA_DELTA_UP", getattr(AgentThresholds, "LAMBDA_DELTA_UP", 0.0)
+                )
+                or 0.0
+            )
             allow_up = bool(
                 (overfit_guard.get("overfit_risk") is not None)
-                and float(overfit_guard.get("overfit_risk")) <= float(self._agent_threshold("OVERFIT_RISK_LO", getattr(AgentThresholds, "OVERFIT_RISK_LO", 0.0)) or 0.0)
-                and int(self._miou_low_gain_streak) >= int(self._agent_threshold("MIOU_LOW_GAIN_STREAK", getattr(AgentThresholds, "MIOU_LOW_GAIN_STREAK", 0)) or 0)
+                and float(overfit_guard.get("overfit_risk"))
+                <= float(
+                    self._agent_threshold(
+                        "OVERFIT_RISK_LO",
+                        getattr(AgentThresholds, "OVERFIT_RISK_LO", 0.0),
+                    )
+                    or 0.0
+                )
+                and int(self._miou_low_gain_streak)
+                >= int(
+                    self._agent_threshold(
+                        "MIOU_LOW_GAIN_STREAK",
+                        getattr(AgentThresholds, "MIOU_LOW_GAIN_STREAK", 0),
+                    )
+                    or 0
+                )
             )
 
-            cooling_rounds = int(self._agent_threshold("LAMBDA_DOWN_COOLING_ROUNDS", getattr(AgentThresholds, "LAMBDA_DOWN_COOLING_ROUNDS", 0) or 0) or 0)
+            cooling_rounds = int(
+                self._agent_threshold(
+                    "LAMBDA_DOWN_COOLING_ROUNDS",
+                    getattr(AgentThresholds, "LAMBDA_DOWN_COOLING_ROUNDS", 0) or 0,
+                )
+                or 0
+            )
             round_num = int(getattr(self.controller, "current_round", 0) or 0)
-            in_cooling = bool(round_num > 0 and (round_num - int(getattr(self, "_last_lambda_down_round", 0) or 0)) <= int(cooling_rounds))
+            in_cooling = bool(
+                round_num > 0
+                and (round_num - int(getattr(self, "_last_lambda_down_round", 0) or 0))
+                <= int(cooling_rounds)
+            )
             overfit_guard["cooling"] = bool(in_cooling)
 
             if rollback_flag and last is not None and float(v) > float(last):
@@ -1577,43 +2077,60 @@ class Toolbox:
             clamp_reason = clamp_reason or f"policy_clamp_max:{clamp_max}"
 
         self._last_lambda_applied = float(v)
-        self.control_state['lambda_override_round'] = float(v)
-        self.control_meta['lambda_override_round'] = {
-            'clamped': bool(clamped),
-            'clamp_reason': clamp_reason,
-            'suggested_lambda': suggested_lambda,
-            'delta_from_suggested': delta_from_suggested,
-            'suggested_adjust_range': float(self._agent_threshold("LAMBDA_ADJUST_RANGE", getattr(AgentThresholds, "LAMBDA_ADJUST_RANGE", 0.0))),
-            'exceeds_suggested_range': exceeds_suggested_range,
-            'overfit_guard': overfit_guard,
+        self.control_state["lambda_override_round"] = float(v)
+        self.control_meta["lambda_override_round"] = {
+            "clamped": bool(clamped),
+            "clamp_reason": clamp_reason,
+            "suggested_lambda": suggested_lambda,
+            "delta_from_suggested": delta_from_suggested,
+            "suggested_adjust_range": float(
+                self._agent_threshold(
+                    "LAMBDA_ADJUST_RANGE",
+                    getattr(AgentThresholds, "LAMBDA_ADJUST_RANGE", 0.0),
+                )
+            ),
+            "exceeds_suggested_range": exceeds_suggested_range,
+            "overfit_guard": overfit_guard,
         }
         if hasattr(self.controller, "_append_trace"):
-            self.controller._append_trace({
-                "type": "lambda_override",
-                "round": int(getattr(self.controller, "current_round", 0) or 0),
-                "scope": str(scope or "round"),
-                "applied": float(v),
-                "requested": float(v_req),
-                "suggested_lambda": suggested_lambda,
-                "delta_from_suggested": delta_from_suggested,
-                "suggested_adjust_range": float(self._agent_threshold("LAMBDA_ADJUST_RANGE", getattr(AgentThresholds, "LAMBDA_ADJUST_RANGE", 0.0))),
-                "exceeds_suggested_range": exceeds_suggested_range,
-                "clamped": bool(clamped),
-                "clamp_reason": clamp_reason,
-                "overfit_guard": overfit_guard,
-            })
+            self.controller._append_trace(
+                {
+                    "type": "lambda_override",
+                    "round": int(getattr(self.controller, "current_round", 0) or 0),
+                    "scope": str(scope or "round"),
+                    "applied": float(v),
+                    "requested": float(v_req),
+                    "suggested_lambda": suggested_lambda,
+                    "delta_from_suggested": delta_from_suggested,
+                    "suggested_adjust_range": float(
+                        self._agent_threshold(
+                            "LAMBDA_ADJUST_RANGE",
+                            getattr(AgentThresholds, "LAMBDA_ADJUST_RANGE", 0.0),
+                        )
+                    ),
+                    "exceeds_suggested_range": exceeds_suggested_range,
+                    "clamped": bool(clamped),
+                    "clamp_reason": clamp_reason,
+                    "overfit_guard": overfit_guard,
+                }
+            )
         payload = {
-            'status': 'success',
-            'applied': float(v),
-            'requested': float(v_req),
-            'scope': scope,
-            'clamped': bool(clamped),
-            'clamp_reason': clamp_reason,
-            'suggested_lambda': suggested_lambda,
-            'delta_from_suggested': delta_from_suggested,
-            'suggested_adjust_range': float(self._agent_threshold("LAMBDA_ADJUST_RANGE", getattr(AgentThresholds, "LAMBDA_ADJUST_RANGE", 0.0))),
-            'exceeds_suggested_range': exceeds_suggested_range,
-            'overfit_guard': overfit_guard,
+            "status": "success",
+            "applied": float(v),
+            "requested": float(v_req),
+            "scope": scope,
+            "clamped": bool(clamped),
+            "clamp_reason": clamp_reason,
+            "suggested_lambda": suggested_lambda,
+            "delta_from_suggested": delta_from_suggested,
+            "suggested_adjust_range": float(
+                self._agent_threshold(
+                    "LAMBDA_ADJUST_RANGE",
+                    getattr(AgentThresholds, "LAMBDA_ADJUST_RANGE", 0.0),
+                )
+            ),
+            "exceeds_suggested_range": exceeds_suggested_range,
+            "overfit_guard": overfit_guard,
         }
         return json.dumps(payload)
 
@@ -1621,12 +2138,14 @@ class Toolbox:
         if not self._check_permission("set_query_size"):
             raise RuntimeError("PermissionDenied: set_query_size")
         q = int(query_size)
-        total_budget = int(self.training_state.get('total_budget') or 0)
-        current_labeled = int(self.training_state.get('current_labeled_count') or 0)
+        total_budget = int(self.training_state.get("total_budget") or 0)
+        current_labeled = int(self.training_state.get("current_labeled_count") or 0)
         if total_budget <= 0:
             raise ValueError(f"Invalid total_budget in training_state: {total_budget}")
         if current_labeled < 0:
-            raise ValueError(f"Invalid current_labeled_count in training_state: {current_labeled}")
+            raise ValueError(
+                f"Invalid current_labeled_count in training_state: {current_labeled}"
+            )
         remaining = max(0, total_budget - current_labeled)
         if q < AgentConstraints.QUERY_SIZE_MIN:
             raise ValueError(f"query_size {q} < min {AgentConstraints.QUERY_SIZE_MIN}")
@@ -1646,26 +2165,28 @@ class Toolbox:
             "applied": False,
         }
 
-        self.control_state['query_size_round'] = q
-        self.control_meta['query_size_round'] = {
-            'clamped': bool(clamped),
-            'clamp_reason': clamp_reason,
-            'overfit_guard': overfit_guard,
+        self.control_state["query_size_round"] = q
+        self.control_meta["query_size_round"] = {
+            "clamped": bool(clamped),
+            "clamp_reason": clamp_reason,
+            "overfit_guard": overfit_guard,
         }
-        if hasattr(self.controller, 'config'):
+        if hasattr(self.controller, "config"):
             self.controller.config.QUERY_SIZE = int(q)
         payload = {
-            'status': 'success',
-            'applied': int(q),
-            'scope': scope,
-            'remaining_budget': int(remaining) if remaining is not None else None,
-            'clamped': bool(clamped),
-            'clamp_reason': clamp_reason,
-            'overfit_guard': overfit_guard,
+            "status": "success",
+            "applied": int(q),
+            "scope": scope,
+            "remaining_budget": int(remaining) if remaining is not None else None,
+            "clamped": bool(clamped),
+            "clamp_reason": clamp_reason,
+            "overfit_guard": overfit_guard,
         }
         return json.dumps(payload)
 
-    def set_epochs_per_round(self, epochs: Union[int, str], scope: str = "round") -> str:
+    def set_epochs_per_round(
+        self, epochs: Union[int, str], scope: str = "round"
+    ) -> str:
         if not self._check_permission("set_epochs_per_round"):
             raise RuntimeError("PermissionDenied: set_epochs_per_round")
         e = int(epochs)
@@ -1673,23 +2194,22 @@ class Toolbox:
             raise ValueError(f"epochs {e} < min {AgentConstraints.EPOCHS_MIN}")
         if e > AgentConstraints.EPOCHS_MAX:
             raise ValueError(f"epochs {e} > max {AgentConstraints.EPOCHS_MAX}")
-        self.control_state['epochs_round'] = e
-        self.control_meta['epochs_round'] = {
-            'clamped': False,
-            'clamp_reason': None
-        }
-        if hasattr(self.controller, 'config'):
+        self.control_state["epochs_round"] = e
+        self.control_meta["epochs_round"] = {"clamped": False, "clamp_reason": None}
+        if hasattr(self.controller, "config"):
             self.controller.config.EPOCHS_PER_ROUND = int(e)
         payload = {
-            'status': 'success',
-            'applied': int(e),
-            'scope': scope,
-            'clamped': False,
-            'clamp_reason': None
+            "status": "success",
+            "applied": int(e),
+            "scope": scope,
+            "clamped": False,
+            "clamp_reason": None,
         }
         return json.dumps(payload)
 
-    def get_score_distribution(self, n_bins: int = 10, quantiles: Optional[List[float]] = None) -> str:
+    def get_score_distribution(
+        self, n_bins: int = 10, quantiles: Optional[List[float]] = None
+    ) -> str:
         if not self._check_permission("get_score_distribution"):
             raise RuntimeError("PermissionDenied: get_score_distribution")
         if quantiles is None:
@@ -1699,55 +2219,71 @@ class Toolbox:
                 raise TypeError("quantiles must be a non-empty list")
             qts = quantiles
         if not self.current_scores:
-            raise RuntimeError("No scores available: call precalculate_scores() before get_score_distribution")
+            raise RuntimeError(
+                "No scores available: call precalculate_scores() before get_score_distribution"
+            )
         u_vals: List[float] = []
         k_vals: List[float] = []
         for v in self.current_scores.values():
-            u_vals.append(float(v['U']))
-            k_vals.append(float(v['K']))
+            u_vals.append(float(v["U"]))
+            k_vals.append(float(v["K"]))
         h_vals: List[float] = []
         for u, k in zip(u_vals, k_vals):
             h_vals.append((u + k) * 0.5)
         import numpy as np
+
         def _stats(arr: List[float]) -> Dict[str, Any]:
             a = np.asarray(arr, dtype=float)
             if a.size == 0:
-                return {'min': None, 'max': None, 'mean': None, 'std': None, 'quantiles': {}}
+                return {
+                    "min": None,
+                    "max": None,
+                    "mean": None,
+                    "std": None,
+                    "quantiles": {},
+                }
             qs = {str(p): float(np.quantile(a, p)) for p in qts}
-            return {'min': float(np.min(a)), 'max': float(np.max(a)), 'mean': float(np.mean(a)), 'std': float(np.std(a)), 'quantiles': qs}
+            return {
+                "min": float(np.min(a)),
+                "max": float(np.max(a)),
+                "mean": float(np.mean(a)),
+                "std": float(np.std(a)),
+                "quantiles": qs,
+            }
+
         def _hist(arr: List[float]) -> Dict[str, Any]:
             a = np.asarray(arr, dtype=float)
             if a.size == 0:
-                return {'bins': [], 'counts': []}
+                return {"bins": [], "counts": []}
             counts, bins = np.histogram(a, bins=int(n_bins))
-            return {'bins': [float(x) for x in bins.tolist()], 'counts': [int(x) for x in counts.tolist()]}
-        n_unlabeled = int(len(getattr(self.controller, 'unlabeled_indices', []) or []))
+            return {
+                "bins": [float(x) for x in bins.tolist()],
+                "counts": [int(x) for x in counts.tolist()],
+            }
+
+        n_unlabeled = int(len(getattr(self.controller, "unlabeled_indices", []) or []))
         payload = {
-            'U_stats': _stats(u_vals),
-            'K_stats': _stats(k_vals),
-            'H_stats': _stats(h_vals),
-            'histograms': {
-                'U': _hist(u_vals),
-                'K': _hist(k_vals),
-                'H': _hist(h_vals)
-            },
-            'n_unlabeled': n_unlabeled
+            "U_stats": _stats(u_vals),
+            "K_stats": _stats(k_vals),
+            "H_stats": _stats(h_vals),
+            "histograms": {"U": _hist(u_vals), "K": _hist(k_vals), "H": _hist(h_vals)},
+            "n_unlabeled": n_unlabeled,
         }
         meta = {
-            'schema_version': self.SCHEMA_VERSION,
-            'n_bins': int(n_bins),
-            'quantiles': qts
+            "schema_version": self.SCHEMA_VERSION,
+            "n_bins": int(n_bins),
+            "quantiles": qts,
         }
         return self._success_response(payload, meta)
 
     def _to_numpy(self, value: Any) -> np.ndarray:
-        if hasattr(value, 'detach'):
+        if hasattr(value, "detach"):
             return value.detach().cpu().numpy()
         return np.asarray(value)
 
     def _get_sample_metadata(self, idx: int) -> Dict[str, Any]:
         info: Dict[str, Any] = {}
-        dataset = getattr(self.controller, 'dataset', None)
+        dataset = getattr(self.controller, "dataset", None)
         if dataset is None:
             return info
         if idx < 0 or idx >= len(dataset):
@@ -1778,42 +2314,39 @@ class Toolbox:
         else:
             image = item
 
-        if name is None and hasattr(dataset, 'images'):
+        if name is None and hasattr(dataset, "images"):
             try:
                 name = dataset.images[idx]
             except (IndexError, KeyError, TypeError) as ex:
                 name = None
 
         if name is not None:
-            info['image_name'] = name
+            info["image_name"] = name
 
-        if hasattr(dataset, 'split'):
-            info['split'] = dataset.split
+        if hasattr(dataset, "split"):
+            info["split"] = dataset.split
 
         if image is not None:
             img_np = self._to_numpy(image)
-            info['image_mean'] = float(np.mean(img_np))
-            info['image_std'] = float(np.std(img_np))
+            info["image_mean"] = float(np.mean(img_np))
+            info["image_std"] = float(np.std(img_np))
 
         if mask is not None:
             mask_np = self._to_numpy(mask)
-            info['mask_positive_ratio'] = float(np.mean(mask_np > 0))
+            info["mask_positive_ratio"] = float(np.mean(mask_np > 0))
 
-        info['in_labeled_pool'] = idx in self.controller.labeled_indices
-        info['in_unlabeled_pool'] = idx in self.controller.unlabeled_indices
+        info["in_labeled_pool"] = idx in self.controller.labeled_indices
+        info["in_unlabeled_pool"] = idx in self.controller.unlabeled_indices
         return info
 
     def get_sample_details(self, sample_id: Union[int, str]) -> str:
         if not self._check_permission("get_sample_details"):
             raise RuntimeError("PermissionDenied: get_sample_details")
         sid = str(sample_id)
-        info = {'id': sid}
+        info = {"id": sid}
         if sid in self.current_scores:
             scores = self.current_scores[sid]
-            info.update({
-                'U_score': scores['U'],
-                'K_score': scores['K']
-            })
+            info.update({"U_score": scores["U"], "K_score": scores["K"]})
         try:
             idx = int(sample_id)
         except (ValueError, TypeError) as ex:
@@ -1821,10 +2354,12 @@ class Toolbox:
         if idx is not None:
             info.update(self._get_sample_metadata(idx))
         info["raw_image_access"] = False
-        return json.dumps({'status': 'success', 'result': info})
+        return json.dumps({"status": "success", "result": info})
 
     def get_training_status(self) -> str:
-        return json.dumps({'status': 'success', 'result': {'training_status': self.training_state}})
+        return json.dumps(
+            {"status": "success", "result": {"training_status": self.training_state}}
+        )
 
     def set_hyperparameter(self, alpha: Union[float, str]) -> str:
         if not self._check_permission("set_alpha"):
@@ -1836,41 +2371,63 @@ class Toolbox:
             raise ValueError(f"alpha {alpha_val} > max {AgentConstraints.ALPHA_MAX}")
 
         self.alpha = float(alpha_val)
-        if hasattr(self.strategy, 'alpha'):
+        if hasattr(self.strategy, "alpha"):
             self.strategy.alpha = float(alpha_val)
-        if hasattr(self.controller, 'config') and hasattr(self.controller.config, 'ALPHA'):
+        if hasattr(self.controller, "config") and hasattr(
+            self.controller.config, "ALPHA"
+        ):
             self.controller.config.ALPHA = float(alpha_val)
-        self.control_state['alpha'] = float(alpha_val)
-        self.control_meta['alpha'] = {
-            'clamped': False,
-            'clamp_reason': None
-        }
-        return json.dumps({'status': 'success', 'alpha': self.alpha, 'clamped': False, 'clamp_reason': None})
+        self.control_state["alpha"] = float(alpha_val)
+        self.control_meta["alpha"] = {"clamped": False, "clamp_reason": None}
+        return json.dumps(
+            {
+                "status": "success",
+                "alpha": self.alpha,
+                "clamped": False,
+                "clamp_reason": None,
+            }
+        )
 
     def set_training_state(self, state: Dict[str, Any]) -> None:
         if not isinstance(state, dict):
             raise TypeError("training_state must be a dict")
         for field in (
-            'last_miou',
-            'prev_miou',
-            'rollback_flag',
-            'current_labeled_count',
-            'total_budget',
+            "last_miou",
+            "prev_miou",
+            "rollback_flag",
+            "current_labeled_count",
+            "total_budget",
         ):
             if field not in state:
                 raise KeyError(f"training_state missing required field: {field}")
         self.training_state = dict(state)
-        for key in ("overfit_risk", "grad_train_val_cos_min", "grad_train_val_cos_last"):
+        for key in (
+            "overfit_risk",
+            "grad_train_val_cos_min",
+            "grad_train_val_cos_last",
+        ):
             self._append_signal_history(key, self.training_state.get(key))
         try:
             miou_delta = self.training_state.get("miou_delta")
             overfit_risk = self.training_state.get("overfit_risk")
             low_gain = False
-            low_gain_thresh = float(self._agent_threshold("MIOU_LOW_GAIN_THRESH", getattr(AgentThresholds, "MIOU_LOW_GAIN_THRESH", 0.0) or 0.0) or 0.0)
+            low_gain_thresh = float(
+                self._agent_threshold(
+                    "MIOU_LOW_GAIN_THRESH",
+                    getattr(AgentThresholds, "MIOU_LOW_GAIN_THRESH", 0.0) or 0.0,
+                )
+                or 0.0
+            )
             if miou_delta is not None and float(miou_delta) <= float(low_gain_thresh):
                 low_gain = True
             low_risk = False
-            risk_lo = float(self._agent_threshold("OVERFIT_RISK_LO", getattr(AgentThresholds, "OVERFIT_RISK_LO", 0.0) or 0.0) or 0.0)
+            risk_lo = float(
+                self._agent_threshold(
+                    "OVERFIT_RISK_LO",
+                    getattr(AgentThresholds, "OVERFIT_RISK_LO", 0.0) or 0.0,
+                )
+                or 0.0
+            )
             if overfit_risk is not None and float(overfit_risk) <= float(risk_lo):
                 low_risk = True
             if low_gain and low_risk:
@@ -1882,7 +2439,9 @@ class Toolbox:
             self._miou_low_gain_streak = 0
             self.training_state["miou_low_gain_streak"] = 0
 
-    def finalize_selection(self, sample_ids: List[str], reason: str, thought: Optional[str] = None) -> str:
+    def finalize_selection(
+        self, sample_ids: List[str], reason: str, thought: Optional[str] = None
+    ) -> str:
         """
         Tool: 提交最终选择
         Args:
@@ -1894,9 +2453,9 @@ class Toolbox:
         result: Dict[str, Any] = {
             "status": "error",
             "selected_count": 0,
-            "reason_recorded": reason
+            "reason_recorded": reason,
         }
-        if not hasattr(self.controller, 'update'):
+        if not hasattr(self.controller, "update"):
             raise RuntimeError("Controller has no update()")
         if hasattr(self.controller, "_selection_context"):
             ctx = {
@@ -1906,10 +2465,14 @@ class Toolbox:
                 "experiment_name": getattr(self.controller, "experiment_name", None),
                 "current_round": getattr(self.controller, "current_round", None),
                 "decision_reason": reason,
-                "llm_mode": "mock_no_api_key" if str(reason) == "mock_no_api_key" else None
+                "llm_mode": "mock_no_api_key"
+                if str(reason) == "mock_no_api_key"
+                else None,
             }
             self.controller._selection_context = ctx
-        if str(reason) == "mock_no_api_key" and hasattr(self.controller, "_append_trace"):
+        if str(reason) == "mock_no_api_key" and hasattr(
+            self.controller, "_append_trace"
+        ):
             self.controller._append_trace(
                 {
                     "type": "llm_degraded",
@@ -1922,8 +2485,12 @@ class Toolbox:
                 }
             )
         if str(reason) == "mock_no_api_key":
-            raise RuntimeError("LLM_API_KEY is missing: agent fallback is forbidden (reason=mock_no_api_key).")
-        if not getattr(self.controller, "_last_ranked_items", None) and isinstance(self.candidates_cache, list):
+            raise RuntimeError(
+                "LLM_API_KEY is missing: agent fallback is forbidden (reason=mock_no_api_key)."
+            )
+        if not getattr(self.controller, "_last_ranked_items", None) and isinstance(
+            self.candidates_cache, list
+        ):
             items = []
             lambda_t = self.control_state.get("lambda_override_round")
             for raw in self.candidates_cache:
@@ -1949,42 +2516,51 @@ class Toolbox:
                 self.controller._last_ranked_items = items
         guardrail = self._apply_selection_guardrail(list(sample_ids or []))
         final_ids = guardrail.get("sample_ids") if isinstance(guardrail, dict) else None
-        final_ids = final_ids if isinstance(final_ids, list) and final_ids else list(sample_ids or [])
+        final_ids = (
+            final_ids
+            if isinstance(final_ids, list) and final_ids
+            else list(sample_ids or [])
+        )
         update_result = self.controller.update(final_ids)
-        if not (isinstance(update_result, dict) and update_result.get("status") == "success"):
+        if not (
+            isinstance(update_result, dict) and update_result.get("status") == "success"
+        ):
             raise RuntimeError(f"update_failed: {update_result}")
         result.update(update_result)
         applied: Dict[str, Any] = {
-            'lambda': self.control_state.get('lambda_override_round'),
-            'query_size': self.control_state.get('query_size_round'),
-            'epochs': self.control_state.get('epochs_round'),
-            'alpha': self.control_state.get('alpha')
+            "lambda": self.control_state.get("lambda_override_round"),
+            "query_size": self.control_state.get("query_size_round"),
+            "epochs": self.control_state.get("epochs_round"),
+            "alpha": self.control_state.get("alpha"),
         }
         violations: Dict[str, Any] = dict(self.control_meta or {})
-        result['decision_reason'] = reason
-        result['control_applied'] = applied
-        result['violations'] = violations
+        result["decision_reason"] = reason
+        result["control_applied"] = applied
+        result["violations"] = violations
         constraints: Dict[str, Any] = {
-            'remaining_budget': int(self.training_state.get('total_budget') or 0) - int(self.training_state.get('current_labeled_count') or 0) if self.training_state else None,
-            'epochs_cap': AgentThresholds.EPOCHS_CAP
+            "remaining_budget": int(self.training_state.get("total_budget") or 0)
+            - int(self.training_state.get("current_labeled_count") or 0)
+            if self.training_state
+            else None,
+            "epochs_cap": AgentThresholds.EPOCHS_CAP,
         }
         action: Dict[str, Any] = {
-            'selected_ids': result.get('selected_ids') or final_ids,
-            'query_size': applied.get('query_size'),
-            'epochs': applied.get('epochs'),
-            'lambda': applied.get('lambda')
+            "selected_ids": result.get("selected_ids") or final_ids,
+            "query_size": applied.get("query_size"),
+            "epochs": applied.get("epochs"),
+            "lambda": applied.get("lambda"),
         }
         event: Dict[str, Any] = {
-            'type': 'controller_step',
-            'round': int(getattr(self.controller, 'current_round', 0) or 0),
-            'state': dict(self.training_state or {}),
-            'action': action,
-            'constraints': constraints,
-            'outcome_ref': {
-                'expected': result.get('expected_count'),
-                'selected': result.get('selected_count')
+            "type": "controller_step",
+            "round": int(getattr(self.controller, "current_round", 0) or 0),
+            "state": dict(self.training_state or {}),
+            "action": action,
+            "constraints": constraints,
+            "outcome_ref": {
+                "expected": result.get("expected_count"),
+                "selected": result.get("selected_count"),
             },
-            'reasoning': thought
+            "reasoning": thought,
         }
         self.controller._append_trace(event)
         return json.dumps(result)
