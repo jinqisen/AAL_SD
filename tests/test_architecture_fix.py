@@ -603,7 +603,6 @@ class TestArchitectureFix(unittest.TestCase):
         pipeline.rollback_config = {"mode": "adaptive_threshold", "threshold": 0.1, "std_factor": 1.5}
         pipeline.exp_config = {}
         pipeline.sampler_type = "ad_kucs"
-        pipeline.k_definition = "coreset_to_labeled"
         pipeline.score_normalization = True
         pipeline.sampler = MagicMock()
         pipeline._last_ranking_metadata = {"lambda_effective": 0.55, "lambda_source": "lambda_policy"}

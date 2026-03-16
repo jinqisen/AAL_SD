@@ -14,7 +14,6 @@ class TestSamplerAuditLambdaInference(unittest.TestCase):
         p.toolbox = None
         p.sampler = None
         p.sampler_type = "ad_kucs"
-        p.k_definition = "coreset_to_labeled"
         p.score_normalization = True
         return p
 
@@ -46,4 +45,3 @@ class TestSamplerAuditLambdaInference(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-

@@ -1407,7 +1407,6 @@ class Toolbox:
             rollback_flag = self.training_state.get("rollback_flag", False)
             rollback_mode = self.training_state.get("rollback_mode", None)
             rollback_threshold = self.training_state.get("rollback_threshold", None)
-            k_definition = self.training_state.get("k_definition", None)
             remaining_budget = max(0, t_max - t)
 
             status = {
@@ -1424,7 +1423,6 @@ class Toolbox:
                 "rollback_flag": bool(rollback_flag),
                 "rollback_mode": rollback_mode,
                 "rollback_threshold": rollback_threshold,
-                "k_definition": k_definition,
                 "remaining_budget": int(remaining_budget),
                 "grad_train_val_cos_mean": self.training_state.get(
                     "grad_train_val_cos_mean"

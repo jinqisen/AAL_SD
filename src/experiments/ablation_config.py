@@ -1087,11 +1087,10 @@ ABLATION_SETTINGS = {
         },
     },
     "fixed_k": {
-        "description": "消融：Fixed K（K(x)固定相对初始标注池计算），其余保持与full_model一致",
+        "description": "消融：Fixed K（历史配置；当前实现K为未标注池聚类代表性），其余保持与full_model一致",
         "use_agent": True,
         "sampler_type": "ad_kucs",
         "lambda_override": None,
-        "k_definition": "coreset_to_labeled_fixed",
         "acquisition_protocol": {
             "uncertainty_aggregation": "mean",
             "diversity_postprocess": "none",

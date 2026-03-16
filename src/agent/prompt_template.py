@@ -2,7 +2,7 @@ import json
 from .config import AgentThresholds, AgentConstraints
 
 class PromptBuilder:
-    def build_system_prompt(self, total_iterations=0, current_iteration=0, last_miou=0.0, lambda_t=0.0, rollback_threshold=None, rollback_mode=None, k_definition=None, control_permissions=None, require_explicit_lambda: bool = False, miou_low_gain_streak=0):
+    def build_system_prompt(self, total_iterations=0, current_iteration=0, last_miou=0.0, lambda_t=0.0, rollback_threshold=None, rollback_mode=None, control_permissions=None, require_explicit_lambda: bool = False, miou_low_gain_streak=0):
         allowed_actions = []
         control_permissions_json = "null"
         alpha_allowed = None
@@ -83,13 +83,11 @@ class PromptBuilder:
             rollback_threshold_val = float(AgentThresholds.ROLLBACK_THRESHOLD)
         rollback_mode_str = str(rollback_mode) if rollback_mode is not None else "adaptive_threshold"
 
-        kd = str(k_definition or "unlabeled_kmeans_representativeness").strip()
-        k_definition_desc = (
-            f"1. {kd or 'default'}（当前代码实现；k_definition 仅用于标识展示，不影响公式）：K(x)为“未标注池聚类代表性”得分（越大越代表性/越靠近簇中心）。"
+        knowledge_gain_desc = (
+            "K(x)为“未标注池聚类代表性”得分（越大越代表性/越靠近簇中心）。"
             "具体：对未标注样本特征做 KMeans 聚类（簇数 n_clusters=min(88, |U|)），"
             "令 x 归属簇中心为 c(x)，距离 d(x)=||f_x-c(x)||，并以未标注池内最大距离 d_max 归一化，"
             "K(x)=1-d(x)/max(d_max,1e-12)。"
-            "注意：当前 score 预计算阶段仍要求已标注池非空（否则会直接报错终止），这是实现层面的前置约束。"
         )
 
         prompt = """
@@ -111,7 +109,6 @@ class PromptBuilder:
             - diagnostics:
               - mIoU={last_miou:.4f}, miou_low_gain_streak={miou_low_gain_streak}, lambda_t={lambda_t:.4f}
               - rollback_threshold={rollback_threshold}, rollback_mode={rollback_mode}
-              - k_definition={k_definition_desc}
             - issues:
               - 重点排查回撤、过拟合、训练过载、预算越界、无效动作
               - 若信息缺失，必须在Thought里声明降级策略
@@ -122,7 +119,7 @@ class PromptBuilder:
             AD-KUCS 评分逻辑（必须遵守） ：
             - 不确定性 U(x) = 像素熵均值（log2）：U(I)=mean_i H(p_i)，H(p_i)=-sum_c p_{{i,c}} log2(p_{{i,c}}+1e-10)。
             - 知识增益 K(x) 定义：
-              {k_definition_desc}
+              {knowledge_gain_desc}
             - 融合得分 Score(x) = (1-λ)·U(x) + λ·K(x)，λ∈[0,1]。
             - 系统提供的 lambda_t 为本轮策略建议/已应用的λ；建议将单轮调整幅度控制在±{lambda_adjust_range}以内。系统对λ的硬约束为[{lambda_min},{lambda_max}]；实验策略额外约束为 λ∈[{lambda_policy_min},{lambda_policy_max}]。
 
@@ -190,7 +187,7 @@ class PromptBuilder:
             late_stage_ratio=AgentThresholds.LATE_STAGE_RATIO,
             rollback_threshold=float(rollback_threshold_val),
             rollback_mode=rollback_mode_str,
-            k_definition_desc=k_definition_desc,
+            knowledge_gain_desc=knowledge_gain_desc,
             training_overload_epochs=AgentThresholds.TRAINING_OVERLOAD_EPOCHS,
             epochs_cap=AgentThresholds.EPOCHS_CAP,
             lambda_min=AgentConstraints.LAMBDA_MIN,

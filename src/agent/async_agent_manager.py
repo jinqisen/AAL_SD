@@ -129,7 +129,6 @@ class AsyncAgentManager:
         last_miou = None
         rollback_threshold = None
         rollback_mode = None
-        k_definition = None
         
         if isinstance(status_payload, dict):
             result = status_payload.get("result", {})
@@ -139,8 +138,6 @@ class AsyncAgentManager:
                 lambda_t = result.get("lambda_t")
                 last_miou = result.get("last_miou")
                 rollback_threshold = result.get("rollback_threshold")
-                rollback_mode = result.get("rollback_mode")
-                k_definition = result.get("k_definition")
 
         self.history = [
             {
@@ -152,7 +149,6 @@ class AsyncAgentManager:
                     lambda_t=lambda_t,
                     rollback_threshold=rollback_threshold,
                     rollback_mode=rollback_mode,
-                    k_definition=k_definition,
                     control_permissions=getattr(self.tools, "control_permissions", None)
                 )
             },

@@ -42,7 +42,6 @@ def _case(
     *,
     rollback_mode: Optional[str],
     rollback_threshold: Optional[float],
-    k_definition: Optional[str],
     total_iterations: int = 1000,
     current_iteration: int = 100,
     last_miou: float = 0.55,
@@ -67,7 +66,6 @@ def _case(
         lambda_t=lambda_t,
         rollback_threshold=rollback_threshold,
         rollback_mode=rollback_mode,
-        k_definition=k_definition,
         control_permissions=control_permissions,
     )
     return name, prompt
@@ -93,7 +91,6 @@ def main() -> int:
             "A_adaptive_threshold__K_coreset_to_labeled",
             rollback_mode="adaptive_threshold",
             rollback_threshold=-0.03,
-            k_definition="coreset_to_labeled",
         )
     ]
 

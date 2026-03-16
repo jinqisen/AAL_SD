@@ -59,7 +59,7 @@ class ActiveLearningPipeline:
         set_global_seed(self.seed, deterministic=self.deterministic)
 
         logger.info(f"Initializing Experiment: {experiment_name}")
-        logger.info(f"Description: {self.exp_config['description']}")
+        logger.info(f"Description: {self.exp_config.get('description') or ''}")
         logger.info(
             f"Isolation: run_id={self.run_id} experiment={self.experiment_name} pools_dir={getattr(self.config, 'POOLS_DIR', None)} "
             f"results_dir={getattr(self.config, 'RESULTS_DIR', None)} checkpoint_dir={getattr(self.config, 'CHECKPOINT_DIR', None)}"
@@ -192,7 +192,6 @@ class ActiveLearningPipeline:
         sampler_result = build_sampler(config, self.exp_config)
         self.sampler = sampler_result.sampler
         self.sampler_type = sampler_result.sampler_type
-        self.k_definition = sampler_result.k_definition
         self.score_normalization = sampler_result.score_normalization
         self.rollback_config = sampler_result.rollback_config
 
@@ -348,7 +347,6 @@ class ActiveLearningPipeline:
                 "ablation": {
                     "use_agent": bool(self.use_agent),
                     "sampler_type": getattr(self, "sampler_type", None),
-                    "k_definition": getattr(self, "k_definition", None),
                     "score_normalization": getattr(self, "score_normalization", None),
                     "lambda_override": self.exp_config.get("lambda_override")
                     if isinstance(self.exp_config, dict)
@@ -736,7 +734,6 @@ class ActiveLearningPipeline:
             "sampler_class": self.sampler.__class__.__name__
             if hasattr(self, "sampler") and self.sampler is not None
             else None,
-            "k_definition": getattr(self, "k_definition", None),
             "score_normalization": getattr(self, "score_normalization", None),
             "lambda_effective": ranking_lambda_eff,
             "lambda_source": ranking_lambda_source,
@@ -2254,7 +2251,6 @@ class ActiveLearningPipeline:
                     "rollback_threshold": float(rollback_threshold_used)
                     if rollback_threshold_used is not None
                     else None,
-                    "k_definition": getattr(self, "k_definition", None),
                     "current_labeled_count": int(len(self.labeled_indices)),
                     "total_budget": int(self.config.TOTAL_BUDGET),
                     "remaining_budget": remaining_budget,
@@ -3782,11 +3778,8 @@ class ActiveLearningPipeline:
             unlabeled_info[idx] = info
 
         labeled_features = None
-        labeled_source = self.labeled_indices
-        if str(getattr(self, "k_definition", "") or "") == "coreset_to_labeled_fixed":
-            labeled_source = getattr(self, "_initial_labeled_indices", []) or []
-        if labeled_source:
-            subset_l = Subset(self.query_dataset, labeled_source)
+        if self.labeled_indices:
+            subset_l = Subset(self.query_dataset, self.labeled_indices)
             loader_l = DataLoader(subset_l, **feature_loader_kwargs)
             l_feats = self._extract_features_only(model, loader_l)
             if l_feats is None:

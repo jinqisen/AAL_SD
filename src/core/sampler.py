@@ -16,7 +16,6 @@ class ADKUCSSampler:
         device="cpu",
         alpha=5.0,
         score_normalization: bool = True,
-        k_definition: str | None = None,
         feature_num_workers: int = 0,
         feature_persistent_workers: bool = False,
         feature_prefetch_factor: int = 2,
@@ -25,7 +24,6 @@ class ADKUCSSampler:
         self.device = device
         self.alpha = alpha
         self.score_normalization = bool(score_normalization)
-        self.k_definition = str(k_definition or "coreset_to_labeled")
         self.current_round = None
         self.uncertainty_calibration = None
         self.uncertainty_method = "entropy"
@@ -666,18 +664,6 @@ class ADKUCSSampler:
         if features_u is None:
             raise RuntimeError("Feature extraction failed: missing features")
         features_u_np = features_u.numpy()
-
-        # FIX: Extract Labeled Features for K-term (Diversity/Novelty) consistency
-        labeled_features_np = None
-        if labeled_indices is not None and len(labeled_indices) > 0:
-            subset_l = Subset(dataset, labeled_indices)
-            loader_l = DataLoader(subset_l, **loader_kwargs)
-            features_l = self.get_features_only(model, loader_l)
-            if features_l is not None:
-                labeled_features_np = features_l.numpy()
-
-        if labeled_features_np is None or len(labeled_features_np) == 0:
-            raise RuntimeError("coreset-to-labeled requires non-empty labeled set; labeled pool is empty or feature extraction failed")
 
         # 1. Generate clustering on Unlabeled Features
         n_clusters = min(88, len(features_u_np)) # Query size is 88 by default

@@ -11,7 +11,6 @@ class SamplerBuildResult:
     sampler: Any
     sampler_type: str
     rollback_config: Optional[dict]
-    k_definition: str
     score_normalization: bool
 
 
@@ -27,7 +26,6 @@ def build_sampler(config: Any, exp_config: Mapping[str, Any]) -> SamplerBuildRes
     from core.sampler import ADKUCSSampler
 
     sampler_type = str(exp_config["sampler_type"])
-    k_definition = str(exp_config.get("k_definition") or "coreset_to_labeled")
     score_normalization = bool(exp_config.get("score_normalization", True))
 
     def _build_random() -> tuple[Any, Optional[dict]]:
@@ -64,7 +62,6 @@ def build_sampler(config: Any, exp_config: Mapping[str, Any]) -> SamplerBuildRes
             device=config.DEVICE,
             alpha=config.ALPHA,
             score_normalization=score_normalization,
-            k_definition=k_definition,
             feature_num_workers=getattr(config, "FEATURE_NUM_WORKERS", 0),
             feature_persistent_workers=getattr(config, "FEATURE_PERSISTENT_WORKERS", False),
             feature_prefetch_factor=getattr(config, "FEATURE_PREFETCH_FACTOR", 2),
@@ -94,7 +91,6 @@ def build_sampler(config: Any, exp_config: Mapping[str, Any]) -> SamplerBuildRes
         sampler=sampler,
         sampler_type=sampler_type,
         rollback_config=rollback_config,
-        k_definition=k_definition,
         score_normalization=score_normalization,
     )
 
