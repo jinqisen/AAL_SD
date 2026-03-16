@@ -7,6 +7,7 @@ from tqdm import tqdm
 import numpy as np
 import math
 
+
 class Trainer:
     def __init__(self, model, config, device, training_state=None):
         self.model = model
@@ -19,7 +20,11 @@ class Trainer:
             and torch.cuda.is_available()
             and bool(getattr(self.config, "AMP_ENABLED", False))
         )
-        self._amp_dtype = str(getattr(self.config, "AMP_DTYPE", "float16") or "float16").strip().lower()
+        self._amp_dtype = (
+            str(getattr(self.config, "AMP_DTYPE", "float16") or "float16")
+            .strip()
+            .lower()
+        )
         if hasattr(torch, "amp") and hasattr(torch.amp, "GradScaler"):
             self.scaler = torch.amp.GradScaler("cuda", enabled=self._amp_enabled)
         else:
@@ -31,7 +36,9 @@ class Trainer:
             and bool(getattr(self.config, "TORCH_COMPILE", False))
             and hasattr(torch, "compile")
         ):
-            mode = str(getattr(self.config, "TORCH_COMPILE_MODE", "default") or "default").strip()
+            mode = str(
+                getattr(self.config, "TORCH_COMPILE_MODE", "default") or "default"
+            ).strip()
             try:
                 self.model = torch.compile(self.model, mode=mode)
             except Exception:
@@ -75,13 +82,19 @@ class Trainer:
             self.training_state["train_u_median_history"].append(
                 (int(round_num), float(u_median))
             )
-            if max_len > 0 and len(self.training_state["train_u_median_history"]) > max_len:
+            if (
+                max_len > 0
+                and len(self.training_state["train_u_median_history"]) > max_len
+            ):
                 self.training_state["train_u_median_history"].pop(0)
         if k_median is not None:
             self.training_state["train_k_median_history"].append(
                 (int(round_num), float(k_median))
             )
-            if max_len > 0 and len(self.training_state["train_k_median_history"]) > max_len:
+            if (
+                max_len > 0
+                and len(self.training_state["train_k_median_history"]) > max_len
+            ):
                 self.training_state["train_k_median_history"].pop(0)
 
     def _select_grad_probe_param_names(self) -> list:
@@ -307,8 +320,15 @@ class Trainer:
                     mean_vec = np.mean(stack, axis=0)
             cos_to_mean = []
             if mean_vec is not None and probe_vecs:
-                for v in probe_vecs:
-                    cos_to_mean.append(self._cosine(v, mean_vec))
+                probe_stack = np.stack(probe_vecs, axis=0)
+                norms_probe = np.linalg.norm(probe_stack, axis=1, keepdims=True)
+                norm_mean = np.linalg.norm(mean_vec)
+                if norm_mean > 0 and np.all(norms_probe > 0):
+                    cos_to_mean = (
+                        probe_stack @ mean_vec / (norms_probe.flatten() * norm_mean)
+                    ).tolist()
+                else:
+                    cos_to_mean = [self._cosine(v, mean_vec) for v in probe_vecs]
 
             train_val_cos = None
             if probe_iter is not None and mean_vec is not None:
@@ -381,10 +401,18 @@ class Trainer:
                 if conf is not None:
                     y_pred_flat = np.asarray(preds).reshape(-1)
                     y_true_flat = np.asarray(targets).reshape(-1)
-                    y_true_flat = np.clip(y_true_flat.astype(np.int64, copy=False), 0, k - 1)
-                    y_pred_flat = np.clip(y_pred_flat.astype(np.int64, copy=False), 0, k - 1)
+                    y_true_flat = np.clip(
+                        y_true_flat.astype(np.int64, copy=False), 0, k - 1
+                    )
+                    y_pred_flat = np.clip(
+                        y_pred_flat.astype(np.int64, copy=False), 0, k - 1
+                    )
                     indices = y_true_flat * k + y_pred_flat
-                    conf += np.bincount(indices, minlength=k * k).reshape(k, k).astype(np.int64)
+                    conf += (
+                        np.bincount(indices, minlength=k * k)
+                        .reshape(k, k)
+                        .astype(np.int64)
+                    )
 
         if conf is None or int(conf.size) == 0:
             mean_iou = 0.0
