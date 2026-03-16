@@ -101,7 +101,7 @@ def _parse_trace(trace_path: str) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]
             try:
                 entry = json.loads(line)
             except json.JSONDecodeError as e:
-                raise ValueError(f"Invalid JSONL at {trace_path}:{line_no} ({e})") from e
+                continue
 
             etype = entry.get("type")
             if etype == "selection":

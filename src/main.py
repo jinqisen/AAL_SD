@@ -419,6 +419,7 @@ class ActiveLearningPipeline:
 
     def _write_status(self, patch):
         import json
+        from utils import atomic_write_json
 
         payload = {}
         try:
@@ -434,18 +435,50 @@ class ActiveLearningPipeline:
             "run_id": self.run_id,
             "experiment_name": self.experiment_name,
             "updated_at": datetime.now().isoformat(),
+            "pid": int(os.getpid()),
+            "ppid": int(os.getppid()),
         }
         payload.update(base)
+        existing_errors = payload.get("errors")
+        errors: list = list(existing_errors) if isinstance(existing_errors, list) else []
         if isinstance(patch, dict):
-            payload.update(patch)
+            patch_dict = dict(patch)
+            incoming_error = None
+            if "current_error" in patch_dict:
+                incoming_error = patch_dict.pop("current_error")
+            if "error" in patch_dict:
+                incoming_error = patch_dict.pop("error")
 
-        tmp = self.status_path + ".tmp"
-        with open(tmp, "w", encoding="utf-8") as f:
-            json.dump(payload, f, ensure_ascii=False, indent=2)
-        os.replace(tmp, self.status_path)
+            status_next = patch_dict.get("status")
+            should_clear_current_error = (
+                incoming_error is None
+                and isinstance(status_next, str)
+                and status_next.strip().lower() in ("running", "completed", "finished")
+            )
+
+            payload.update(patch_dict)
+            payload["errors"] = errors
+
+            if incoming_error is not None:
+                cur = payload.get("current_error")
+                if incoming_error != cur:
+                    errors.append(
+                        {
+                            "ts": datetime.now().isoformat(),
+                            "status": str(payload.get("status") or ""),
+                            "error": incoming_error,
+                        }
+                    )
+                payload["current_error"] = incoming_error
+                payload["error"] = incoming_error
+            elif should_clear_current_error:
+                payload.pop("current_error", None)
+                payload.pop("error", None)
+
+        atomic_write_json(self.status_path, payload, indent=2)
 
     def _append_trace(self, event):
-        import json
+        from utils import append_jsonl
 
         payload = {
             "run_id": self.run_id,
@@ -465,9 +498,7 @@ class ActiveLearningPipeline:
                 self._last_control_events[str(et)] = dict(payload)
         except Exception:
             pass
-        line = json.dumps(payload, ensure_ascii=False)
-        with open(self.trace_path, "a", encoding="utf-8") as f:
-            f.write(line + "\n")
+        append_jsonl(self.trace_path, payload)
 
     def _resolve_pools_dir(self):
         return os.path.join(self.config.POOLS_DIR, self.run_id, self.experiment_name)
@@ -2622,6 +2653,21 @@ class ActiveLearningPipeline:
                     "alc": float(result["alc"]),
                     "final_mIoU": float(result["final_miou"]),
                     "final_f1": float(result["final_f1"]),
+                    "final_selected_mIoU": float(result["final_selected_miou"])
+                    if result.get("final_selected_miou") is not None
+                    else None,
+                    "final_selected_f1": float(result["final_selected_f1"])
+                    if result.get("final_selected_f1") is not None
+                    else None,
+                    "final_report_mIoU": float(result["final_report_miou"])
+                    if result.get("final_report_miou") is not None
+                    else None,
+                    "final_report_f1": float(result["final_report_f1"])
+                    if result.get("final_report_f1") is not None
+                    else None,
+                    "final_miou_source": str(result.get("final_miou_source") or ""),
+                    "final_f1_source": str(result.get("final_f1_source") or ""),
+                    "test_split": str(result.get("test_split") or ""),
                     "budget_history": list(result["budget_history"]),
                 },
             }
@@ -3406,9 +3452,10 @@ class ActiveLearningPipeline:
         # 1. Truncate Labeled Pool
         # Keep first N rows
         valid_labeled_df = labeled_df.iloc[:target_labeled_size]
-        valid_labeled_df.to_csv(
-            os.path.join(self.pools_dir, "labeled_pool.csv"), index=False
-        )
+        labeled_path = os.path.join(self.pools_dir, "labeled_pool.csv")
+        labeled_tmp = labeled_path + ".tmp"
+        valid_labeled_df.to_csv(labeled_tmp, index=False)
+        os.replace(labeled_tmp, labeled_path)
         self.labeled_df = valid_labeled_df
 
         # 2. Reconstruct Unlabeled Pool
@@ -3428,9 +3475,10 @@ class ActiveLearningPipeline:
         # If it had other columns (like scores), they are lost for the rolled-back samples,
         # but that's fine as they need to be re-scored anyway.
         unlabeled_df = pd.DataFrame({"sample_id": unlabeled_ids})
-        unlabeled_df.to_csv(
-            os.path.join(self.pools_dir, "unlabeled_pool.csv"), index=False
-        )
+        unlabeled_path = os.path.join(self.pools_dir, "unlabeled_pool.csv")
+        unlabeled_tmp = unlabeled_path + ".tmp"
+        unlabeled_df.to_csv(unlabeled_tmp, index=False)
+        os.replace(unlabeled_tmp, unlabeled_path)
         self.unlabeled_df = unlabeled_df
 
         # Update indices in memory
@@ -3482,8 +3530,10 @@ class ActiveLearningPipeline:
         )
         valid_lines.append(resume_marker + "\n")
 
-        with open(self.trace_path, "w", encoding="utf-8") as f:
+        tmp_path = str(self.trace_path) + ".tmp"
+        with open(tmp_path, "w", encoding="utf-8") as f:
             f.writelines(valid_lines)
+        os.replace(tmp_path, self.trace_path)
 
     def _save_pool_states(self):
         import pandas as pd

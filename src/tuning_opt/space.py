@@ -51,8 +51,6 @@ class ParameterSpace:
             [
                 Param("agent_threshold_overrides.LAMBDA_DELTA_UP", 0.02, 0.30),
                 Param("agent_threshold_overrides.LAMBDA_DELTA_DOWN", 0.02, 0.25),
-                Param("agent_threshold_overrides.LAMBDA_CLAMP_MIN", 0.0, 0.30),
-                Param("agent_threshold_overrides.LAMBDA_CLAMP_MAX", 0.50, 1.00),
                 Param("agent_threshold_overrides.OVERFIT_RISK_HI", 0.5, 2.0),
                 Param("agent_threshold_overrides.OVERFIT_RISK_LO", 0.1, 1.0),
                 Param("agent_threshold_overrides.OVERFIT_TVC_MIN_HI", 0.4, 0.95),
@@ -70,7 +68,6 @@ class ParameterSpace:
                 Param("lambda_policy.selection_guardrail.u_low_thresh", 0.10, 0.60),
                 Param("lambda_policy.selection_guardrail.u_low_frac_max", 0.05, 0.60),
                 Param("lambda_policy.selection_guardrail.lambda_step_down", 0.02, 0.25),
-                Param("epochs_per_round_override", 5.0, 20.0),
             ]
         )
 
@@ -103,12 +100,46 @@ class ParameterSpace:
             if spec.kind == "int":
                 fv = int(round(fv))
             path = _path_from_key(k)
-            if path and path[0] == "epochs_per_round_override":
-                merged["epochs_per_round_override"] = int(round(fv))
-            else:
-                _set_nested(
-                    merged, path, int(round(fv)) if k.endswith("_round") else fv
-                )
+            _set_nested(merged, path, int(round(fv)) if k.endswith("_round") else fv)
+
+        agent_overrides = merged.get("agent_threshold_overrides")
+        if isinstance(agent_overrides, dict):
+            lo = agent_overrides.get("OVERFIT_RISK_LO")
+            hi = agent_overrides.get("OVERFIT_RISK_HI")
+            if isinstance(lo, (int, float)) and isinstance(hi, (int, float)):
+                if float(lo) >= float(hi):
+                    agent_overrides["OVERFIT_RISK_LO"] = max(0.0, float(hi) - 0.05)
+
+            clamp_min = agent_overrides.get("LAMBDA_CLAMP_MIN")
+            clamp_max = agent_overrides.get("LAMBDA_CLAMP_MAX")
+            if isinstance(clamp_min, (int, float)) and isinstance(clamp_max, (int, float)):
+                if float(clamp_min) >= float(clamp_max):
+                    agent_overrides["LAMBDA_CLAMP_MIN"] = max(0.0, float(clamp_max) - 0.05)
+
+        lp = merged.get("lambda_policy")
+        if isinstance(lp, dict):
+            ramp = lp.get("late_stage_ramp")
+            if isinstance(ramp, dict):
+                sr = ramp.get("start_round")
+                er = ramp.get("end_round")
+                if isinstance(sr, int) and isinstance(er, int):
+                    if int(er) <= int(sr):
+                        ramp["end_round"] = int(sr) + 1
+
+                sl = ramp.get("start_lambda")
+                el = ramp.get("end_lambda")
+                if isinstance(sl, (int, float)) and isinstance(el, (int, float)):
+                    if float(el) < float(sl):
+                        ramp["end_lambda"] = float(sl)
+
+            guard = lp.get("selection_guardrail")
+            if isinstance(guard, dict):
+                u_min = guard.get("u_median_min")
+                u_low = guard.get("u_low_thresh")
+                if isinstance(u_min, (int, float)) and isinstance(u_low, (int, float)):
+                    if float(u_low) > float(u_min):
+                        guard["u_low_thresh"] = float(u_min)
+
         return merged
 
     def trust_region_sample(

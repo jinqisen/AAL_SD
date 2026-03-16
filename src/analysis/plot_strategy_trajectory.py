@@ -80,7 +80,7 @@ def load_trace(trace_path: str) -> pd.DataFrame:
             try:
                 entry = json.loads(line)
             except json.JSONDecodeError:
-                raise ValueError(f"Invalid JSONL at {trace_path}:{line_no}")
+                continue
 
             etype = entry.get("type")
 

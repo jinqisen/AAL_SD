@@ -11,12 +11,19 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Tuple
 
+try:
+    from tuning_opt.evaluator import parse_objective_from_status
+except Exception:
+    parse_objective_from_status = None
+
 
 _RE_RUN = re.compile(r"^(autotune_iter\d+_|autotune_opt_iter\d+_|autotune_opt_iter\d{3}_)", re.I)
 _RE_MIOU_TEST = re.compile(r"最终报告 mIoU\(test\):\s*([0-9.]+)")
 _RE_MIOU_OUT = re.compile(r"最终输出 mIoU:\s*([0-9.]+)")
 _RE_MIOU_LAST_VAL = re.compile(r"最后一轮选模 mIoU\(val\):\s*([0-9.]+)")
 _RE_ROUND_RESULT = re.compile(r"本轮结果:\s*Round=(\d+).*?mIoU=([0-9.]+)")
+_RE_BASE_RUN = re.compile(r"^autotune_opt_iter(\d+)_")
+_RE_SEED_RUN = re.compile(r"^(autotune_opt_iter\d+_[0-9]{8}_[0-9]{4})_seed(\d+)$")
 
 
 def _read_json(path: Path) -> Optional[Dict[str, Any]]:
@@ -113,6 +120,21 @@ def _parse_round_curve_from_md(md_path: Path) -> List[Tuple[int, float]]:
     return sorted(best_by_round.items(), key=lambda x: x[0])
 
 
+def _best_round_miou_from_md(md_path: Path) -> Tuple[Optional[int], Optional[float]]:
+    curve = _parse_round_curve_from_md(md_path)
+    if not curve:
+        return None, None
+    best_r, best_v = max(curve, key=lambda x: x[1])
+    return int(best_r), float(best_v)
+
+
+def _latest_epoch_end_from_trace(trace_path: Path) -> Optional[Dict[str, Any]]:
+    events = _parse_epoch_end_events(trace_path)
+    if not events:
+        return None
+    return events[-1]
+
+
 def _mean(xs: List[float]) -> Optional[float]:
     if not xs:
         return None
@@ -153,6 +175,28 @@ class RunSummary:
     best_exp: Optional[str]
     best_miou: Optional[float]
     counts: Dict[str, int]
+
+@dataclass(frozen=True)
+class AutoTuningIterSummary:
+    iteration: int
+    run_id: str
+    updated_at: str
+    n_exps: int
+    n_running: int
+    n_done: int
+    f1_done: bool
+    f2_done: bool
+    f3_done: bool
+    screen_best_exp: Optional[str]
+    screen_best: Optional[float]
+    confirm_best_exp: Optional[str]
+    confirm_best: Optional[float]
+    topk: List[str]
+    topk_round: Dict[str, Optional[int]]
+    topk_status: Dict[str, str]
+    seed_done: Dict[int, bool]
+    seed_round: Dict[int, Optional[int]]
+    running_experiments: List[Dict[str, Any]]
 
 
 def _list_runs(runs_dir: Path, *, max_runs: int) -> List[Path]:
@@ -206,6 +250,323 @@ def _summarize_run(run_dir: Path, objective: str) -> RunSummary:
         best_miou=best_miou,
         counts=counts,
     )
+
+def _list_autotune_base_runs(runs_dir: Path, *, max_runs: int) -> List[Tuple[int, Path]]:
+    out: List[Tuple[int, Path]] = []
+    for p in runs_dir.iterdir():
+        if not p.is_dir():
+            continue
+        name = p.name
+        if _RE_SEED_RUN.match(name):
+            continue
+        m = _RE_BASE_RUN.match(name)
+        if not m:
+            continue
+        try:
+            it = int(m.group(1))
+        except Exception:
+            continue
+        out.append((it, p))
+    out.sort(key=lambda x: (x[0], x[1].name))
+    return out[-max_runs:] if max_runs > 0 else out
+
+
+def _find_seed_runs(runs_dir: Path, base_run_id: str) -> Dict[int, Path]:
+    out: Dict[int, Path] = {}
+    for p in runs_dir.iterdir():
+        if not p.is_dir():
+            continue
+        m = _RE_SEED_RUN.match(p.name)
+        if not m:
+            continue
+        if str(m.group(1)) != str(base_run_id):
+            continue
+        out[int(m.group(2))] = p
+    return dict(sorted(out.items(), key=lambda x: x[0]))
+
+
+def _objective_from_status(run_dir: Path, exp: str, objective: str) -> Optional[float]:
+    if parse_objective_from_status is not None:
+        v = parse_objective_from_status(run_dir / f"{exp}_status.json", objective)
+        if isinstance(v, (int, float)):
+            return float(v)
+    status = _read_json(run_dir / f"{exp}_status.json") or {}
+    res = status.get("result") if isinstance(status.get("result"), dict) else {}
+    obj = str(objective or "").strip().lower()
+    if obj in ("alc", "learning_curve", "learning_curve_area"):
+        v = res.get("alc")
+        return float(v) if isinstance(v, (int, float)) else None
+    if obj in ("val", "best_val", "last_val", "miou", "final_miou", "final_val"):
+        v = res.get("final_mIoU")
+        return float(v) if isinstance(v, (int, float)) else None
+    if obj in ("f1", "final_f1"):
+        v = res.get("final_f1")
+        return float(v) if isinstance(v, (int, float)) else None
+    return None
+
+
+def _autotune_iter_summary(
+    run_dir: Path,
+    *,
+    iteration: int,
+    screen_objective: str,
+    confirm_objective: str,
+    screen_end_round: int,
+    confirm_end_round: int,
+    screen_topk: int,
+    expected_seeds: List[int],
+) -> AutoTuningIterSummary:
+    manifest = _read_json(run_dir / "manifest.json") or {}
+    updated_at = str(manifest.get("updated_at") or "-")
+    status_files = sorted(run_dir.glob("*_status.json"))
+    exps = []
+    progress_round: Dict[str, int] = {}
+    status_map: Dict[str, str] = {}
+    running_experiments: List[Dict[str, Any]] = []
+    running = 0
+    done = 0
+    for sp in status_files:
+        payload = _read_json(sp) or {}
+        exp_name = str(payload.get("experiment_name") or sp.name.replace("_status.json", ""))
+        if not exp_name:
+            continue
+        exps.append(exp_name)
+        st = str(payload.get("status") or "").lower()
+        status_map[exp_name] = st
+        if st == "running":
+            running += 1
+            prog = payload.get("progress") if isinstance(payload.get("progress"), dict) else {}
+            resume = payload.get("resume") if isinstance(payload.get("resume"), dict) else {}
+            initial = payload.get("initial") if isinstance(payload.get("initial"), dict) else {}
+            running_experiments.append(
+                {
+                    "run_id": str(run_dir.name),
+                    "exp": str(exp_name),
+                    "updated_at": payload.get("updated_at"),
+                    "resume_start_round": resume.get("start_round"),
+                    "round": prog.get("round"),
+                    "epoch": prog.get("epoch"),
+                    "labeled_size": prog.get("labeled_size"),
+                    "loss": prog.get("loss"),
+                    "miou_live": prog.get("mIoU"),
+                    "best_miou_round": prog.get("best_mIoU_round"),
+                    "initial_labeled": initial.get("labeled"),
+                    "initial_unlabeled": initial.get("unlabeled"),
+                    "pools_dir": payload.get("pools_dir"),
+                    "checkpoint_path": payload.get("checkpoint_path"),
+                }
+            )
+        if st in ("completed", "finished"):
+            done += 1
+        prog = payload.get("progress") if isinstance(payload.get("progress"), dict) else {}
+        rr = prog.get("round")
+        if isinstance(rr, int):
+            progress_round[exp_name] = rr
+
+    exps = sorted(set(exps))
+
+    scored = []
+    for exp in exps:
+        v = _objective_from_status(run_dir, exp, screen_objective)
+        scored.append((exp, float(v) if isinstance(v, (int, float)) else float("-inf")))
+    scored.sort(key=lambda x: x[1], reverse=True)
+    topk = [exp for exp, v in scored[: max(1, min(int(screen_topk), len(scored)))] if v != float("-inf")]
+    topk_round = {exp: progress_round.get(exp) for exp in topk}
+    topk_status = {exp: status_map.get(exp, "unknown") for exp in topk}
+
+    screen_best_exp = topk[0] if topk else None
+    screen_best = None if not topk else (scored[0][1] if scored[0][1] != float("-inf") else None)
+
+    confirm_best_exp = None
+    confirm_best = None
+    for exp in exps:
+        v = _objective_from_status(run_dir, exp, confirm_objective)
+        if v is None:
+            continue
+        if confirm_best is None or float(v) > float(confirm_best):
+            confirm_best = float(v)
+            confirm_best_exp = exp
+
+    f1_done = bool(exps) and all(progress_round.get(e, -1) >= int(screen_end_round) for e in exps)
+    f2_done = bool(topk) and all(progress_round.get(e, -1) >= int(confirm_end_round) for e in topk)
+
+    seed_done: Dict[int, bool] = {}
+    seed_round: Dict[int, Optional[int]] = {}
+    f3_done = False
+    if expected_seeds:
+        seed_runs = _find_seed_runs(run_dir.parent, run_dir.name)
+        if confirm_best_exp:
+            for seed in expected_seeds:
+                if int(seed) == int(expected_seeds[0]):
+                    seed_done[int(seed)] = f2_done
+                    seed_round[int(seed)] = progress_round.get(confirm_best_exp)
+                    continue
+                sdir = seed_runs.get(int(seed))
+                if sdir is None:
+                    seed_done[int(seed)] = False
+                    seed_round[int(seed)] = None
+                    continue
+                sp = _read_json(sdir / f"{confirm_best_exp}_status.json") or {}
+                prog = sp.get("progress") if isinstance(sp.get("progress"), dict) else {}
+                rr = prog.get("round")
+                seed_round[int(seed)] = int(rr) if isinstance(rr, int) else None
+                seed_done[int(seed)] = bool(isinstance(rr, int) and rr >= int(confirm_end_round))
+            f3_done = all(seed_done.values()) if seed_done else False
+
+    return AutoTuningIterSummary(
+        iteration=int(iteration),
+        run_id=str(run_dir.name),
+        updated_at=updated_at,
+        n_exps=len(exps),
+        n_running=int(running),
+        n_done=int(done),
+        f1_done=bool(f1_done),
+        f2_done=bool(f2_done),
+        f3_done=bool(f3_done),
+        screen_best_exp=screen_best_exp,
+        screen_best=screen_best,
+        confirm_best_exp=confirm_best_exp,
+        confirm_best=confirm_best,
+        topk=list(topk),
+        topk_round=topk_round,
+        topk_status=topk_status,
+        seed_done=seed_done,
+        seed_round=seed_round,
+        running_experiments=running_experiments,
+    )
+
+
+def _autotune_stage(summary: AutoTuningIterSummary) -> str:
+    if not summary.f1_done:
+        return "F1_screening"
+    if not summary.f2_done:
+        return "F2_confirming"
+    if summary.seed_done and not summary.f3_done:
+        return "F3_multi_seed"
+    if summary.f3_done:
+        return "iter_complete"
+    return "F2_confirming"
+
+
+def _format_bool(x: bool) -> str:
+    return "yes" if bool(x) else "no"
+
+
+def _write_autotune_md(
+    *,
+    out_path: Path,
+    iters: List[AutoTuningIterSummary],
+    running_experiments: List[Dict[str, Any]],
+    screen_objective: str,
+    confirm_objective: str,
+    screen_end_round: int,
+    confirm_end_round: int,
+    screen_topk: int,
+    expected_seeds: List[int],
+) -> None:
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    cur = iters[-1] if iters else None
+    stage = _autotune_stage(cur) if cur else "no_runs"
+    active_node = {"F1_screening": "B", "F2_confirming": "D", "F3_multi_seed": "E", "iter_complete": "F"}.get(stage, "B")
+
+    lines: List[str] = []
+    lines.append("# Auto Tuning 运行监控（分阶段）\n\n")
+    lines.append(f"- screen_objective: `{screen_objective}`（screen_end_round={screen_end_round}）\n")
+    lines.append(f"- confirm_objective: `{confirm_objective}`（confirm_end_round={confirm_end_round}）\n")
+    lines.append(f"- screen_topk: {screen_topk}\n")
+    lines.append(f"- expected_seeds: {','.join(str(s) for s in expected_seeds)}\n\n")
+
+    lines.append("```mermaid\n")
+    lines.append("flowchart LR\n")
+    lines.append("  A[Branch from incumbent] --> B[F1: Screen]\n")
+    lines.append("  B --> C{Pick top-k}\n")
+    lines.append("  C --> D[F2: Confirm]\n")
+    lines.append("  D --> E[F3: Multi-seed]\n")
+    lines.append("  E --> F[Update incumbent]\n")
+    lines.append("  classDef active fill:#fffae6,stroke:#d4a106,stroke-width:2px;\n")
+    lines.append(f"  class {active_node} active;\n")
+    lines.append("```\n\n")
+
+    lines.append("## 迭代总览\n")
+    lines.append("| iter | run_id | updated_at | exps | running | F1 | F2 | F3 | top-k | best@screen | best@confirm |\n")
+    lines.append("|---:|---|---|---:|---:|---|---|---|---|---|---|\n")
+    for s in iters:
+        best_screen = "-" if s.screen_best is None else f"{s.screen_best_exp} ({s.screen_best:.4f})"
+        best_confirm = "-" if s.confirm_best is None else f"{s.confirm_best_exp} ({s.confirm_best:.4f})"
+        lines.append(
+            f"| {s.iteration} | {s.run_id} | {s.updated_at} | {s.n_exps} | {s.n_running} | {_format_bool(s.f1_done)} | {_format_bool(s.f2_done)} | {_format_bool(s.f3_done)} | {', '.join(s.topk) if s.topk else '-'} | {best_screen} | {best_confirm} |\n"
+        )
+
+    lines.append("\n## 当前进展（最新一轮）\n")
+    if cur:
+        lines.append(f"- 当前 run_id: `{cur.run_id}`\n")
+        lines.append(f"- 当前阶段: `{stage}`\n")
+        lines.append(f"- F1 完成: {_format_bool(cur.f1_done)}（{cur.n_done}/{cur.n_exps} 已完成/标记）\n")
+        lines.append(f"- F2 完成: {_format_bool(cur.f2_done)}（top-k={', '.join(cur.topk) if cur.topk else '-'}）\n")
+        if cur.seed_done:
+            lines.append(f"- F3 seeds: `{cur.seed_done}`\n")
+        lines.append(f"- best@screen: {cur.screen_best_exp} {cur.screen_best}\n")
+        lines.append(f"- best@confirm: {cur.confirm_best_exp} {cur.confirm_best}\n")
+        if cur.topk:
+            lines.append("\n### F2 候选进度（top-k）\n")
+            lines.append("| exp | status | round | target_round |\n")
+            lines.append("|---|---|---:|---:|\n")
+            for exp in cur.topk:
+                st = cur.topk_status.get(exp, "unknown")
+                rr = cur.topk_round.get(exp)
+                rr_s = "-" if rr is None else str(int(rr))
+                lines.append(f"| {exp} | {st} | {rr_s} | {int(confirm_end_round)} |\n")
+        if cur.seed_done:
+            lines.append("\n### F3 复核进度（best@confirm across seeds）\n")
+            lines.append("| seed | done | round | target_round |\n")
+            lines.append("|---:|---|---:|---:|\n")
+            for seed in expected_seeds:
+                done_s = _format_bool(bool(cur.seed_done.get(int(seed), False)))
+                rr = cur.seed_round.get(int(seed))
+                rr_s = "-" if rr is None else str(int(rr))
+                lines.append(f"| {int(seed)} | {done_s} | {rr_s} | {int(confirm_end_round)} |\n")
+
+        lines.append("\n## 正在运行的实验（全局）\n")
+        if running_experiments:
+            lines.append("| run_id | exp | rd | ep | ep_mIoU | best_rd | best_mIoU | updated_at |\n")
+            lines.append("|---|---|---:|---:|---:|---:|---:|---|\n")
+            for r in sorted(running_experiments, key=lambda x: (str(x.get("run_id")), str(x.get("exp")))):
+                lines.append(
+                    "| {run_id} | {exp} | {rd} | {ep} | {ep_miou} | {best_rd} | {best_miou} | {updated_at} |\n".format(
+                        run_id=str(r.get("run_id") or "-"),
+                        exp=str(r.get("exp") or "-"),
+                        rd=str(r.get("rd") if r.get("rd") is not None else "-"),
+                        ep=str(r.get("ep") if r.get("ep") is not None else "-"),
+                        ep_miou=(
+                            "{:.4f}".format(float(r.get("ep_miou")))
+                            if isinstance(r.get("ep_miou"), (int, float))
+                            else "-"
+                        ),
+                        best_rd=str(r.get("best_rd") if r.get("best_rd") is not None else "-"),
+                        best_miou=(
+                            "{:.4f}".format(float(r.get("best_miou")))
+                            if isinstance(r.get("best_miou"), (int, float))
+                            else "-"
+                        ),
+                        updated_at=str(r.get("updated_at") or "-"),
+                    )
+                )
+
+            lines.append("\n### 运行中实验详情\n")
+            for r in sorted(running_experiments, key=lambda x: (str(x.get("run_id")), str(x.get("exp")))):
+                lines.append(f"- run_id: `{r.get('run_id')}` exp: `{r.get('exp')}`\n")
+                lines.append(f"  - resume_start_round: `{r.get('resume_start_round') if r.get('resume_start_round') is not None else '-'}`\n")
+                lines.append(f"  - labeled_size: `{r.get('labeled_size') if r.get('labeled_size') is not None else '-'}`\n")
+                lines.append(f"  - pools_dir: `{r.get('pools_dir') or '-'}`\n")
+                lines.append(f"  - checkpoint_path: `{r.get('checkpoint_path') or '-'}`\n")
+        else:
+            lines.append("- 无 running 状态的实验\n")
+    else:
+        lines.append("- 未发现 autotune_opt_iter* 目录\n")
+
+    tmp = out_path.with_suffix(out_path.suffix + ".tmp")
+    tmp.write_text("".join(lines), encoding="utf-8")
+    os.replace(tmp, out_path)
 
 
 def _summarize_training_curve(run_dir: Path, exp_name: str, objective: str, window_rounds: int) -> TrainingCurveSummary:
@@ -374,6 +735,15 @@ def main() -> None:
     parser.add_argument("--window-rounds", type=int, default=5)
     parser.add_argument("--show", type=int, default=12)
     parser.add_argument("--run-ids", type=str, default="")
+    parser.add_argument("--autotune-report", action="store_true", default=False)
+    parser.add_argument("--autotune-screen-objective", type=str, default="alc")
+    parser.add_argument("--autotune-confirm-objective", type=str, default="val")
+    parser.add_argument("--autotune-screen-end-round", type=int, default=10)
+    parser.add_argument("--autotune-confirm-end-round", type=int, default=16)
+    parser.add_argument("--autotune-screen-topk", type=int, default=2)
+    parser.add_argument("--autotune-seeds", type=str, default="42,43,44")
+    parser.add_argument("--autotune-write-md", type=str, default="results/runs/autotune_progress_report.md")
+    parser.add_argument("--once", action="store_true", default=False)
     args = parser.parse_args()
 
     repo_root = Path(__file__).resolve().parents[1]
@@ -415,9 +785,90 @@ def main() -> None:
         running_curves.sort(key=lambda x: (x.run_id, x.exp_name))
         _print_training_curves(running_curves)
 
+        if bool(args.autotune_report):
+            seeds = [int(s) for s in str(args.autotune_seeds).split(",") if s.strip()]
+            base_runs = _list_autotune_base_runs(runs_dir, max_runs=int(args.max_runs))
+            iters = [
+                _autotune_iter_summary(
+                    d,
+                    iteration=it,
+                    screen_objective=str(args.autotune_screen_objective),
+                    confirm_objective=str(args.autotune_confirm_objective),
+                    screen_end_round=int(args.autotune_screen_end_round),
+                    confirm_end_round=int(args.autotune_confirm_end_round),
+                    screen_topk=int(args.autotune_screen_topk),
+                    expected_seeds=seeds,
+                )
+                for it, d in base_runs
+            ]
+            running_exps: List[Dict[str, Any]] = []
+            for d in run_dirs:
+                for sp in d.glob("*_status.json"):
+                    payload = _read_json(sp) or {}
+                    if str(payload.get("status") or "").lower() != "running":
+                        continue
+                    exp_name = str(payload.get("experiment_name") or sp.name.replace("_status.json", ""))
+                    prog = payload.get("progress") if isinstance(payload.get("progress"), dict) else {}
+                    resume = payload.get("resume") if isinstance(payload.get("resume"), dict) else {}
+                    initial = payload.get("initial") if isinstance(payload.get("initial"), dict) else {}
+                    trace_path = d / f"{exp_name}_trace.jsonl"
+                    md_path = d / f"{exp_name}.md"
+                    last_evt = _latest_epoch_end_from_trace(trace_path)
+                    best_rd, best_miou = _best_round_miou_from_md(md_path)
+                    rd = None
+                    ep = None
+                    ep_miou = None
+                    if isinstance(last_evt, dict):
+                        rr = last_evt.get("round")
+                        ee = last_evt.get("epoch")
+                        mm = last_evt.get("mIoU")
+                        if isinstance(rr, int):
+                            rd = int(rr)
+                        if isinstance(ee, int):
+                            ep = int(ee)
+                        if isinstance(mm, (int, float)):
+                            ep_miou = float(mm)
+                    running_exps.append(
+                        {
+                            "run_id": str(d.name),
+                            "exp": str(exp_name),
+                            "updated_at": payload.get("updated_at"),
+                            "resume_start_round": resume.get("start_round"),
+                            "labeled_size": prog.get("labeled_size"),
+                            "rd": rd,
+                            "ep": ep,
+                            "ep_miou": ep_miou,
+                            "best_rd": best_rd,
+                            "best_miou": best_miou,
+                            "initial_labeled": initial.get("labeled"),
+                            "initial_unlabeled": initial.get("unlabeled"),
+                            "pools_dir": payload.get("pools_dir"),
+                            "checkpoint_path": payload.get("checkpoint_path"),
+                            "status_path": str(sp),
+                        }
+                    )
+            out_md = Path(args.autotune_write_md)
+            if not out_md.is_absolute():
+                out_md = (repo_root / out_md).resolve()
+            _write_autotune_md(
+                out_path=out_md,
+                iters=iters,
+                running_experiments=running_exps,
+                screen_objective=str(args.autotune_screen_objective),
+                confirm_objective=str(args.autotune_confirm_objective),
+                screen_end_round=int(args.autotune_screen_end_round),
+                confirm_end_round=int(args.autotune_confirm_end_round),
+                screen_topk=int(args.autotune_screen_topk),
+                expected_seeds=seeds,
+            )
+            if iters:
+                cur = iters[-1]
+                print("autotune_progress:", cur.run_id, "stage=", _autotune_stage(cur), "md=", str(out_md))
+
+        if bool(args.once):
+            break
         time.sleep(int(args.interval))
 
 
 if __name__ == "__main__":
     main()
-

@@ -2512,13 +2512,189 @@ class Toolbox:
                 )
             if items:
                 self.controller._last_ranked_items = items
-        guardrail = self._apply_selection_guardrail(list(sample_ids or []))
-        final_ids = guardrail.get("sample_ids") if isinstance(guardrail, dict) else None
-        final_ids = (
-            final_ids
-            if isinstance(final_ids, list) and final_ids
-            else list(sample_ids or [])
+        controller_cfg = getattr(self.controller, "config", None)
+        expected = int(getattr(controller_cfg, "QUERY_SIZE", 0) or 0)
+        if expected <= 0:
+            expected = int(len(sample_ids or []))
+        expected = max(1, expected)
+
+        def _to_int(x: Any) -> Optional[int]:
+            if isinstance(x, int):
+                return int(x)
+            if isinstance(x, float) and int(x) == x:
+                return int(x)
+            if isinstance(x, str):
+                s = x.strip()
+                if s and (s.isdigit() or (s.startswith("-") and s[1:].isdigit())):
+                    try:
+                        return int(s)
+                    except Exception:
+                        return None
+            return None
+
+        unlabeled = getattr(self.controller, "unlabeled_indices", None)
+        unlabeled_int_set = None
+        unlabeled_str_set = None
+        if isinstance(unlabeled, list):
+            ints = []
+            strs = []
+            for x in unlabeled:
+                if isinstance(x, int):
+                    ints.append(int(x))
+                    strs.append(str(int(x)))
+                    continue
+                if isinstance(x, str):
+                    s = x.strip()
+                    if not s:
+                        continue
+                    strs.append(s)
+                    try:
+                        ints.append(int(s))
+                    except Exception:
+                        pass
+                    continue
+                v = _to_int(x)
+                if v is not None:
+                    ints.append(int(v))
+                    strs.append(str(int(v)))
+            unlabeled_int_set = set(ints)
+            unlabeled_str_set = set(strs)
+
+        def _dedup_keep_order(xs: List[str]) -> List[str]:
+            out: List[str] = []
+            seen: set[str] = set()
+            for v in xs:
+                if v in seen:
+                    continue
+                seen.add(v)
+                out.append(v)
+            return out
+
+        def _fallback_ranked_ids() -> List[str]:
+            ranked: List[str] = []
+            items = getattr(self.controller, "_last_ranked_items", None)
+            if isinstance(items, list) and items:
+                for it in items:
+                    if not isinstance(it, dict):
+                        continue
+                    sid = _to_int(it.get("sample_id"))
+                    if sid is None:
+                        continue
+                    ranked.append(str(int(sid)))
+                ranked = _dedup_keep_order(ranked)
+            if ranked:
+                return ranked
+
+            cache = self.candidates_cache if isinstance(self.candidates_cache, list) else []
+            scored: List[tuple] = []
+            for raw in cache:
+                if not isinstance(raw, dict):
+                    continue
+                sid = _to_int(raw.get("id", raw.get("sample_id")))
+                if sid is None:
+                    continue
+                score = raw.get("final_score")
+                try:
+                    score_f = float(score) if score is not None else float("-inf")
+                except Exception:
+                    score_f = float("-inf")
+                scored.append((score_f, str(int(sid))))
+            scored.sort(key=lambda x: (float(x[0]), int(x[1])), reverse=True)
+            ranked = [str(sid) for _, sid in scored]
+            return _dedup_keep_order(ranked)
+
+        def _is_valid_unlabeled(sid: str) -> bool:
+            if unlabeled_int_set is None and unlabeled_str_set is None:
+                return True
+            if unlabeled_str_set is not None and sid in unlabeled_str_set:
+                return True
+            if unlabeled_int_set is not None:
+                try:
+                    return int(sid) in unlabeled_int_set
+                except Exception:
+                    return False
+            return False
+
+        def _repair_to_expected(ids_in: List[Any], *, tag: str) -> List[str]:
+            raw_ids: List[str] = []
+            for x in list(ids_in or []):
+                v = _to_int(x)
+                if v is None:
+                    continue
+                raw_ids.append(str(int(v)))
+            raw_ids = _dedup_keep_order(raw_ids)
+            valid = [v for v in raw_ids if _is_valid_unlabeled(v)]
+
+            before_n = int(len(valid))
+            if before_n < expected:
+                ranked = _fallback_ranked_ids()
+                chosen = set(valid)
+                for v in ranked:
+                    if v in chosen:
+                        continue
+                    if not _is_valid_unlabeled(v):
+                        continue
+                    valid.append(str(v))
+                    chosen.add(str(v))
+                    if len(valid) >= expected:
+                        break
+
+            if len(valid) < expected and isinstance(unlabeled, list):
+                chosen = set(valid)
+                for v in unlabeled:
+                    if isinstance(v, int):
+                        sid = str(int(v))
+                    elif isinstance(v, str) and v.strip():
+                        sid = v.strip()
+                    else:
+                        vi = _to_int(v)
+                        if vi is None:
+                            continue
+                        sid = str(int(vi))
+                    if sid in chosen:
+                        continue
+                    valid.append(str(sid))
+                    chosen.add(str(sid))
+                    if len(valid) >= expected:
+                        break
+
+            repaired = valid[:expected]
+            if hasattr(self.controller, "_selection_context") and isinstance(
+                getattr(self.controller, "_selection_context", None), dict
+            ):
+                ctx = dict(getattr(self.controller, "_selection_context") or {})
+                if before_n < expected:
+                    ctx["selection_repair"] = {
+                        "applied": True,
+                        "tag": str(tag),
+                        "expected": int(expected),
+                        "valid_before": int(before_n),
+                        "valid_after": int(len(repaired)),
+                    }
+                self.controller._selection_context = ctx
+            if hasattr(self.controller, "_append_trace") and before_n < expected:
+                try:
+                    self.controller._append_trace(
+                        {
+                            "type": "selection_repair",
+                            "round": int(self._current_round()),
+                            "tag": str(tag),
+                            "expected": int(expected),
+                            "valid_before": int(before_n),
+                            "valid_after": int(len(repaired)),
+                        }
+                    )
+                except Exception:
+                    pass
+            return repaired
+
+        repaired_ids = _repair_to_expected(list(sample_ids or []), tag="agent_raw")
+        guardrail = self._apply_selection_guardrail([str(x) for x in repaired_ids])
+        guarded = guardrail.get("sample_ids") if isinstance(guardrail, dict) else None
+        final_ids = _repair_to_expected(
+            list(guarded or repaired_ids), tag="after_guardrail"
         )
+
         update_result = self.controller.update(final_ids)
         if not (
             isinstance(update_result, dict) and update_result.get("status") == "success"

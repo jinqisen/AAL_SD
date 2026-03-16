@@ -1,26 +1,15 @@
 {
   "auto_opt_iter00_cand0_00": {
+    "description": "AutoTuneOpt: cand0",
     "use_agent": true,
     "sampler_type": "ad_kucs",
     "lambda_override": null,
+    "grad_probe_source": "train_holdout",
+    "grad_probe_holdout_frac": 0.1,
+    "grad_probe_holdout_min": 50,
     "acquisition_protocol": {
       "uncertainty_aggregation": "mean",
       "diversity_postprocess": "none"
-    },
-    "enable_l3_selection_logging": true,
-    "enable_agent_prompt_logging": true,
-    "l3_topk": 256,
-    "l3_max_selected": 256,
-    "rollback_config": {
-      "mode": "adaptive_threshold",
-      "std_factor": 1.5,
-      "tau_min": 0.005
-    },
-    "control_permissions": {
-      "set_lambda": false,
-      "set_query_size": false,
-      "set_epochs_per_round": false,
-      "set_alpha": false
     },
     "agent_threshold_overrides": {
       "OVERFIT_RISK_HI": 1.2,
@@ -31,12 +20,16 @@
       "MIOU_LOW_GAIN_STREAK": 1,
       "LAMBDA_UP_K_U_GAP_MIN": 0.0,
       "LAMBDA_CLAMP_MIN": 0.05,
-      "LAMBDA_CLAMP_MAX": 0.92,
+      "LAMBDA_CLAMP_MAX": 0.8,
       "LAMBDA_DELTA_UP": 0.15,
       "LAMBDA_DELTA_DOWN": 0.1,
-      "OVERFIT_RISK_EMA_ALPHA": 0.6,
+      "OVERFIT_RISK_EMA_ALPHA": 0.5825557212921313,
       "LAMBDA_DOWN_COOLING_ROUNDS": 2.0
     },
+    "enable_l3_selection_logging": true,
+    "enable_agent_prompt_logging": true,
+    "l3_topk": 256,
+    "l3_max_selected": 256,
     "lambda_policy": {
       "mode": "warmup_risk_closed_loop",
       "r1_lambda": 0.0,
@@ -48,79 +41,71 @@
       "severe_logic": "and",
       "severe_tvc_key": "grad_train_val_cos_last",
       "risk_trigger": "ci",
-      "risk_ci_window": 6.12010229546318,
-      "risk_ci_quantile": 0.2,
+      "risk_ci_window": 6.0,
+      "risk_ci_quantile": 0.2260651542424119,
       "risk_ci_min_samples": 3,
       "lambda_smoothing": "ema",
       "lambda_smoothing_alpha": 0.85,
       "lambda_max_step": 0.15,
       "late_stage_ramp": {
-        "start_round": 9,
+        "start_round": 10,
         "end_round": 12,
         "start_lambda": 0.4,
-        "end_lambda": 0.7,
-        "conditional": true,
-        "require_low_gain": true,
-        "require_stable_tvc": true
+        "end_lambda": 0.7
       },
       "selection_guardrail": {
         "enabled": true,
-        "u_median_min": 0.4232549826951025,
-        "u_low_thresh": 0.43243737469076315,
-        "u_low_frac_max": 0.18720752894756296,
+        "u_median_min": 0.45,
+        "u_low_thresh": 0.4,
+        "u_low_frac_max": 0.17883967267774528,
         "lambda_step_down": 0.1,
         "max_steps": 5,
-        "fallback_quota_u_frac": 0.7,
-        "adaptive_thresholds": {
-          "enabled": true,
-          "window": 5,
-          "min_samples": 3,
-          "u_median_quantile": 0.3,
-          "u_low_frac_quantile": 0.8
-        }
+        "fallback_quota_u_frac": 0.7
       }
     },
-    "description": "AutoTuneOpt: cand0",
-    "epochs_per_round_override": 12
+    "rollback_config": {
+      "mode": "adaptive_threshold",
+      "std_factor": 1.5,
+      "tau_min": 0.005
+    },
+    "control_permissions": {
+      "set_lambda": false,
+      "set_query_size": false,
+      "set_epochs_per_round": false,
+      "set_alpha": false
+    }
   },
   "auto_opt_iter00_cand1_01": {
+    "description": "AutoTuneOpt: cand1",
     "use_agent": true,
     "sampler_type": "ad_kucs",
     "lambda_override": null,
+    "grad_probe_source": "train_holdout",
+    "grad_probe_holdout_frac": 0.1,
+    "grad_probe_holdout_min": 50,
     "acquisition_protocol": {
       "uncertainty_aggregation": "mean",
       "diversity_postprocess": "none"
     },
-    "enable_l3_selection_logging": true,
-    "enable_agent_prompt_logging": true,
-    "l3_topk": 256,
-    "l3_max_selected": 256,
-    "rollback_config": {
-      "mode": "adaptive_threshold",
-      "std_factor": 1.5,
-      "tau_min": 0.005
-    },
-    "control_permissions": {
-      "set_lambda": false,
-      "set_query_size": false,
-      "set_epochs_per_round": false,
-      "set_alpha": false
-    },
     "agent_threshold_overrides": {
       "OVERFIT_RISK_HI": 1.2,
-      "OVERFIT_RISK_LO": 0.6,
-      "OVERFIT_TVC_MIN_HI": 0.828768994377483,
+      "OVERFIT_RISK_LO": 0.6576787733609643,
+      "OVERFIT_TVC_MIN_HI": 0.8,
       "OVERFIT_RISK_LAMBDA_UP_MAX": 0.9,
       "MIOU_LOW_GAIN_THRESH": 0.01,
       "MIOU_LOW_GAIN_STREAK": 1,
       "LAMBDA_UP_K_U_GAP_MIN": 0.0,
       "LAMBDA_CLAMP_MIN": 0.05,
-      "LAMBDA_CLAMP_MAX": 0.92,
+      "LAMBDA_CLAMP_MAX": 0.8,
       "LAMBDA_DELTA_UP": 0.15,
       "LAMBDA_DELTA_DOWN": 0.1,
       "OVERFIT_RISK_EMA_ALPHA": 0.6,
-      "LAMBDA_DOWN_COOLING_ROUNDS": 2.0
+      "LAMBDA_DOWN_COOLING_ROUNDS": 1.8987390540549645
     },
+    "enable_l3_selection_logging": true,
+    "enable_agent_prompt_logging": true,
+    "l3_topk": 256,
+    "l3_max_selected": 256,
     "lambda_policy": {
       "mode": "warmup_risk_closed_loop",
       "r1_lambda": 0.0,
@@ -132,20 +117,17 @@
       "severe_logic": "and",
       "severe_tvc_key": "grad_train_val_cos_last",
       "risk_trigger": "ci",
-      "risk_ci_window": 5.81082221085581,
-      "risk_ci_quantile": 0.1932938892680361,
+      "risk_ci_window": 6.0,
+      "risk_ci_quantile": 0.2,
       "risk_ci_min_samples": 3,
       "lambda_smoothing": "ema",
-      "lambda_smoothing_alpha": 0.8863830074014554,
+      "lambda_smoothing_alpha": 0.85,
       "lambda_max_step": 0.15,
       "late_stage_ramp": {
-        "start_round": 9,
+        "start_round": 8,
         "end_round": 12,
-        "start_lambda": 0.4,
-        "end_lambda": 0.7,
-        "conditional": true,
-        "require_low_gain": true,
-        "require_stable_tvc": true
+        "start_lambda": 0.4258970831100336,
+        "end_lambda": 0.7
       },
       "selection_guardrail": {
         "enabled": true,
@@ -154,41 +136,32 @@
         "u_low_frac_max": 0.2,
         "lambda_step_down": 0.1,
         "max_steps": 5,
-        "fallback_quota_u_frac": 0.7,
-        "adaptive_thresholds": {
-          "enabled": true,
-          "window": 5,
-          "min_samples": 3,
-          "u_median_quantile": 0.3,
-          "u_low_frac_quantile": 0.8
-        }
+        "fallback_quota_u_frac": 0.7
       }
     },
-    "description": "AutoTuneOpt: cand1",
-    "epochs_per_round_override": 12
+    "rollback_config": {
+      "mode": "adaptive_threshold",
+      "std_factor": 1.5,
+      "tau_min": 0.005
+    },
+    "control_permissions": {
+      "set_lambda": false,
+      "set_query_size": false,
+      "set_epochs_per_round": false,
+      "set_alpha": false
+    }
   },
   "auto_opt_iter00_cand2_02": {
+    "description": "AutoTuneOpt: cand2",
     "use_agent": true,
     "sampler_type": "ad_kucs",
     "lambda_override": null,
+    "grad_probe_source": "train_holdout",
+    "grad_probe_holdout_frac": 0.1,
+    "grad_probe_holdout_min": 50,
     "acquisition_protocol": {
       "uncertainty_aggregation": "mean",
       "diversity_postprocess": "none"
-    },
-    "enable_l3_selection_logging": true,
-    "enable_agent_prompt_logging": true,
-    "l3_topk": 256,
-    "l3_max_selected": 256,
-    "rollback_config": {
-      "mode": "adaptive_threshold",
-      "std_factor": 1.5,
-      "tau_min": 0.005
-    },
-    "control_permissions": {
-      "set_lambda": false,
-      "set_query_size": false,
-      "set_epochs_per_round": false,
-      "set_alpha": false
     },
     "agent_threshold_overrides": {
       "OVERFIT_RISK_HI": 1.2,
@@ -198,13 +171,17 @@
       "MIOU_LOW_GAIN_THRESH": 0.01,
       "MIOU_LOW_GAIN_STREAK": 1,
       "LAMBDA_UP_K_U_GAP_MIN": 0.0,
-      "LAMBDA_CLAMP_MIN": 0.061952499896938566,
-      "LAMBDA_CLAMP_MAX": 0.92,
+      "LAMBDA_CLAMP_MIN": 0.05,
+      "LAMBDA_CLAMP_MAX": 0.8,
       "LAMBDA_DELTA_UP": 0.15,
       "LAMBDA_DELTA_DOWN": 0.1,
       "OVERFIT_RISK_EMA_ALPHA": 0.6,
       "LAMBDA_DOWN_COOLING_ROUNDS": 2.0
     },
+    "enable_l3_selection_logging": true,
+    "enable_agent_prompt_logging": true,
+    "l3_topk": 256,
+    "l3_max_selected": 256,
     "lambda_policy": {
       "mode": "warmup_risk_closed_loop",
       "r1_lambda": 0.0,
@@ -216,8 +193,8 @@
       "severe_logic": "and",
       "severe_tvc_key": "grad_train_val_cos_last",
       "risk_trigger": "ci",
-      "risk_ci_window": 6.0,
-      "risk_ci_quantile": 0.18632917486093792,
+      "risk_ci_window": 6.229248435981243,
+      "risk_ci_quantile": 0.2,
       "risk_ci_min_samples": 3,
       "lambda_smoothing": "ema",
       "lambda_smoothing_alpha": 0.85,
@@ -226,53 +203,41 @@
         "start_round": 9,
         "end_round": 12,
         "start_lambda": 0.4,
-        "end_lambda": 0.687466378975198,
-        "conditional": true,
-        "require_low_gain": true,
-        "require_stable_tvc": true
+        "end_lambda": 0.7
       },
       "selection_guardrail": {
         "enabled": true,
         "u_median_min": 0.45,
         "u_low_thresh": 0.4,
-        "u_low_frac_max": 0.2,
-        "lambda_step_down": 0.11387417714243415,
+        "u_low_frac_max": 0.19570270476566154,
+        "lambda_step_down": 0.1,
         "max_steps": 5,
-        "fallback_quota_u_frac": 0.7,
-        "adaptive_thresholds": {
-          "enabled": true,
-          "window": 5,
-          "min_samples": 3,
-          "u_median_quantile": 0.3,
-          "u_low_frac_quantile": 0.8
-        }
+        "fallback_quota_u_frac": 0.7
       }
     },
-    "description": "AutoTuneOpt: cand2",
-    "epochs_per_round_override": 12
+    "rollback_config": {
+      "mode": "adaptive_threshold",
+      "std_factor": 1.5,
+      "tau_min": 0.005
+    },
+    "control_permissions": {
+      "set_lambda": false,
+      "set_query_size": false,
+      "set_epochs_per_round": false,
+      "set_alpha": false
+    }
   },
   "auto_opt_iter00_cand3_03": {
+    "description": "AutoTuneOpt: cand3",
     "use_agent": true,
     "sampler_type": "ad_kucs",
     "lambda_override": null,
+    "grad_probe_source": "train_holdout",
+    "grad_probe_holdout_frac": 0.1,
+    "grad_probe_holdout_min": 50,
     "acquisition_protocol": {
       "uncertainty_aggregation": "mean",
       "diversity_postprocess": "none"
-    },
-    "enable_l3_selection_logging": true,
-    "enable_agent_prompt_logging": true,
-    "l3_topk": 256,
-    "l3_max_selected": 256,
-    "rollback_config": {
-      "mode": "adaptive_threshold",
-      "std_factor": 1.5,
-      "tau_min": 0.005
-    },
-    "control_permissions": {
-      "set_lambda": false,
-      "set_query_size": false,
-      "set_epochs_per_round": false,
-      "set_alpha": false
     },
     "agent_threshold_overrides": {
       "OVERFIT_RISK_HI": 1.2,
@@ -283,12 +248,16 @@
       "MIOU_LOW_GAIN_STREAK": 1,
       "LAMBDA_UP_K_U_GAP_MIN": 0.0,
       "LAMBDA_CLAMP_MIN": 0.05,
-      "LAMBDA_CLAMP_MAX": 0.92,
-      "LAMBDA_DELTA_UP": 0.15528958122907646,
+      "LAMBDA_CLAMP_MAX": 0.8,
+      "LAMBDA_DELTA_UP": 0.15,
       "LAMBDA_DELTA_DOWN": 0.1,
-      "OVERFIT_RISK_EMA_ALPHA": 0.6,
+      "OVERFIT_RISK_EMA_ALPHA": 0.6455986498307229,
       "LAMBDA_DOWN_COOLING_ROUNDS": 2.0
     },
+    "enable_l3_selection_logging": true,
+    "enable_agent_prompt_logging": true,
+    "l3_topk": 256,
+    "l3_max_selected": 256,
     "lambda_policy": {
       "mode": "warmup_risk_closed_loop",
       "r1_lambda": 0.0,
@@ -300,20 +269,17 @@
       "severe_logic": "and",
       "severe_tvc_key": "grad_train_val_cos_last",
       "risk_trigger": "ci",
-      "risk_ci_window": 6.640588741300288,
-      "risk_ci_quantile": 0.2,
+      "risk_ci_window": 6.0,
+      "risk_ci_quantile": 0.21245152270264855,
       "risk_ci_min_samples": 3,
       "lambda_smoothing": "ema",
-      "lambda_smoothing_alpha": 0.8460933679687832,
-      "lambda_max_step": 0.15,
+      "lambda_smoothing_alpha": 0.85,
+      "lambda_max_step": 0.1528654526474924,
       "late_stage_ramp": {
         "start_round": 9,
         "end_round": 12,
         "start_lambda": 0.4,
-        "end_lambda": 0.7,
-        "conditional": true,
-        "require_low_gain": true,
-        "require_stable_tvc": true
+        "end_lambda": 0.7610331483962202
       },
       "selection_guardrail": {
         "enabled": true,
@@ -322,31 +288,9 @@
         "u_low_frac_max": 0.2,
         "lambda_step_down": 0.1,
         "max_steps": 5,
-        "fallback_quota_u_frac": 0.7,
-        "adaptive_thresholds": {
-          "enabled": true,
-          "window": 5,
-          "min_samples": 3,
-          "u_median_quantile": 0.3,
-          "u_low_frac_quantile": 0.8
-        }
+        "fallback_quota_u_frac": 0.7
       }
     },
-    "description": "AutoTuneOpt: cand3",
-    "epochs_per_round_override": 13
-  },
-  "auto_opt_iter00_cand4_04": {
-    "use_agent": true,
-    "sampler_type": "ad_kucs",
-    "lambda_override": null,
-    "acquisition_protocol": {
-      "uncertainty_aggregation": "mean",
-      "diversity_postprocess": "none"
-    },
-    "enable_l3_selection_logging": true,
-    "enable_agent_prompt_logging": true,
-    "l3_topk": 256,
-    "l3_max_selected": 256,
     "rollback_config": {
       "mode": "adaptive_threshold",
       "std_factor": 1.5,
@@ -357,9 +301,22 @@
       "set_query_size": false,
       "set_epochs_per_round": false,
       "set_alpha": false
+    }
+  },
+  "auto_opt_iter00_cand4_04": {
+    "description": "AutoTuneOpt: cand4",
+    "use_agent": true,
+    "sampler_type": "ad_kucs",
+    "lambda_override": null,
+    "grad_probe_source": "train_holdout",
+    "grad_probe_holdout_frac": 0.1,
+    "grad_probe_holdout_min": 50,
+    "acquisition_protocol": {
+      "uncertainty_aggregation": "mean",
+      "diversity_postprocess": "none"
     },
     "agent_threshold_overrides": {
-      "OVERFIT_RISK_HI": 1.2,
+      "OVERFIT_RISK_HI": 1.3205667293513095,
       "OVERFIT_RISK_LO": 0.6,
       "OVERFIT_TVC_MIN_HI": 0.8,
       "OVERFIT_RISK_LAMBDA_UP_MAX": 0.9,
@@ -367,96 +324,16 @@
       "MIOU_LOW_GAIN_STREAK": 1,
       "LAMBDA_UP_K_U_GAP_MIN": 0.0,
       "LAMBDA_CLAMP_MIN": 0.05,
-      "LAMBDA_CLAMP_MAX": 0.92,
+      "LAMBDA_CLAMP_MAX": 0.8,
       "LAMBDA_DELTA_UP": 0.15,
-      "LAMBDA_DELTA_DOWN": 0.1,
+      "LAMBDA_DELTA_DOWN": 0.12127526234115994,
       "OVERFIT_RISK_EMA_ALPHA": 0.6,
       "LAMBDA_DOWN_COOLING_ROUNDS": 2.0
-    },
-    "lambda_policy": {
-      "mode": "warmup_risk_closed_loop",
-      "r1_lambda": 0.0,
-      "uncertainty_only_rounds": 2,
-      "warmup_start_round": 3,
-      "warmup_rounds": 1,
-      "warmup_lambda": 0.2,
-      "risk_control_start_round": 4,
-      "severe_logic": "and",
-      "severe_tvc_key": "grad_train_val_cos_last",
-      "risk_trigger": "ci",
-      "risk_ci_window": 6.0,
-      "risk_ci_quantile": 0.2,
-      "risk_ci_min_samples": 3,
-      "lambda_smoothing": "ema",
-      "lambda_smoothing_alpha": 0.85,
-      "lambda_max_step": 0.15620487180271275,
-      "late_stage_ramp": {
-        "start_round": 9,
-        "end_round": 12,
-        "start_lambda": 0.4,
-        "end_lambda": 0.7,
-        "conditional": true,
-        "require_low_gain": true,
-        "require_stable_tvc": true
-      },
-      "selection_guardrail": {
-        "enabled": true,
-        "u_median_min": 0.45,
-        "u_low_thresh": 0.4,
-        "u_low_frac_max": 0.2052533298537361,
-        "lambda_step_down": 0.1,
-        "max_steps": 5,
-        "fallback_quota_u_frac": 0.7,
-        "adaptive_thresholds": {
-          "enabled": true,
-          "window": 5,
-          "min_samples": 3,
-          "u_median_quantile": 0.3,
-          "u_low_frac_quantile": 0.8
-        }
-      }
-    },
-    "description": "AutoTuneOpt: cand4",
-    "epochs_per_round_override": 13
-  },
-  "auto_opt_iter00_cand5_05": {
-    "use_agent": true,
-    "sampler_type": "ad_kucs",
-    "lambda_override": null,
-    "acquisition_protocol": {
-      "uncertainty_aggregation": "mean",
-      "diversity_postprocess": "none"
     },
     "enable_l3_selection_logging": true,
     "enable_agent_prompt_logging": true,
     "l3_topk": 256,
     "l3_max_selected": 256,
-    "rollback_config": {
-      "mode": "adaptive_threshold",
-      "std_factor": 1.5,
-      "tau_min": 0.005
-    },
-    "control_permissions": {
-      "set_lambda": false,
-      "set_query_size": false,
-      "set_epochs_per_round": false,
-      "set_alpha": false
-    },
-    "agent_threshold_overrides": {
-      "OVERFIT_RISK_HI": 1.2,
-      "OVERFIT_RISK_LO": 0.6,
-      "OVERFIT_TVC_MIN_HI": 0.8,
-      "OVERFIT_RISK_LAMBDA_UP_MAX": 0.9,
-      "MIOU_LOW_GAIN_THRESH": 0.01,
-      "MIOU_LOW_GAIN_STREAK": 1,
-      "LAMBDA_UP_K_U_GAP_MIN": 0.0,
-      "LAMBDA_CLAMP_MIN": 0.05917536582137157,
-      "LAMBDA_CLAMP_MAX": 0.92,
-      "LAMBDA_DELTA_UP": 0.15,
-      "LAMBDA_DELTA_DOWN": 0.0957436201145892,
-      "OVERFIT_RISK_EMA_ALPHA": 0.6,
-      "LAMBDA_DOWN_COOLING_ROUNDS": 2.0
-    },
     "lambda_policy": {
       "mode": "warmup_risk_closed_loop",
       "r1_lambda": 0.0,
@@ -477,30 +354,1863 @@
       "late_stage_ramp": {
         "start_round": 9,
         "end_round": 12,
-        "start_lambda": 0.4,
-        "end_lambda": 0.7,
-        "conditional": true,
-        "require_low_gain": true,
-        "require_stable_tvc": true
+        "start_lambda": 0.3419981705980588,
+        "end_lambda": 0.7
       },
       "selection_guardrail": {
         "enabled": true,
         "u_median_min": 0.45,
-        "u_low_thresh": 0.41197455454903253,
-        "u_low_frac_max": 0.21931587622974408,
-        "lambda_step_down": 0.1,
+        "u_low_thresh": 0.4,
+        "u_low_frac_max": 0.2,
+        "lambda_step_down": 0.07778846391446816,
         "max_steps": 5,
-        "fallback_quota_u_frac": 0.7,
-        "adaptive_thresholds": {
-          "enabled": true,
-          "window": 5,
-          "min_samples": 3,
-          "u_median_quantile": 0.3,
-          "u_low_frac_quantile": 0.8
-        }
+        "fallback_quota_u_frac": 0.7
       }
     },
+    "rollback_config": {
+      "mode": "adaptive_threshold",
+      "std_factor": 1.5,
+      "tau_min": 0.005
+    },
+    "control_permissions": {
+      "set_lambda": false,
+      "set_query_size": false,
+      "set_epochs_per_round": false,
+      "set_alpha": false
+    }
+  },
+  "auto_opt_iter00_cand5_05": {
     "description": "AutoTuneOpt: cand5",
-    "epochs_per_round_override": 12
+    "use_agent": true,
+    "sampler_type": "ad_kucs",
+    "lambda_override": null,
+    "grad_probe_source": "train_holdout",
+    "grad_probe_holdout_frac": 0.1,
+    "grad_probe_holdout_min": 50,
+    "acquisition_protocol": {
+      "uncertainty_aggregation": "mean",
+      "diversity_postprocess": "none"
+    },
+    "agent_threshold_overrides": {
+      "OVERFIT_RISK_HI": 1.2,
+      "OVERFIT_RISK_LO": 0.5453834591911664,
+      "OVERFIT_TVC_MIN_HI": 0.8,
+      "OVERFIT_RISK_LAMBDA_UP_MAX": 0.9,
+      "MIOU_LOW_GAIN_THRESH": 0.01,
+      "MIOU_LOW_GAIN_STREAK": 1,
+      "LAMBDA_UP_K_U_GAP_MIN": 0.0,
+      "LAMBDA_CLAMP_MIN": 0.05,
+      "LAMBDA_CLAMP_MAX": 0.8,
+      "LAMBDA_DELTA_UP": 0.15,
+      "LAMBDA_DELTA_DOWN": 0.1,
+      "OVERFIT_RISK_EMA_ALPHA": 0.6,
+      "LAMBDA_DOWN_COOLING_ROUNDS": 2.2491113388279884
+    },
+    "enable_l3_selection_logging": true,
+    "enable_agent_prompt_logging": true,
+    "l3_topk": 256,
+    "l3_max_selected": 256,
+    "lambda_policy": {
+      "mode": "warmup_risk_closed_loop",
+      "r1_lambda": 0.0,
+      "uncertainty_only_rounds": 2,
+      "warmup_start_round": 3,
+      "warmup_rounds": 1,
+      "warmup_lambda": 0.2,
+      "risk_control_start_round": 4,
+      "severe_logic": "and",
+      "severe_tvc_key": "grad_train_val_cos_last",
+      "risk_trigger": "ci",
+      "risk_ci_window": 6.699516602736223,
+      "risk_ci_quantile": 0.2,
+      "risk_ci_min_samples": 3,
+      "lambda_smoothing": "ema",
+      "lambda_smoothing_alpha": 0.85,
+      "lambda_max_step": 0.15,
+      "late_stage_ramp": {
+        "start_round": 9,
+        "end_round": 12,
+        "start_lambda": 0.4,
+        "end_lambda": 0.7
+      },
+      "selection_guardrail": {
+        "enabled": true,
+        "u_median_min": 0.45,
+        "u_low_thresh": 0.4,
+        "u_low_frac_max": 0.2,
+        "lambda_step_down": 0.10315920143169921,
+        "max_steps": 5,
+        "fallback_quota_u_frac": 0.7
+      }
+    },
+    "rollback_config": {
+      "mode": "adaptive_threshold",
+      "std_factor": 1.5,
+      "tau_min": 0.005
+    },
+    "control_permissions": {
+      "set_lambda": false,
+      "set_query_size": false,
+      "set_epochs_per_round": false,
+      "set_alpha": false
+    }
+  },
+  "auto_opt_iter09_cand0_00": {
+    "use_agent": true,
+    "sampler_type": "ad_kucs",
+    "k_definition": "coreset_to_labeled",
+    "score_normalization": true,
+    "lambda_override": null,
+    "lambda_controller": null,
+    "lambda_policy": {
+      "mode": "warmup_risk_closed_loop",
+      "r1_lambda": 0.0,
+      "uncertainty_only_rounds": 2,
+      "warmup_start_round": 3,
+      "warmup_rounds": 1,
+      "warmup_lambda": 0.2,
+      "risk_control_start_round": 4,
+      "severe_logic": "and",
+      "severe_tvc_key": "grad_train_val_cos_last",
+      "risk_trigger": "ci",
+      "risk_ci_window": 6.331769525416814,
+      "risk_ci_quantile": 0.2,
+      "risk_ci_min_samples": 3,
+      "lambda_smoothing": "ema",
+      "lambda_smoothing_alpha": 0.85,
+      "lambda_max_step": 0.15,
+      "late_stage_ramp": {
+        "start_round": 9,
+        "end_round": 12,
+        "start_lambda": 0.4,
+        "end_lambda": 0.7
+      },
+      "selection_guardrail": {
+        "enabled": true,
+        "u_median_min": 0.45,
+        "u_low_thresh": 0.4,
+        "u_low_frac_max": 0.2,
+        "lambda_step_down": 0.1,
+        "max_steps": 5,
+        "fallback_quota_u_frac": 0.7
+      }
+    },
+    "require_explicit_lambda": null,
+    "rollback_config": {
+      "mode": "adaptive_threshold",
+      "std_factor": 1.5,
+      "tau_min": 0.005
+    },
+    "control_permissions": {
+      "set_lambda": false,
+      "set_query_size": false,
+      "set_epochs_per_round": false,
+      "set_alpha": false
+    },
+    "agent_threshold_overrides": {
+      "OVERFIT_RISK_HI": 1.1284109290184006,
+      "OVERFIT_RISK_LO": 0.581645263337967,
+      "OVERFIT_TVC_MIN_HI": 0.7738875353432791,
+      "OVERFIT_RISK_LAMBDA_UP_MAX": 0.9,
+      "MIOU_LOW_GAIN_THRESH": 0.01,
+      "MIOU_LOW_GAIN_STREAK": 1,
+      "LAMBDA_UP_K_U_GAP_MIN": 0.0,
+      "LAMBDA_CLAMP_MIN": 0.05,
+      "LAMBDA_CLAMP_MAX": 0.8,
+      "LAMBDA_DELTA_UP": 0.15,
+      "LAMBDA_DELTA_DOWN": 0.1,
+      "OVERFIT_RISK_EMA_ALPHA": 0.6,
+      "LAMBDA_DOWN_COOLING_ROUNDS": 2.0
+    },
+    "enable_l3_selection_logging": true,
+    "enable_agent_prompt_logging": true,
+    "description": "AutoTuneOpt: auto_opt_iter09_cand0_00"
+  },
+  "auto_opt_iter09_cand1_01": {
+    "use_agent": true,
+    "sampler_type": "ad_kucs",
+    "k_definition": "coreset_to_labeled",
+    "score_normalization": true,
+    "lambda_override": null,
+    "lambda_controller": null,
+    "lambda_policy": {
+      "mode": "warmup_risk_closed_loop",
+      "r1_lambda": 0.0,
+      "uncertainty_only_rounds": 2,
+      "warmup_start_round": 3,
+      "warmup_rounds": 1,
+      "warmup_lambda": 0.2,
+      "risk_control_start_round": 4,
+      "severe_logic": "and",
+      "severe_tvc_key": "grad_train_val_cos_last",
+      "risk_trigger": "ci",
+      "risk_ci_window": 6.0,
+      "risk_ci_quantile": 0.21075364086091936,
+      "risk_ci_min_samples": 3,
+      "lambda_smoothing": "ema",
+      "lambda_smoothing_alpha": 0.85,
+      "lambda_max_step": 0.15,
+      "late_stage_ramp": {
+        "start_round": 9,
+        "end_round": 12,
+        "start_lambda": 0.4,
+        "end_lambda": 0.7221905872577479
+      },
+      "selection_guardrail": {
+        "enabled": true,
+        "u_median_min": 0.45,
+        "u_low_thresh": 0.4,
+        "u_low_frac_max": 0.1675390933497523,
+        "lambda_step_down": 0.1,
+        "max_steps": 5,
+        "fallback_quota_u_frac": 0.7
+      }
+    },
+    "require_explicit_lambda": null,
+    "rollback_config": {
+      "mode": "adaptive_threshold",
+      "std_factor": 1.5,
+      "tau_min": 0.005
+    },
+    "control_permissions": {
+      "set_lambda": false,
+      "set_query_size": false,
+      "set_epochs_per_round": false,
+      "set_alpha": false
+    },
+    "agent_threshold_overrides": {
+      "OVERFIT_RISK_HI": 1.2,
+      "OVERFIT_RISK_LO": 0.6,
+      "OVERFIT_TVC_MIN_HI": 0.8,
+      "OVERFIT_RISK_LAMBDA_UP_MAX": 0.9,
+      "MIOU_LOW_GAIN_THRESH": 0.01,
+      "MIOU_LOW_GAIN_STREAK": 1,
+      "LAMBDA_UP_K_U_GAP_MIN": 0.0,
+      "LAMBDA_CLAMP_MIN": 0.05,
+      "LAMBDA_CLAMP_MAX": 0.8,
+      "LAMBDA_DELTA_UP": 0.15,
+      "LAMBDA_DELTA_DOWN": 0.1,
+      "OVERFIT_RISK_EMA_ALPHA": 0.6,
+      "LAMBDA_DOWN_COOLING_ROUNDS": 2.1642441408014275
+    },
+    "enable_l3_selection_logging": true,
+    "enable_agent_prompt_logging": true,
+    "description": "AutoTuneOpt: auto_opt_iter09_cand1_01"
+  },
+  "auto_opt_iter09_cand2_02": {
+    "use_agent": true,
+    "sampler_type": "ad_kucs",
+    "k_definition": "coreset_to_labeled",
+    "score_normalization": true,
+    "lambda_override": null,
+    "lambda_controller": null,
+    "lambda_policy": {
+      "mode": "warmup_risk_closed_loop",
+      "r1_lambda": 0.0,
+      "uncertainty_only_rounds": 2,
+      "warmup_start_round": 3,
+      "warmup_rounds": 1,
+      "warmup_lambda": 0.2,
+      "risk_control_start_round": 4,
+      "severe_logic": "and",
+      "severe_tvc_key": "grad_train_val_cos_last",
+      "risk_trigger": "ci",
+      "risk_ci_window": 6.0,
+      "risk_ci_quantile": 0.2,
+      "risk_ci_min_samples": 3,
+      "lambda_smoothing": "ema",
+      "lambda_smoothing_alpha": 0.85,
+      "lambda_max_step": 0.12198306803058609,
+      "late_stage_ramp": {
+        "start_round": 9,
+        "end_round": 12,
+        "start_lambda": 0.4,
+        "end_lambda": 0.7
+      },
+      "selection_guardrail": {
+        "enabled": true,
+        "u_median_min": 0.45,
+        "u_low_thresh": 0.37084309721465475,
+        "u_low_frac_max": 0.2,
+        "lambda_step_down": 0.1,
+        "max_steps": 5,
+        "fallback_quota_u_frac": 0.7
+      }
+    },
+    "require_explicit_lambda": null,
+    "rollback_config": {
+      "mode": "adaptive_threshold",
+      "std_factor": 1.5,
+      "tau_min": 0.005
+    },
+    "control_permissions": {
+      "set_lambda": false,
+      "set_query_size": false,
+      "set_epochs_per_round": false,
+      "set_alpha": false
+    },
+    "agent_threshold_overrides": {
+      "OVERFIT_RISK_HI": 1.2,
+      "OVERFIT_RISK_LO": 0.6,
+      "OVERFIT_TVC_MIN_HI": 0.7817543564355537,
+      "OVERFIT_RISK_LAMBDA_UP_MAX": 0.9,
+      "MIOU_LOW_GAIN_THRESH": 0.01,
+      "MIOU_LOW_GAIN_STREAK": 1,
+      "LAMBDA_UP_K_U_GAP_MIN": 0.0,
+      "LAMBDA_CLAMP_MIN": 0.05,
+      "LAMBDA_CLAMP_MAX": 0.8,
+      "LAMBDA_DELTA_UP": 0.15,
+      "LAMBDA_DELTA_DOWN": 0.1,
+      "OVERFIT_RISK_EMA_ALPHA": 0.6,
+      "LAMBDA_DOWN_COOLING_ROUNDS": 2.0
+    },
+    "enable_l3_selection_logging": true,
+    "enable_agent_prompt_logging": true,
+    "description": "AutoTuneOpt: auto_opt_iter09_cand2_02"
+  },
+  "auto_opt_iter09_cand3_03": {
+    "use_agent": true,
+    "sampler_type": "ad_kucs",
+    "k_definition": "coreset_to_labeled",
+    "score_normalization": true,
+    "lambda_override": null,
+    "lambda_controller": null,
+    "lambda_policy": {
+      "mode": "warmup_risk_closed_loop",
+      "r1_lambda": 0.0,
+      "uncertainty_only_rounds": 2,
+      "warmup_start_round": 3,
+      "warmup_rounds": 1,
+      "warmup_lambda": 0.2,
+      "risk_control_start_round": 4,
+      "severe_logic": "and",
+      "severe_tvc_key": "grad_train_val_cos_last",
+      "risk_trigger": "ci",
+      "risk_ci_window": 6.0,
+      "risk_ci_quantile": 0.2151875839023349,
+      "risk_ci_min_samples": 3,
+      "lambda_smoothing": "ema",
+      "lambda_smoothing_alpha": 0.8493342177925259,
+      "lambda_max_step": 0.15,
+      "late_stage_ramp": {
+        "start_round": 9,
+        "end_round": 12,
+        "start_lambda": 0.4,
+        "end_lambda": 0.7
+      },
+      "selection_guardrail": {
+        "enabled": true,
+        "u_median_min": 0.45,
+        "u_low_thresh": 0.4,
+        "u_low_frac_max": 0.2,
+        "lambda_step_down": 0.1,
+        "max_steps": 5,
+        "fallback_quota_u_frac": 0.7
+      }
+    },
+    "require_explicit_lambda": null,
+    "rollback_config": {
+      "mode": "adaptive_threshold",
+      "std_factor": 1.5,
+      "tau_min": 0.005
+    },
+    "control_permissions": {
+      "set_lambda": false,
+      "set_query_size": false,
+      "set_epochs_per_round": false,
+      "set_alpha": false
+    },
+    "agent_threshold_overrides": {
+      "OVERFIT_RISK_HI": 1.2,
+      "OVERFIT_RISK_LO": 0.6,
+      "OVERFIT_TVC_MIN_HI": 0.8,
+      "OVERFIT_RISK_LAMBDA_UP_MAX": 0.9,
+      "MIOU_LOW_GAIN_THRESH": 0.01,
+      "MIOU_LOW_GAIN_STREAK": 1,
+      "LAMBDA_UP_K_U_GAP_MIN": 0.0,
+      "LAMBDA_CLAMP_MIN": 0.05,
+      "LAMBDA_CLAMP_MAX": 0.8,
+      "LAMBDA_DELTA_UP": 0.15,
+      "LAMBDA_DELTA_DOWN": 0.1,
+      "OVERFIT_RISK_EMA_ALPHA": 0.6,
+      "LAMBDA_DOWN_COOLING_ROUNDS": 2.4384000035032725
+    },
+    "enable_l3_selection_logging": true,
+    "enable_agent_prompt_logging": true,
+    "description": "AutoTuneOpt: auto_opt_iter09_cand3_03"
+  },
+  "auto_opt_iter09_cand4_04": {
+    "use_agent": true,
+    "sampler_type": "ad_kucs",
+    "k_definition": "coreset_to_labeled",
+    "score_normalization": true,
+    "lambda_override": null,
+    "lambda_controller": null,
+    "lambda_policy": {
+      "mode": "warmup_risk_closed_loop",
+      "r1_lambda": 0.0,
+      "uncertainty_only_rounds": 2,
+      "warmup_start_round": 3,
+      "warmup_rounds": 1,
+      "warmup_lambda": 0.2,
+      "risk_control_start_round": 4,
+      "severe_logic": "and",
+      "severe_tvc_key": "grad_train_val_cos_last",
+      "risk_trigger": "ci",
+      "risk_ci_window": 5.646143200808059,
+      "risk_ci_quantile": 0.2,
+      "risk_ci_min_samples": 3,
+      "lambda_smoothing": "ema",
+      "lambda_smoothing_alpha": 0.85,
+      "lambda_max_step": 0.15,
+      "late_stage_ramp": {
+        "start_round": 9,
+        "end_round": 12,
+        "start_lambda": 0.4,
+        "end_lambda": 0.7
+      },
+      "selection_guardrail": {
+        "enabled": true,
+        "u_median_min": 0.41434211624354766,
+        "u_low_thresh": 0.4,
+        "u_low_frac_max": 0.2,
+        "lambda_step_down": 0.10468817488136713,
+        "max_steps": 5,
+        "fallback_quota_u_frac": 0.7
+      }
+    },
+    "require_explicit_lambda": null,
+    "rollback_config": {
+      "mode": "adaptive_threshold",
+      "std_factor": 1.5,
+      "tau_min": 0.005
+    },
+    "control_permissions": {
+      "set_lambda": false,
+      "set_query_size": false,
+      "set_epochs_per_round": false,
+      "set_alpha": false
+    },
+    "agent_threshold_overrides": {
+      "OVERFIT_RISK_HI": 1.2,
+      "OVERFIT_RISK_LO": 0.5914193317301507,
+      "OVERFIT_TVC_MIN_HI": 0.8,
+      "OVERFIT_RISK_LAMBDA_UP_MAX": 0.9,
+      "MIOU_LOW_GAIN_THRESH": 0.01,
+      "MIOU_LOW_GAIN_STREAK": 1,
+      "LAMBDA_UP_K_U_GAP_MIN": 0.0,
+      "LAMBDA_CLAMP_MIN": 0.05,
+      "LAMBDA_CLAMP_MAX": 0.8,
+      "LAMBDA_DELTA_UP": 0.15,
+      "LAMBDA_DELTA_DOWN": 0.1,
+      "OVERFIT_RISK_EMA_ALPHA": 0.6,
+      "LAMBDA_DOWN_COOLING_ROUNDS": 2.0
+    },
+    "enable_l3_selection_logging": true,
+    "enable_agent_prompt_logging": true,
+    "description": "AutoTuneOpt: auto_opt_iter09_cand4_04"
+  },
+  "auto_opt_iter09_cand5_05": {
+    "use_agent": true,
+    "sampler_type": "ad_kucs",
+    "k_definition": "coreset_to_labeled",
+    "score_normalization": true,
+    "lambda_override": null,
+    "lambda_controller": null,
+    "lambda_policy": {
+      "mode": "warmup_risk_closed_loop",
+      "r1_lambda": 0.0,
+      "uncertainty_only_rounds": 2,
+      "warmup_start_round": 3,
+      "warmup_rounds": 1,
+      "warmup_lambda": 0.2,
+      "risk_control_start_round": 4,
+      "severe_logic": "and",
+      "severe_tvc_key": "grad_train_val_cos_last",
+      "risk_trigger": "ci",
+      "risk_ci_window": 6.0,
+      "risk_ci_quantile": 0.2,
+      "risk_ci_min_samples": 3,
+      "lambda_smoothing": "ema",
+      "lambda_smoothing_alpha": 0.85,
+      "lambda_max_step": 0.17163609388903353,
+      "late_stage_ramp": {
+        "start_round": 9,
+        "end_round": 12,
+        "start_lambda": 0.38422676935705147,
+        "end_lambda": 0.7
+      },
+      "selection_guardrail": {
+        "enabled": true,
+        "u_median_min": 0.45,
+        "u_low_thresh": 0.4,
+        "u_low_frac_max": 0.2,
+        "lambda_step_down": 0.12216098534348001,
+        "max_steps": 5,
+        "fallback_quota_u_frac": 0.7
+      }
+    },
+    "require_explicit_lambda": null,
+    "rollback_config": {
+      "mode": "adaptive_threshold",
+      "std_factor": 1.5,
+      "tau_min": 0.005
+    },
+    "control_permissions": {
+      "set_lambda": false,
+      "set_query_size": false,
+      "set_epochs_per_round": false,
+      "set_alpha": false
+    },
+    "agent_threshold_overrides": {
+      "OVERFIT_RISK_HI": 1.2,
+      "OVERFIT_RISK_LO": 0.6,
+      "OVERFIT_TVC_MIN_HI": 0.8,
+      "OVERFIT_RISK_LAMBDA_UP_MAX": 0.9,
+      "MIOU_LOW_GAIN_THRESH": 0.01,
+      "MIOU_LOW_GAIN_STREAK": 1,
+      "LAMBDA_UP_K_U_GAP_MIN": 0.0,
+      "LAMBDA_CLAMP_MIN": 0.05,
+      "LAMBDA_CLAMP_MAX": 0.8,
+      "LAMBDA_DELTA_UP": 0.15,
+      "LAMBDA_DELTA_DOWN": 0.11960208899340728,
+      "OVERFIT_RISK_EMA_ALPHA": 0.6,
+      "LAMBDA_DOWN_COOLING_ROUNDS": 2.0
+    },
+    "enable_l3_selection_logging": true,
+    "enable_agent_prompt_logging": true,
+    "description": "AutoTuneOpt: auto_opt_iter09_cand5_05"
+  },
+  "auto_opt_iter10_cand0_00": {
+    "use_agent": true,
+    "sampler_type": "ad_kucs",
+    "k_definition": "coreset_to_labeled",
+    "score_normalization": true,
+    "lambda_override": null,
+    "lambda_controller": null,
+    "lambda_policy": {
+      "mode": "warmup_risk_closed_loop",
+      "r1_lambda": 0.0,
+      "uncertainty_only_rounds": 2,
+      "warmup_start_round": 3,
+      "warmup_rounds": 1,
+      "warmup_lambda": 0.2,
+      "risk_control_start_round": 4,
+      "severe_logic": "and",
+      "severe_tvc_key": "grad_train_val_cos_last",
+      "risk_trigger": "ci",
+      "risk_ci_window": 6.0,
+      "risk_ci_quantile": 0.2,
+      "risk_ci_min_samples": 3,
+      "lambda_smoothing": "ema",
+      "lambda_smoothing_alpha": 0.8233955442707389,
+      "lambda_max_step": 0.17163609388903353,
+      "late_stage_ramp": {
+        "start_round": 9,
+        "end_round": 12,
+        "start_lambda": 0.38422676935705147,
+        "end_lambda": 0.7
+      },
+      "selection_guardrail": {
+        "enabled": true,
+        "u_median_min": 0.4280619025940645,
+        "u_low_thresh": 0.4,
+        "u_low_frac_max": 0.23758705119828227,
+        "lambda_step_down": 0.12216098534348001,
+        "max_steps": 5,
+        "fallback_quota_u_frac": 0.7
+      }
+    },
+    "require_explicit_lambda": null,
+    "rollback_config": {
+      "mode": "adaptive_threshold",
+      "std_factor": 1.5,
+      "tau_min": 0.005
+    },
+    "control_permissions": {
+      "set_lambda": false,
+      "set_query_size": false,
+      "set_epochs_per_round": false,
+      "set_alpha": false
+    },
+    "agent_threshold_overrides": {
+      "OVERFIT_RISK_HI": 1.2,
+      "OVERFIT_RISK_LO": 0.6,
+      "OVERFIT_TVC_MIN_HI": 0.8,
+      "OVERFIT_RISK_LAMBDA_UP_MAX": 0.9,
+      "MIOU_LOW_GAIN_THRESH": 0.01,
+      "MIOU_LOW_GAIN_STREAK": 1,
+      "LAMBDA_UP_K_U_GAP_MIN": 0.0,
+      "LAMBDA_CLAMP_MIN": 0.05,
+      "LAMBDA_CLAMP_MAX": 0.8,
+      "LAMBDA_DELTA_UP": 0.15,
+      "LAMBDA_DELTA_DOWN": 0.11619460918636297,
+      "OVERFIT_RISK_EMA_ALPHA": 0.6,
+      "LAMBDA_DOWN_COOLING_ROUNDS": 2.0
+    },
+    "enable_l3_selection_logging": true,
+    "enable_agent_prompt_logging": true,
+    "description": "AutoTuneOpt: cand0",
+    "grad_probe_source": "train_holdout",
+    "grad_probe_holdout_frac": 0.1,
+    "grad_probe_holdout_min": 8
+  },
+  "auto_opt_iter10_cand1_01": {
+    "use_agent": true,
+    "sampler_type": "ad_kucs",
+    "k_definition": "coreset_to_labeled",
+    "score_normalization": true,
+    "lambda_override": null,
+    "lambda_controller": null,
+    "lambda_policy": {
+      "mode": "warmup_risk_closed_loop",
+      "r1_lambda": 0.0,
+      "uncertainty_only_rounds": 2,
+      "warmup_start_round": 3,
+      "warmup_rounds": 1,
+      "warmup_lambda": 0.2,
+      "risk_control_start_round": 4,
+      "severe_logic": "and",
+      "severe_tvc_key": "grad_train_val_cos_last",
+      "risk_trigger": "ci",
+      "risk_ci_window": 5.900932558673837,
+      "risk_ci_quantile": 0.2,
+      "risk_ci_min_samples": 3,
+      "lambda_smoothing": "ema",
+      "lambda_smoothing_alpha": 0.85,
+      "lambda_max_step": 0.17657117227652602,
+      "late_stage_ramp": {
+        "start_round": 9,
+        "end_round": 12,
+        "start_lambda": 0.38422676935705147,
+        "end_lambda": 0.7
+      },
+      "selection_guardrail": {
+        "enabled": true,
+        "u_median_min": 0.45,
+        "u_low_thresh": 0.4,
+        "u_low_frac_max": 0.2,
+        "lambda_step_down": 0.12216098534348001,
+        "max_steps": 5,
+        "fallback_quota_u_frac": 0.7
+      }
+    },
+    "require_explicit_lambda": null,
+    "rollback_config": {
+      "mode": "adaptive_threshold",
+      "std_factor": 1.5,
+      "tau_min": 0.005
+    },
+    "control_permissions": {
+      "set_lambda": false,
+      "set_query_size": false,
+      "set_epochs_per_round": false,
+      "set_alpha": false
+    },
+    "agent_threshold_overrides": {
+      "OVERFIT_RISK_HI": 1.2,
+      "OVERFIT_RISK_LO": 0.5714600651688602,
+      "OVERFIT_TVC_MIN_HI": 0.8,
+      "OVERFIT_RISK_LAMBDA_UP_MAX": 0.9,
+      "MIOU_LOW_GAIN_THRESH": 0.01,
+      "MIOU_LOW_GAIN_STREAK": 1,
+      "LAMBDA_UP_K_U_GAP_MIN": 0.0,
+      "LAMBDA_CLAMP_MIN": 0.05,
+      "LAMBDA_CLAMP_MAX": 0.8,
+      "LAMBDA_DELTA_UP": 0.15,
+      "LAMBDA_DELTA_DOWN": 0.11960208899340728,
+      "OVERFIT_RISK_EMA_ALPHA": 0.6,
+      "LAMBDA_DOWN_COOLING_ROUNDS": 1.7048857304301932
+    },
+    "enable_l3_selection_logging": true,
+    "enable_agent_prompt_logging": true,
+    "description": "AutoTuneOpt: cand1",
+    "grad_probe_source": "train_holdout",
+    "grad_probe_holdout_frac": 0.1,
+    "grad_probe_holdout_min": 8
+  },
+  "auto_opt_iter10_cand2_02": {
+    "use_agent": true,
+    "sampler_type": "ad_kucs",
+    "k_definition": "coreset_to_labeled",
+    "score_normalization": true,
+    "lambda_override": null,
+    "lambda_controller": null,
+    "lambda_policy": {
+      "mode": "warmup_risk_closed_loop",
+      "r1_lambda": 0.0,
+      "uncertainty_only_rounds": 2,
+      "warmup_start_round": 3,
+      "warmup_rounds": 1,
+      "warmup_lambda": 0.2,
+      "risk_control_start_round": 4,
+      "severe_logic": "and",
+      "severe_tvc_key": "grad_train_val_cos_last",
+      "risk_trigger": "ci",
+      "risk_ci_window": 6.0,
+      "risk_ci_quantile": 0.2,
+      "risk_ci_min_samples": 3,
+      "lambda_smoothing": "ema",
+      "lambda_smoothing_alpha": 0.85,
+      "lambda_max_step": 0.17419406982183372,
+      "late_stage_ramp": {
+        "start_round": 9,
+        "end_round": 12,
+        "start_lambda": 0.38422676935705147,
+        "end_lambda": 0.6794590863607259
+      },
+      "selection_guardrail": {
+        "enabled": true,
+        "u_median_min": 0.4512957675766946,
+        "u_low_thresh": 0.4,
+        "u_low_frac_max": 0.2,
+        "lambda_step_down": 0.12216098534348001,
+        "max_steps": 5,
+        "fallback_quota_u_frac": 0.7
+      }
+    },
+    "require_explicit_lambda": null,
+    "rollback_config": {
+      "mode": "adaptive_threshold",
+      "std_factor": 1.5,
+      "tau_min": 0.005
+    },
+    "control_permissions": {
+      "set_lambda": false,
+      "set_query_size": false,
+      "set_epochs_per_round": false,
+      "set_alpha": false
+    },
+    "agent_threshold_overrides": {
+      "OVERFIT_RISK_HI": 1.266328099420591,
+      "OVERFIT_RISK_LO": 0.6,
+      "OVERFIT_TVC_MIN_HI": 0.8,
+      "OVERFIT_RISK_LAMBDA_UP_MAX": 0.9,
+      "MIOU_LOW_GAIN_THRESH": 0.01,
+      "MIOU_LOW_GAIN_STREAK": 1,
+      "LAMBDA_UP_K_U_GAP_MIN": 0.0,
+      "LAMBDA_CLAMP_MIN": 0.05,
+      "LAMBDA_CLAMP_MAX": 0.8,
+      "LAMBDA_DELTA_UP": 0.15,
+      "LAMBDA_DELTA_DOWN": 0.11960208899340728,
+      "OVERFIT_RISK_EMA_ALPHA": 0.6,
+      "LAMBDA_DOWN_COOLING_ROUNDS": 2.0
+    },
+    "enable_l3_selection_logging": true,
+    "enable_agent_prompt_logging": true,
+    "description": "AutoTuneOpt: cand2",
+    "grad_probe_source": "train_holdout",
+    "grad_probe_holdout_frac": 0.1,
+    "grad_probe_holdout_min": 8
+  },
+  "auto_opt_iter10_cand3_03": {
+    "use_agent": true,
+    "sampler_type": "ad_kucs",
+    "k_definition": "coreset_to_labeled",
+    "score_normalization": true,
+    "lambda_override": null,
+    "lambda_controller": null,
+    "lambda_policy": {
+      "mode": "warmup_risk_closed_loop",
+      "r1_lambda": 0.0,
+      "uncertainty_only_rounds": 2,
+      "warmup_start_round": 3,
+      "warmup_rounds": 1,
+      "warmup_lambda": 0.2,
+      "risk_control_start_round": 4,
+      "severe_logic": "and",
+      "severe_tvc_key": "grad_train_val_cos_last",
+      "risk_trigger": "ci",
+      "risk_ci_window": 6.0,
+      "risk_ci_quantile": 0.2,
+      "risk_ci_min_samples": 3,
+      "lambda_smoothing": "ema",
+      "lambda_smoothing_alpha": 0.85,
+      "lambda_max_step": 0.19120197988046006,
+      "late_stage_ramp": {
+        "start_round": 9,
+        "end_round": 12,
+        "start_lambda": 0.38422676935705147,
+        "end_lambda": 0.7
+      },
+      "selection_guardrail": {
+        "enabled": true,
+        "u_median_min": 0.45,
+        "u_low_thresh": 0.4336664514830086,
+        "u_low_frac_max": 0.2,
+        "lambda_step_down": 0.12772167422852315,
+        "max_steps": 5,
+        "fallback_quota_u_frac": 0.7
+      }
+    },
+    "require_explicit_lambda": null,
+    "rollback_config": {
+      "mode": "adaptive_threshold",
+      "std_factor": 1.5,
+      "tau_min": 0.005
+    },
+    "control_permissions": {
+      "set_lambda": false,
+      "set_query_size": false,
+      "set_epochs_per_round": false,
+      "set_alpha": false
+    },
+    "agent_threshold_overrides": {
+      "OVERFIT_RISK_HI": 1.2,
+      "OVERFIT_RISK_LO": 0.6,
+      "OVERFIT_TVC_MIN_HI": 0.8,
+      "OVERFIT_RISK_LAMBDA_UP_MAX": 0.9,
+      "MIOU_LOW_GAIN_THRESH": 0.01,
+      "MIOU_LOW_GAIN_STREAK": 1,
+      "LAMBDA_UP_K_U_GAP_MIN": 0.0,
+      "LAMBDA_CLAMP_MIN": 0.05,
+      "LAMBDA_CLAMP_MAX": 0.8,
+      "LAMBDA_DELTA_UP": 0.15,
+      "LAMBDA_DELTA_DOWN": 0.1193158881307875,
+      "OVERFIT_RISK_EMA_ALPHA": 0.6,
+      "LAMBDA_DOWN_COOLING_ROUNDS": 2.0
+    },
+    "enable_l3_selection_logging": true,
+    "enable_agent_prompt_logging": true,
+    "description": "AutoTuneOpt: cand3",
+    "grad_probe_source": "train_holdout",
+    "grad_probe_holdout_frac": 0.1,
+    "grad_probe_holdout_min": 8
+  },
+  "auto_opt_iter10_cand4_04": {
+    "use_agent": true,
+    "sampler_type": "ad_kucs",
+    "k_definition": "coreset_to_labeled",
+    "score_normalization": true,
+    "lambda_override": null,
+    "lambda_controller": null,
+    "lambda_policy": {
+      "mode": "warmup_risk_closed_loop",
+      "r1_lambda": 0.0,
+      "uncertainty_only_rounds": 2,
+      "warmup_start_round": 3,
+      "warmup_rounds": 1,
+      "warmup_lambda": 0.2,
+      "risk_control_start_round": 4,
+      "severe_logic": "and",
+      "severe_tvc_key": "grad_train_val_cos_last",
+      "risk_trigger": "ci",
+      "risk_ci_window": 6.0,
+      "risk_ci_quantile": 0.2,
+      "risk_ci_min_samples": 3,
+      "lambda_smoothing": "ema",
+      "lambda_smoothing_alpha": 0.85,
+      "lambda_max_step": 0.16958997918918475,
+      "late_stage_ramp": {
+        "start_round": 9,
+        "end_round": 12,
+        "start_lambda": 0.38422676935705147,
+        "end_lambda": 0.7
+      },
+      "selection_guardrail": {
+        "enabled": true,
+        "u_median_min": 0.45,
+        "u_low_thresh": 0.4,
+        "u_low_frac_max": 0.2,
+        "lambda_step_down": 0.13644336736949544,
+        "max_steps": 5,
+        "fallback_quota_u_frac": 0.7
+      }
+    },
+    "require_explicit_lambda": null,
+    "rollback_config": {
+      "mode": "adaptive_threshold",
+      "std_factor": 1.5,
+      "tau_min": 0.005
+    },
+    "control_permissions": {
+      "set_lambda": false,
+      "set_query_size": false,
+      "set_epochs_per_round": false,
+      "set_alpha": false
+    },
+    "agent_threshold_overrides": {
+      "OVERFIT_RISK_HI": 1.2,
+      "OVERFIT_RISK_LO": 0.6,
+      "OVERFIT_TVC_MIN_HI": 0.8,
+      "OVERFIT_RISK_LAMBDA_UP_MAX": 0.9,
+      "MIOU_LOW_GAIN_THRESH": 0.01,
+      "MIOU_LOW_GAIN_STREAK": 1,
+      "LAMBDA_UP_K_U_GAP_MIN": 0.0,
+      "LAMBDA_CLAMP_MIN": 0.05,
+      "LAMBDA_CLAMP_MAX": 0.8,
+      "LAMBDA_DELTA_UP": 0.15,
+      "LAMBDA_DELTA_DOWN": 0.11960208899340728,
+      "OVERFIT_RISK_EMA_ALPHA": 0.6312351428995681,
+      "LAMBDA_DOWN_COOLING_ROUNDS": 2.0
+    },
+    "enable_l3_selection_logging": true,
+    "enable_agent_prompt_logging": true,
+    "description": "AutoTuneOpt: cand4",
+    "grad_probe_source": "train_holdout",
+    "grad_probe_holdout_frac": 0.1,
+    "grad_probe_holdout_min": 8
+  },
+  "auto_opt_iter10_cand5_05": {
+    "use_agent": true,
+    "sampler_type": "ad_kucs",
+    "k_definition": "coreset_to_labeled",
+    "score_normalization": true,
+    "lambda_override": null,
+    "lambda_controller": null,
+    "lambda_policy": {
+      "mode": "warmup_risk_closed_loop",
+      "r1_lambda": 0.0,
+      "uncertainty_only_rounds": 2,
+      "warmup_start_round": 3,
+      "warmup_rounds": 1,
+      "warmup_lambda": 0.2,
+      "risk_control_start_round": 4,
+      "severe_logic": "and",
+      "severe_tvc_key": "grad_train_val_cos_last",
+      "risk_trigger": "ci",
+      "risk_ci_window": 6.0,
+      "risk_ci_quantile": 0.2,
+      "risk_ci_min_samples": 3,
+      "lambda_smoothing": "ema",
+      "lambda_smoothing_alpha": 0.8703626500462874,
+      "lambda_max_step": 0.19004482242299897,
+      "late_stage_ramp": {
+        "start_round": 9,
+        "end_round": 12,
+        "start_lambda": 0.38422676935705147,
+        "end_lambda": 0.7
+      },
+      "selection_guardrail": {
+        "enabled": true,
+        "u_median_min": 0.45,
+        "u_low_thresh": 0.4,
+        "u_low_frac_max": 0.2,
+        "lambda_step_down": 0.10458736352078707,
+        "max_steps": 5,
+        "fallback_quota_u_frac": 0.7
+      }
+    },
+    "require_explicit_lambda": null,
+    "rollback_config": {
+      "mode": "adaptive_threshold",
+      "std_factor": 1.5,
+      "tau_min": 0.005
+    },
+    "control_permissions": {
+      "set_lambda": false,
+      "set_query_size": false,
+      "set_epochs_per_round": false,
+      "set_alpha": false
+    },
+    "agent_threshold_overrides": {
+      "OVERFIT_RISK_HI": 1.2,
+      "OVERFIT_RISK_LO": 0.6,
+      "OVERFIT_TVC_MIN_HI": 0.8,
+      "OVERFIT_RISK_LAMBDA_UP_MAX": 0.9,
+      "MIOU_LOW_GAIN_THRESH": 0.01,
+      "MIOU_LOW_GAIN_STREAK": 1,
+      "LAMBDA_UP_K_U_GAP_MIN": 0.0,
+      "LAMBDA_CLAMP_MIN": 0.05,
+      "LAMBDA_CLAMP_MAX": 0.8,
+      "LAMBDA_DELTA_UP": 0.15,
+      "LAMBDA_DELTA_DOWN": 0.11960208899340728,
+      "OVERFIT_RISK_EMA_ALPHA": 0.6,
+      "LAMBDA_DOWN_COOLING_ROUNDS": 2.1117300321624137
+    },
+    "enable_l3_selection_logging": true,
+    "enable_agent_prompt_logging": true,
+    "description": "AutoTuneOpt: cand5",
+    "grad_probe_source": "train_holdout",
+    "grad_probe_holdout_frac": 0.1,
+    "grad_probe_holdout_min": 8
+  },
+  "auto_opt_iter11_cand0_00": {
+    "use_agent": true,
+    "sampler_type": "ad_kucs",
+    "k_definition": "coreset_to_labeled",
+    "score_normalization": true,
+    "lambda_override": null,
+    "lambda_controller": null,
+    "lambda_policy": {
+      "mode": "warmup_risk_closed_loop",
+      "r1_lambda": 0.0,
+      "uncertainty_only_rounds": 2,
+      "warmup_start_round": 3,
+      "warmup_rounds": 1,
+      "warmup_lambda": 0.2,
+      "risk_control_start_round": 4,
+      "severe_logic": "and",
+      "severe_tvc_key": "grad_train_val_cos_last",
+      "risk_trigger": "ci",
+      "risk_ci_window": 6.0,
+      "risk_ci_quantile": 0.2,
+      "risk_ci_min_samples": 3,
+      "lambda_smoothing": "ema",
+      "lambda_smoothing_alpha": 0.85,
+      "lambda_max_step": 0.17163609388903353,
+      "late_stage_ramp": {
+        "start_round": 9,
+        "end_round": 12,
+        "start_lambda": 0.38422676935705147,
+        "end_lambda": 0.7445058936540134
+      },
+      "selection_guardrail": {
+        "enabled": true,
+        "u_median_min": 0.45,
+        "u_low_thresh": 0.4,
+        "u_low_frac_max": 0.2,
+        "lambda_step_down": 0.12216098534348001,
+        "max_steps": 5,
+        "fallback_quota_u_frac": 0.7
+      }
+    },
+    "require_explicit_lambda": null,
+    "rollback_config": {
+      "mode": "adaptive_threshold",
+      "std_factor": 1.5,
+      "tau_min": 0.005
+    },
+    "control_permissions": {
+      "set_lambda": false,
+      "set_query_size": false,
+      "set_epochs_per_round": false,
+      "set_alpha": false
+    },
+    "agent_threshold_overrides": {
+      "OVERFIT_RISK_HI": 1.2,
+      "OVERFIT_RISK_LO": 0.6,
+      "OVERFIT_TVC_MIN_HI": 0.7791318166869565,
+      "OVERFIT_RISK_LAMBDA_UP_MAX": 0.9,
+      "MIOU_LOW_GAIN_THRESH": 0.01,
+      "MIOU_LOW_GAIN_STREAK": 1,
+      "LAMBDA_UP_K_U_GAP_MIN": 0.0,
+      "LAMBDA_CLAMP_MIN": 0.05,
+      "LAMBDA_CLAMP_MAX": 0.8,
+      "LAMBDA_DELTA_UP": 0.15,
+      "LAMBDA_DELTA_DOWN": 0.11960208899340728,
+      "OVERFIT_RISK_EMA_ALPHA": 0.6,
+      "LAMBDA_DOWN_COOLING_ROUNDS": 2.282080954494374
+    },
+    "enable_l3_selection_logging": true,
+    "enable_agent_prompt_logging": true,
+    "description": "AutoTuneOpt: cand0",
+    "grad_probe_source": "train_holdout",
+    "grad_probe_holdout_frac": 0.1,
+    "grad_probe_holdout_min": 8
+  },
+  "auto_opt_iter11_cand1_01": {
+    "use_agent": true,
+    "sampler_type": "ad_kucs",
+    "k_definition": "coreset_to_labeled",
+    "score_normalization": true,
+    "lambda_override": null,
+    "lambda_controller": null,
+    "lambda_policy": {
+      "mode": "warmup_risk_closed_loop",
+      "r1_lambda": 0.0,
+      "uncertainty_only_rounds": 2,
+      "warmup_start_round": 3,
+      "warmup_rounds": 1,
+      "warmup_lambda": 0.2,
+      "risk_control_start_round": 4,
+      "severe_logic": "and",
+      "severe_tvc_key": "grad_train_val_cos_last",
+      "risk_trigger": "ci",
+      "risk_ci_window": 6.0,
+      "risk_ci_quantile": 0.2,
+      "risk_ci_min_samples": 3,
+      "lambda_smoothing": "ema",
+      "lambda_smoothing_alpha": 0.85,
+      "lambda_max_step": 0.17163609388903353,
+      "late_stage_ramp": {
+        "start_round": 9,
+        "end_round": 12,
+        "start_lambda": 0.38422676935705147,
+        "end_lambda": 0.6609018784999481
+      },
+      "selection_guardrail": {
+        "enabled": true,
+        "u_median_min": 0.45,
+        "u_low_thresh": 0.4,
+        "u_low_frac_max": 0.2,
+        "lambda_step_down": 0.11472605606619644,
+        "max_steps": 5,
+        "fallback_quota_u_frac": 0.7
+      }
+    },
+    "require_explicit_lambda": null,
+    "rollback_config": {
+      "mode": "adaptive_threshold",
+      "std_factor": 1.5,
+      "tau_min": 0.005
+    },
+    "control_permissions": {
+      "set_lambda": false,
+      "set_query_size": false,
+      "set_epochs_per_round": false,
+      "set_alpha": false
+    },
+    "agent_threshold_overrides": {
+      "OVERFIT_RISK_HI": 1.2,
+      "OVERFIT_RISK_LO": 0.6,
+      "OVERFIT_TVC_MIN_HI": 0.8,
+      "OVERFIT_RISK_LAMBDA_UP_MAX": 0.9,
+      "MIOU_LOW_GAIN_THRESH": 0.01,
+      "MIOU_LOW_GAIN_STREAK": 1,
+      "LAMBDA_UP_K_U_GAP_MIN": 0.0,
+      "LAMBDA_CLAMP_MIN": 0.05,
+      "LAMBDA_CLAMP_MAX": 0.8,
+      "LAMBDA_DELTA_UP": 0.15,
+      "LAMBDA_DELTA_DOWN": 0.11960208899340728,
+      "OVERFIT_RISK_EMA_ALPHA": 0.635192460798937,
+      "LAMBDA_DOWN_COOLING_ROUNDS": 2.0
+    },
+    "enable_l3_selection_logging": true,
+    "enable_agent_prompt_logging": true,
+    "description": "AutoTuneOpt: cand1",
+    "grad_probe_source": "train_holdout",
+    "grad_probe_holdout_frac": 0.1,
+    "grad_probe_holdout_min": 8
+  },
+  "auto_opt_iter11_cand2_02": {
+    "use_agent": true,
+    "sampler_type": "ad_kucs",
+    "k_definition": "coreset_to_labeled",
+    "score_normalization": true,
+    "lambda_override": null,
+    "lambda_controller": null,
+    "lambda_policy": {
+      "mode": "warmup_risk_closed_loop",
+      "r1_lambda": 0.0,
+      "uncertainty_only_rounds": 2,
+      "warmup_start_round": 3,
+      "warmup_rounds": 1,
+      "warmup_lambda": 0.2,
+      "risk_control_start_round": 4,
+      "severe_logic": "and",
+      "severe_tvc_key": "grad_train_val_cos_last",
+      "risk_trigger": "ci",
+      "risk_ci_window": 6.0,
+      "risk_ci_quantile": 0.2,
+      "risk_ci_min_samples": 3,
+      "lambda_smoothing": "ema",
+      "lambda_smoothing_alpha": 0.85,
+      "lambda_max_step": 0.17163609388903353,
+      "late_stage_ramp": {
+        "start_round": 9,
+        "end_round": 12,
+        "start_lambda": 0.38422676935705147,
+        "end_lambda": 0.7
+      },
+      "selection_guardrail": {
+        "enabled": true,
+        "u_median_min": 0.45,
+        "u_low_thresh": 0.386438664051693,
+        "u_low_frac_max": 0.2,
+        "lambda_step_down": 0.12216098534348001,
+        "max_steps": 5,
+        "fallback_quota_u_frac": 0.7
+      }
+    },
+    "require_explicit_lambda": null,
+    "rollback_config": {
+      "mode": "adaptive_threshold",
+      "std_factor": 1.5,
+      "tau_min": 0.005
+    },
+    "control_permissions": {
+      "set_lambda": false,
+      "set_query_size": false,
+      "set_epochs_per_round": false,
+      "set_alpha": false
+    },
+    "agent_threshold_overrides": {
+      "OVERFIT_RISK_HI": 1.204322989718642,
+      "OVERFIT_RISK_LO": 0.6,
+      "OVERFIT_TVC_MIN_HI": 0.8200548656624881,
+      "OVERFIT_RISK_LAMBDA_UP_MAX": 0.9,
+      "MIOU_LOW_GAIN_THRESH": 0.01,
+      "MIOU_LOW_GAIN_STREAK": 1,
+      "LAMBDA_UP_K_U_GAP_MIN": 0.0,
+      "LAMBDA_CLAMP_MIN": 0.05,
+      "LAMBDA_CLAMP_MAX": 0.8,
+      "LAMBDA_DELTA_UP": 0.1555665954620709,
+      "LAMBDA_DELTA_DOWN": 0.11960208899340728,
+      "OVERFIT_RISK_EMA_ALPHA": 0.6,
+      "LAMBDA_DOWN_COOLING_ROUNDS": 2.0
+    },
+    "enable_l3_selection_logging": true,
+    "enable_agent_prompt_logging": true,
+    "description": "AutoTuneOpt: cand2",
+    "grad_probe_source": "train_holdout",
+    "grad_probe_holdout_frac": 0.1,
+    "grad_probe_holdout_min": 8
+  },
+  "auto_opt_iter11_cand3_03": {
+    "use_agent": true,
+    "sampler_type": "ad_kucs",
+    "k_definition": "coreset_to_labeled",
+    "score_normalization": true,
+    "lambda_override": null,
+    "lambda_controller": null,
+    "lambda_policy": {
+      "mode": "warmup_risk_closed_loop",
+      "r1_lambda": 0.0,
+      "uncertainty_only_rounds": 2,
+      "warmup_start_round": 3,
+      "warmup_rounds": 1,
+      "warmup_lambda": 0.2,
+      "risk_control_start_round": 4,
+      "severe_logic": "and",
+      "severe_tvc_key": "grad_train_val_cos_last",
+      "risk_trigger": "ci",
+      "risk_ci_window": 6.0,
+      "risk_ci_quantile": 0.2,
+      "risk_ci_min_samples": 3,
+      "lambda_smoothing": "ema",
+      "lambda_smoothing_alpha": 0.85,
+      "lambda_max_step": 0.16766877788190093,
+      "late_stage_ramp": {
+        "start_round": 9,
+        "end_round": 12,
+        "start_lambda": 0.3600884209321177,
+        "end_lambda": 0.7
+      },
+      "selection_guardrail": {
+        "enabled": true,
+        "u_median_min": 0.45,
+        "u_low_thresh": 0.4,
+        "u_low_frac_max": 0.2304081464209366,
+        "lambda_step_down": 0.12216098534348001,
+        "max_steps": 5,
+        "fallback_quota_u_frac": 0.7
+      }
+    },
+    "require_explicit_lambda": null,
+    "rollback_config": {
+      "mode": "adaptive_threshold",
+      "std_factor": 1.5,
+      "tau_min": 0.005
+    },
+    "control_permissions": {
+      "set_lambda": false,
+      "set_query_size": false,
+      "set_epochs_per_round": false,
+      "set_alpha": false
+    },
+    "agent_threshold_overrides": {
+      "OVERFIT_RISK_HI": 1.2,
+      "OVERFIT_RISK_LO": 0.6,
+      "OVERFIT_TVC_MIN_HI": 0.8,
+      "OVERFIT_RISK_LAMBDA_UP_MAX": 0.9,
+      "MIOU_LOW_GAIN_THRESH": 0.01,
+      "MIOU_LOW_GAIN_STREAK": 1,
+      "LAMBDA_UP_K_U_GAP_MIN": 0.0,
+      "LAMBDA_CLAMP_MIN": 0.05,
+      "LAMBDA_CLAMP_MAX": 0.8,
+      "LAMBDA_DELTA_UP": 0.1509580202559759,
+      "LAMBDA_DELTA_DOWN": 0.11960208899340728,
+      "OVERFIT_RISK_EMA_ALPHA": 0.6,
+      "LAMBDA_DOWN_COOLING_ROUNDS": 2.0
+    },
+    "enable_l3_selection_logging": true,
+    "enable_agent_prompt_logging": true,
+    "description": "AutoTuneOpt: cand3",
+    "grad_probe_source": "train_holdout",
+    "grad_probe_holdout_frac": 0.1,
+    "grad_probe_holdout_min": 8
+  },
+  "auto_opt_iter11_cand4_04": {
+    "use_agent": true,
+    "sampler_type": "ad_kucs",
+    "k_definition": "coreset_to_labeled",
+    "score_normalization": true,
+    "lambda_override": null,
+    "lambda_controller": null,
+    "lambda_policy": {
+      "mode": "warmup_risk_closed_loop",
+      "r1_lambda": 0.0,
+      "uncertainty_only_rounds": 2,
+      "warmup_start_round": 3,
+      "warmup_rounds": 1,
+      "warmup_lambda": 0.2,
+      "risk_control_start_round": 4,
+      "severe_logic": "and",
+      "severe_tvc_key": "grad_train_val_cos_last",
+      "risk_trigger": "ci",
+      "risk_ci_window": 6.0,
+      "risk_ci_quantile": 0.2,
+      "risk_ci_min_samples": 3,
+      "lambda_smoothing": "ema",
+      "lambda_smoothing_alpha": 0.85,
+      "lambda_max_step": 0.17163609388903353,
+      "late_stage_ramp": {
+        "start_round": 9,
+        "end_round": 12,
+        "start_lambda": 0.3569609244914519,
+        "end_lambda": 0.7
+      },
+      "selection_guardrail": {
+        "enabled": true,
+        "u_median_min": 0.45,
+        "u_low_thresh": 0.4,
+        "u_low_frac_max": 0.16834204942676473,
+        "lambda_step_down": 0.12216098534348001,
+        "max_steps": 5,
+        "fallback_quota_u_frac": 0.7
+      }
+    },
+    "require_explicit_lambda": null,
+    "rollback_config": {
+      "mode": "adaptive_threshold",
+      "std_factor": 1.5,
+      "tau_min": 0.005
+    },
+    "control_permissions": {
+      "set_lambda": false,
+      "set_query_size": false,
+      "set_epochs_per_round": false,
+      "set_alpha": false
+    },
+    "agent_threshold_overrides": {
+      "OVERFIT_RISK_HI": 1.2,
+      "OVERFIT_RISK_LO": 0.6,
+      "OVERFIT_TVC_MIN_HI": 0.8,
+      "OVERFIT_RISK_LAMBDA_UP_MAX": 0.9,
+      "MIOU_LOW_GAIN_THRESH": 0.01,
+      "MIOU_LOW_GAIN_STREAK": 1,
+      "LAMBDA_UP_K_U_GAP_MIN": 0.0,
+      "LAMBDA_CLAMP_MIN": 0.05,
+      "LAMBDA_CLAMP_MAX": 0.8,
+      "LAMBDA_DELTA_UP": 0.15,
+      "LAMBDA_DELTA_DOWN": 0.11635135612411403,
+      "OVERFIT_RISK_EMA_ALPHA": 0.6,
+      "LAMBDA_DOWN_COOLING_ROUNDS": 2.2682575895568253
+    },
+    "enable_l3_selection_logging": true,
+    "enable_agent_prompt_logging": true,
+    "description": "AutoTuneOpt: cand4",
+    "grad_probe_source": "train_holdout",
+    "grad_probe_holdout_frac": 0.1,
+    "grad_probe_holdout_min": 8
+  },
+  "auto_opt_iter11_cand5_05": {
+    "use_agent": true,
+    "sampler_type": "ad_kucs",
+    "k_definition": "coreset_to_labeled",
+    "score_normalization": true,
+    "lambda_override": null,
+    "lambda_controller": null,
+    "lambda_policy": {
+      "mode": "warmup_risk_closed_loop",
+      "r1_lambda": 0.0,
+      "uncertainty_only_rounds": 2,
+      "warmup_start_round": 3,
+      "warmup_rounds": 1,
+      "warmup_lambda": 0.2,
+      "risk_control_start_round": 4,
+      "severe_logic": "and",
+      "severe_tvc_key": "grad_train_val_cos_last",
+      "risk_trigger": "ci",
+      "risk_ci_window": 6.0,
+      "risk_ci_quantile": 0.2,
+      "risk_ci_min_samples": 3,
+      "lambda_smoothing": "ema",
+      "lambda_smoothing_alpha": 0.85,
+      "lambda_max_step": 0.17163609388903353,
+      "late_stage_ramp": {
+        "start_round": 9,
+        "end_round": 12,
+        "start_lambda": 0.41187379615069664,
+        "end_lambda": 0.7
+      },
+      "selection_guardrail": {
+        "enabled": true,
+        "u_median_min": 0.4414936726529395,
+        "u_low_thresh": 0.4,
+        "u_low_frac_max": 0.2,
+        "lambda_step_down": 0.12216098534348001,
+        "max_steps": 5,
+        "fallback_quota_u_frac": 0.7
+      }
+    },
+    "require_explicit_lambda": null,
+    "rollback_config": {
+      "mode": "adaptive_threshold",
+      "std_factor": 1.5,
+      "tau_min": 0.005
+    },
+    "control_permissions": {
+      "set_lambda": false,
+      "set_query_size": false,
+      "set_epochs_per_round": false,
+      "set_alpha": false
+    },
+    "agent_threshold_overrides": {
+      "OVERFIT_RISK_HI": 1.2,
+      "OVERFIT_RISK_LO": 0.6,
+      "OVERFIT_TVC_MIN_HI": 0.8,
+      "OVERFIT_RISK_LAMBDA_UP_MAX": 0.9,
+      "MIOU_LOW_GAIN_THRESH": 0.01,
+      "MIOU_LOW_GAIN_STREAK": 1,
+      "LAMBDA_UP_K_U_GAP_MIN": 0.0,
+      "LAMBDA_CLAMP_MIN": 0.05,
+      "LAMBDA_CLAMP_MAX": 0.8,
+      "LAMBDA_DELTA_UP": 0.1565836316076594,
+      "LAMBDA_DELTA_DOWN": 0.11960208899340728,
+      "OVERFIT_RISK_EMA_ALPHA": 0.5787678352030916,
+      "LAMBDA_DOWN_COOLING_ROUNDS": 2.0
+    },
+    "enable_l3_selection_logging": true,
+    "enable_agent_prompt_logging": true,
+    "description": "AutoTuneOpt: cand5",
+    "grad_probe_source": "train_holdout",
+    "grad_probe_holdout_frac": 0.1,
+    "grad_probe_holdout_min": 8
+  },
+  "auto_opt_iter12_cand0_00": {
+    "use_agent": true,
+    "sampler_type": "ad_kucs",
+    "k_definition": "coreset_to_labeled",
+    "score_normalization": true,
+    "lambda_override": null,
+    "lambda_controller": null,
+    "lambda_policy": {
+      "mode": "warmup_risk_closed_loop",
+      "r1_lambda": 0.0,
+      "uncertainty_only_rounds": 2,
+      "warmup_start_round": 3,
+      "warmup_rounds": 1,
+      "warmup_lambda": 0.2,
+      "risk_control_start_round": 4,
+      "severe_logic": "and",
+      "severe_tvc_key": "grad_train_val_cos_last",
+      "risk_trigger": "ci",
+      "risk_ci_window": 6.226574618851265,
+      "risk_ci_quantile": 0.20469753331287005,
+      "risk_ci_min_samples": 3,
+      "lambda_smoothing": "ema",
+      "lambda_smoothing_alpha": 0.85,
+      "lambda_max_step": 0.17163609388903353,
+      "late_stage_ramp": {
+        "start_round": 9,
+        "end_round": 12,
+        "start_lambda": 0.38422676935705147,
+        "end_lambda": 0.7
+      },
+      "selection_guardrail": {
+        "enabled": true,
+        "u_median_min": 0.45,
+        "u_low_thresh": 0.4,
+        "u_low_frac_max": 0.2,
+        "lambda_step_down": 0.12216098534348001,
+        "max_steps": 5,
+        "fallback_quota_u_frac": 0.7
+      }
+    },
+    "require_explicit_lambda": null,
+    "rollback_config": {
+      "mode": "adaptive_threshold",
+      "std_factor": 1.5,
+      "tau_min": 0.005
+    },
+    "control_permissions": {
+      "set_lambda": false,
+      "set_query_size": false,
+      "set_epochs_per_round": false,
+      "set_alpha": false
+    },
+    "agent_threshold_overrides": {
+      "OVERFIT_RISK_HI": 1.2,
+      "OVERFIT_RISK_LO": 0.6,
+      "OVERFIT_TVC_MIN_HI": 0.8,
+      "OVERFIT_RISK_LAMBDA_UP_MAX": 0.9,
+      "MIOU_LOW_GAIN_THRESH": 0.01,
+      "MIOU_LOW_GAIN_STREAK": 1,
+      "LAMBDA_UP_K_U_GAP_MIN": 0.0,
+      "LAMBDA_CLAMP_MIN": 0.05,
+      "LAMBDA_CLAMP_MAX": 0.8,
+      "LAMBDA_DELTA_UP": 0.14629058102171252,
+      "LAMBDA_DELTA_DOWN": 0.11960208899340728,
+      "OVERFIT_RISK_EMA_ALPHA": 0.6,
+      "LAMBDA_DOWN_COOLING_ROUNDS": 2.0
+    },
+    "enable_l3_selection_logging": true,
+    "enable_agent_prompt_logging": true,
+    "description": "AutoTuneOpt: cand0",
+    "grad_probe_source": "train_holdout",
+    "grad_probe_holdout_frac": 0.1,
+    "grad_probe_holdout_min": 8
+  },
+  "auto_opt_iter12_cand1_01": {
+    "use_agent": true,
+    "sampler_type": "ad_kucs",
+    "k_definition": "coreset_to_labeled",
+    "score_normalization": true,
+    "lambda_override": null,
+    "lambda_controller": null,
+    "lambda_policy": {
+      "mode": "warmup_risk_closed_loop",
+      "r1_lambda": 0.0,
+      "uncertainty_only_rounds": 2,
+      "warmup_start_round": 3,
+      "warmup_rounds": 1,
+      "warmup_lambda": 0.2,
+      "risk_control_start_round": 4,
+      "severe_logic": "and",
+      "severe_tvc_key": "grad_train_val_cos_last",
+      "risk_trigger": "ci",
+      "risk_ci_window": 6.0,
+      "risk_ci_quantile": 0.2,
+      "risk_ci_min_samples": 3,
+      "lambda_smoothing": "ema",
+      "lambda_smoothing_alpha": 0.8536901520582364,
+      "lambda_max_step": 0.17163609388903353,
+      "late_stage_ramp": {
+        "start_round": 9,
+        "end_round": 12,
+        "start_lambda": 0.38422676935705147,
+        "end_lambda": 0.7
+      },
+      "selection_guardrail": {
+        "enabled": true,
+        "u_median_min": 0.45,
+        "u_low_thresh": 0.4,
+        "u_low_frac_max": 0.20120203149414279,
+        "lambda_step_down": 0.12582159186006653,
+        "max_steps": 5,
+        "fallback_quota_u_frac": 0.7
+      }
+    },
+    "require_explicit_lambda": null,
+    "rollback_config": {
+      "mode": "adaptive_threshold",
+      "std_factor": 1.5,
+      "tau_min": 0.005
+    },
+    "control_permissions": {
+      "set_lambda": false,
+      "set_query_size": false,
+      "set_epochs_per_round": false,
+      "set_alpha": false
+    },
+    "agent_threshold_overrides": {
+      "OVERFIT_RISK_HI": 1.2,
+      "OVERFIT_RISK_LO": 0.5932272839897913,
+      "OVERFIT_TVC_MIN_HI": 0.8,
+      "OVERFIT_RISK_LAMBDA_UP_MAX": 0.9,
+      "MIOU_LOW_GAIN_THRESH": 0.01,
+      "MIOU_LOW_GAIN_STREAK": 1,
+      "LAMBDA_UP_K_U_GAP_MIN": 0.0,
+      "LAMBDA_CLAMP_MIN": 0.05,
+      "LAMBDA_CLAMP_MAX": 0.8,
+      "LAMBDA_DELTA_UP": 0.15,
+      "LAMBDA_DELTA_DOWN": 0.11960208899340728,
+      "OVERFIT_RISK_EMA_ALPHA": 0.6,
+      "LAMBDA_DOWN_COOLING_ROUNDS": 2.0
+    },
+    "enable_l3_selection_logging": true,
+    "enable_agent_prompt_logging": true,
+    "description": "AutoTuneOpt: cand1",
+    "grad_probe_source": "train_holdout",
+    "grad_probe_holdout_frac": 0.1,
+    "grad_probe_holdout_min": 8
+  },
+  "auto_opt_iter12_cand2_02": {
+    "use_agent": true,
+    "sampler_type": "ad_kucs",
+    "k_definition": "coreset_to_labeled",
+    "score_normalization": true,
+    "lambda_override": null,
+    "lambda_controller": null,
+    "lambda_policy": {
+      "mode": "warmup_risk_closed_loop",
+      "r1_lambda": 0.0,
+      "uncertainty_only_rounds": 2,
+      "warmup_start_round": 3,
+      "warmup_rounds": 1,
+      "warmup_lambda": 0.2,
+      "risk_control_start_round": 4,
+      "severe_logic": "and",
+      "severe_tvc_key": "grad_train_val_cos_last",
+      "risk_trigger": "ci",
+      "risk_ci_window": 6.0,
+      "risk_ci_quantile": 0.2,
+      "risk_ci_min_samples": 3,
+      "lambda_smoothing": "ema",
+      "lambda_smoothing_alpha": 0.85,
+      "lambda_max_step": 0.1802750205334276,
+      "late_stage_ramp": {
+        "start_round": 9,
+        "end_round": 12,
+        "start_lambda": 0.38422676935705147,
+        "end_lambda": 0.7
+      },
+      "selection_guardrail": {
+        "enabled": true,
+        "u_median_min": 0.45,
+        "u_low_thresh": 0.4,
+        "u_low_frac_max": 0.2,
+        "lambda_step_down": 0.12216098534348001,
+        "max_steps": 5,
+        "fallback_quota_u_frac": 0.7
+      }
+    },
+    "require_explicit_lambda": null,
+    "rollback_config": {
+      "mode": "adaptive_threshold",
+      "std_factor": 1.5,
+      "tau_min": 0.005
+    },
+    "control_permissions": {
+      "set_lambda": false,
+      "set_query_size": false,
+      "set_epochs_per_round": false,
+      "set_alpha": false
+    },
+    "agent_threshold_overrides": {
+      "OVERFIT_RISK_HI": 1.2,
+      "OVERFIT_RISK_LO": 0.5870620445490016,
+      "OVERFIT_TVC_MIN_HI": 0.8,
+      "OVERFIT_RISK_LAMBDA_UP_MAX": 0.9,
+      "MIOU_LOW_GAIN_THRESH": 0.01,
+      "MIOU_LOW_GAIN_STREAK": 1,
+      "LAMBDA_UP_K_U_GAP_MIN": 0.0,
+      "LAMBDA_CLAMP_MIN": 0.05,
+      "LAMBDA_CLAMP_MAX": 0.8,
+      "LAMBDA_DELTA_UP": 0.14251996258420416,
+      "LAMBDA_DELTA_DOWN": 0.11960208899340728,
+      "OVERFIT_RISK_EMA_ALPHA": 0.6,
+      "LAMBDA_DOWN_COOLING_ROUNDS": 2.0
+    },
+    "enable_l3_selection_logging": true,
+    "enable_agent_prompt_logging": true,
+    "description": "AutoTuneOpt: cand2",
+    "grad_probe_source": "train_holdout",
+    "grad_probe_holdout_frac": 0.1,
+    "grad_probe_holdout_min": 8
+  },
+  "auto_opt_iter12_cand3_03": {
+    "use_agent": true,
+    "sampler_type": "ad_kucs",
+    "k_definition": "coreset_to_labeled",
+    "score_normalization": true,
+    "lambda_override": null,
+    "lambda_controller": null,
+    "lambda_policy": {
+      "mode": "warmup_risk_closed_loop",
+      "r1_lambda": 0.0,
+      "uncertainty_only_rounds": 2,
+      "warmup_start_round": 3,
+      "warmup_rounds": 1,
+      "warmup_lambda": 0.2,
+      "risk_control_start_round": 4,
+      "severe_logic": "and",
+      "severe_tvc_key": "grad_train_val_cos_last",
+      "risk_trigger": "ci",
+      "risk_ci_window": 6.259308338235573,
+      "risk_ci_quantile": 0.2,
+      "risk_ci_min_samples": 3,
+      "lambda_smoothing": "ema",
+      "lambda_smoothing_alpha": 0.8316470035360832,
+      "lambda_max_step": 0.17163609388903353,
+      "late_stage_ramp": {
+        "start_round": 9,
+        "end_round": 12,
+        "start_lambda": 0.38422676935705147,
+        "end_lambda": 0.7
+      },
+      "selection_guardrail": {
+        "enabled": true,
+        "u_median_min": 0.45,
+        "u_low_thresh": 0.4,
+        "u_low_frac_max": 0.2,
+        "lambda_step_down": 0.12216098534348001,
+        "max_steps": 5,
+        "fallback_quota_u_frac": 0.7
+      }
+    },
+    "require_explicit_lambda": null,
+    "rollback_config": {
+      "mode": "adaptive_threshold",
+      "std_factor": 1.5,
+      "tau_min": 0.005
+    },
+    "control_permissions": {
+      "set_lambda": false,
+      "set_query_size": false,
+      "set_epochs_per_round": false,
+      "set_alpha": false
+    },
+    "agent_threshold_overrides": {
+      "OVERFIT_RISK_HI": 1.2582477407997081,
+      "OVERFIT_RISK_LO": 0.5806642148551403,
+      "OVERFIT_TVC_MIN_HI": 0.8,
+      "OVERFIT_RISK_LAMBDA_UP_MAX": 0.9,
+      "MIOU_LOW_GAIN_THRESH": 0.01,
+      "MIOU_LOW_GAIN_STREAK": 1,
+      "LAMBDA_UP_K_U_GAP_MIN": 0.0,
+      "LAMBDA_CLAMP_MIN": 0.05,
+      "LAMBDA_CLAMP_MAX": 0.8,
+      "LAMBDA_DELTA_UP": 0.15,
+      "LAMBDA_DELTA_DOWN": 0.11960208899340728,
+      "OVERFIT_RISK_EMA_ALPHA": 0.6,
+      "LAMBDA_DOWN_COOLING_ROUNDS": 2.0
+    },
+    "enable_l3_selection_logging": true,
+    "enable_agent_prompt_logging": true,
+    "description": "AutoTuneOpt: cand3",
+    "grad_probe_source": "train_holdout",
+    "grad_probe_holdout_frac": 0.1,
+    "grad_probe_holdout_min": 8
+  },
+  "auto_opt_iter12_cand4_04": {
+    "use_agent": true,
+    "sampler_type": "ad_kucs",
+    "k_definition": "coreset_to_labeled",
+    "score_normalization": true,
+    "lambda_override": null,
+    "lambda_controller": null,
+    "lambda_policy": {
+      "mode": "warmup_risk_closed_loop",
+      "r1_lambda": 0.0,
+      "uncertainty_only_rounds": 2,
+      "warmup_start_round": 3,
+      "warmup_rounds": 1,
+      "warmup_lambda": 0.2,
+      "risk_control_start_round": 4,
+      "severe_logic": "and",
+      "severe_tvc_key": "grad_train_val_cos_last",
+      "risk_trigger": "ci",
+      "risk_ci_window": 6.0,
+      "risk_ci_quantile": 0.2,
+      "risk_ci_min_samples": 3,
+      "lambda_smoothing": "ema",
+      "lambda_smoothing_alpha": 0.873587510368601,
+      "lambda_max_step": 0.17163609388903353,
+      "late_stage_ramp": {
+        "start_round": 9,
+        "end_round": 12,
+        "start_lambda": 0.38422676935705147,
+        "end_lambda": 0.7
+      },
+      "selection_guardrail": {
+        "enabled": true,
+        "u_median_min": 0.45,
+        "u_low_thresh": 0.39000085696067754,
+        "u_low_frac_max": 0.21692555077836945,
+        "lambda_step_down": 0.12216098534348001,
+        "max_steps": 5,
+        "fallback_quota_u_frac": 0.7
+      }
+    },
+    "require_explicit_lambda": null,
+    "rollback_config": {
+      "mode": "adaptive_threshold",
+      "std_factor": 1.5,
+      "tau_min": 0.005
+    },
+    "control_permissions": {
+      "set_lambda": false,
+      "set_query_size": false,
+      "set_epochs_per_round": false,
+      "set_alpha": false
+    },
+    "agent_threshold_overrides": {
+      "OVERFIT_RISK_HI": 1.2,
+      "OVERFIT_RISK_LO": 0.6,
+      "OVERFIT_TVC_MIN_HI": 0.8,
+      "OVERFIT_RISK_LAMBDA_UP_MAX": 0.9,
+      "MIOU_LOW_GAIN_THRESH": 0.01,
+      "MIOU_LOW_GAIN_STREAK": 1,
+      "LAMBDA_UP_K_U_GAP_MIN": 0.0,
+      "LAMBDA_CLAMP_MIN": 0.05,
+      "LAMBDA_CLAMP_MAX": 0.8,
+      "LAMBDA_DELTA_UP": 0.15,
+      "LAMBDA_DELTA_DOWN": 0.11960208899340728,
+      "OVERFIT_RISK_EMA_ALPHA": 0.6,
+      "LAMBDA_DOWN_COOLING_ROUNDS": 2.0
+    },
+    "enable_l3_selection_logging": true,
+    "enable_agent_prompt_logging": true,
+    "description": "AutoTuneOpt: cand4",
+    "grad_probe_source": "train_holdout",
+    "grad_probe_holdout_frac": 0.1,
+    "grad_probe_holdout_min": 8
+  },
+  "auto_opt_iter12_cand5_05": {
+    "use_agent": true,
+    "sampler_type": "ad_kucs",
+    "k_definition": "coreset_to_labeled",
+    "score_normalization": true,
+    "lambda_override": null,
+    "lambda_controller": null,
+    "lambda_policy": {
+      "mode": "warmup_risk_closed_loop",
+      "r1_lambda": 0.0,
+      "uncertainty_only_rounds": 2,
+      "warmup_start_round": 3,
+      "warmup_rounds": 1,
+      "warmup_lambda": 0.2,
+      "risk_control_start_round": 4,
+      "severe_logic": "and",
+      "severe_tvc_key": "grad_train_val_cos_last",
+      "risk_trigger": "ci",
+      "risk_ci_window": 6.0,
+      "risk_ci_quantile": 0.2,
+      "risk_ci_min_samples": 3,
+      "lambda_smoothing": "ema",
+      "lambda_smoothing_alpha": 0.85,
+      "lambda_max_step": 0.17163609388903353,
+      "late_stage_ramp": {
+        "start_round": 9,
+        "end_round": 12,
+        "start_lambda": 0.38422676935705147,
+        "end_lambda": 0.7
+      },
+      "selection_guardrail": {
+        "enabled": true,
+        "u_median_min": 0.45,
+        "u_low_thresh": 0.4,
+        "u_low_frac_max": 0.2,
+        "lambda_step_down": 0.12216098534348001,
+        "max_steps": 5,
+        "fallback_quota_u_frac": 0.7
+      }
+    },
+    "require_explicit_lambda": null,
+    "rollback_config": {
+      "mode": "adaptive_threshold",
+      "std_factor": 1.5,
+      "tau_min": 0.005
+    },
+    "control_permissions": {
+      "set_lambda": false,
+      "set_query_size": false,
+      "set_epochs_per_round": false,
+      "set_alpha": false
+    },
+    "agent_threshold_overrides": {
+      "OVERFIT_RISK_HI": 1.1957555725008477,
+      "OVERFIT_RISK_LO": 0.6,
+      "OVERFIT_TVC_MIN_HI": 0.8,
+      "OVERFIT_RISK_LAMBDA_UP_MAX": 0.9,
+      "MIOU_LOW_GAIN_THRESH": 0.01,
+      "MIOU_LOW_GAIN_STREAK": 1,
+      "LAMBDA_UP_K_U_GAP_MIN": 0.0,
+      "LAMBDA_CLAMP_MIN": 0.05,
+      "LAMBDA_CLAMP_MAX": 0.8,
+      "LAMBDA_DELTA_UP": 0.15,
+      "LAMBDA_DELTA_DOWN": 0.10942682804040804,
+      "OVERFIT_RISK_EMA_ALPHA": 0.6337269896503179,
+      "LAMBDA_DOWN_COOLING_ROUNDS": 1.9927036921871484
+    },
+    "enable_l3_selection_logging": true,
+    "enable_agent_prompt_logging": true,
+    "description": "AutoTuneOpt: cand5",
+    "grad_probe_source": "train_holdout",
+    "grad_probe_holdout_frac": 0.1,
+    "grad_probe_holdout_min": 8
   }
 }

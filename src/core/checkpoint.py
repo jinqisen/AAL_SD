@@ -6,6 +6,8 @@ from datetime import datetime
 
 logger = logging.getLogger(__name__)
 
+from utils import atomic_write_json, read_json_dict
+
 class CheckpointManager:
     def __init__(self, checkpoint_dir, experiment_name):
         self.checkpoint_dir = checkpoint_dir
@@ -24,10 +26,7 @@ class CheckpointManager:
             state_dict['timestamp'] = datetime.now().isoformat()
             state_dict['experiment_name'] = self.experiment_name
             os.makedirs(self.checkpoint_dir, exist_ok=True)
-            temp_path = self.checkpoint_path + ".tmp"
-            with open(temp_path, 'w', encoding='utf-8') as f:
-                json.dump(state_dict, f, indent=4, ensure_ascii=False)
-            os.rename(temp_path, self.checkpoint_path)
+            atomic_write_json(self.checkpoint_path, state_dict, indent=4)
             logger.info(f"Checkpoint saved to {self.checkpoint_path}")
             return True
         except Exception as e:
@@ -45,8 +44,7 @@ class CheckpointManager:
             return None
             
         try:
-            with open(self.checkpoint_path, 'r', encoding='utf-8') as f:
-                state_dict = json.load(f)
+            state_dict = read_json_dict(self.checkpoint_path)
             logger.info(f"Checkpoint loaded from {self.checkpoint_path}")
             return state_dict
         except Exception as e:

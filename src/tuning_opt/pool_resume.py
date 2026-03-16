@@ -7,22 +7,15 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
+from utils import atomic_write_json, read_json_dict
+
 
 def _read_json(path: Path) -> Optional[Dict[str, Any]]:
-    if not path.exists():
-        return None
-    try:
-        obj = json.loads(path.read_text(encoding="utf-8"))
-        return obj if isinstance(obj, dict) else None
-    except Exception:
-        return None
+    return read_json_dict(path)
 
 
 def _write_json_atomic(path: Path, payload: Dict[str, Any]) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.with_suffix(path.suffix + ".tmp")
-    tmp.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
-    os.replace(tmp, path)
+    atomic_write_json(path, payload, indent=2)
 
 
 def _read_csv_rows(path: Path) -> Tuple[List[Dict[str, str]], List[str]]:
@@ -227,4 +220,3 @@ class PoolResumeManager:
             "model_selection": "best_val",
             "experiment_name": str(exp_name),
         }
-
