@@ -1,6 +1,21 @@
 import sys
 from unittest.mock import MagicMock
 
+_SENTINEL = object()
+_MOCKED_MODULE_NAMES = [
+    'torch',
+    'torch.nn',
+    'torch.nn.functional',
+    'torch.optim',
+    'torch.utils',
+    'torch.utils.data',
+    'torchvision',
+    'torchvision.transforms',
+    'cv2',
+    'segmentation_models_pytorch',
+]
+_ORIGINAL_MODULES = {name: sys.modules.get(name, _SENTINEL) for name in _MOCKED_MODULE_NAMES}
+
 # Mock heavy dependencies before importing src modules
 mock_torch = MagicMock()
 sys.modules['torch'] = mock_torch
@@ -12,16 +27,7 @@ sys.modules['torch.utils.data'] = MagicMock()
 sys.modules['torchvision'] = MagicMock()
 sys.modules['torchvision.transforms'] = MagicMock()
 sys.modules['cv2'] = MagicMock()
-sys.modules['sklearn'] = MagicMock()
-sys.modules['sklearn.model_selection'] = MagicMock()
-sys.modules['sklearn.metrics'] = MagicMock()
-sys.modules['sklearn.cluster'] = MagicMock()
-sys.modules['scipy'] = MagicMock()
-sys.modules['scipy.spatial'] = MagicMock()
-sys.modules['scipy.spatial.distance'] = MagicMock()
-sys.modules['scipy.stats'] = MagicMock()
 sys.modules['segmentation_models_pytorch'] = MagicMock()
-sys.modules['tqdm'] = MagicMock()
 
 import unittest
 import os
@@ -42,6 +48,24 @@ from agent.agent_manager import AgentManager
 from main import ActiveLearningPipeline
 from config import Config
 from experiments.ablation_config import ABLATION_SETTINGS
+
+
+def teardown_module(module):
+    for name, original in _ORIGINAL_MODULES.items():
+        if original is _SENTINEL:
+            sys.modules.pop(name, None)
+        else:
+            sys.modules[name] = original
+    for name in [
+        "main",
+        "core.data_preprocessing",
+        "core.dataset",
+        "core.sampler",
+        "core.trainer",
+        "agent.toolbox",
+        "agent.agent_manager",
+    ]:
+        sys.modules.pop(name, None)
 
 class TestArchitectureFix(unittest.TestCase):
     def setUp(self):

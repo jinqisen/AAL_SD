@@ -68,8 +68,30 @@ class ParameterSpace:
                 Param("lambda_policy.selection_guardrail.u_low_thresh", 0.10, 0.60),
                 Param("lambda_policy.selection_guardrail.u_low_frac_max", 0.05, 0.60),
                 Param("lambda_policy.selection_guardrail.lambda_step_down", 0.02, 0.25),
+                Param("stage_aware_scales.early_up_scale", 0.5, 2.0),
+                Param("stage_aware_scales.late_down_scale", 0.5, 3.0),
+                Param("stage_aware_scales.late_up_scale", 0.2, 1.0),
             ]
         )
+
+    @staticmethod
+    def from_config(cfg: Mapping[str, Any]) -> "ParameterSpace":
+        if not cfg or "parameter_space" not in cfg:
+            return ParameterSpace.default()
+        
+        params = []
+        for p_def in cfg["parameter_space"]:
+            key = p_def.get("key")
+            lo = p_def.get("lo")
+            hi = p_def.get("hi")
+            kind = p_def.get("kind", "float")
+            if key and lo is not None and hi is not None:
+                params.append(Param(key, float(lo), float(hi), kind))
+                
+        if not params:
+            return ParameterSpace.default()
+            
+        return ParameterSpace(params)
 
     def flatten_from_ablation_cfg(self, cfg: Mapping[str, Any]) -> Dict[str, float]:
         out: Dict[str, float] = {}
@@ -88,8 +110,10 @@ class ParameterSpace:
         self, base_cfg: Mapping[str, Any], overrides: Mapping[str, Any]
     ) -> Dict[str, Any]:
         merged = copy.deepcopy(dict(base_cfg))
+        ignored_keys = []
         for k, v in overrides.items():
             if k not in self._index:
+                ignored_keys.append(k)
                 continue
             spec = self.params[self._index[k]]
             try:
@@ -117,6 +141,9 @@ class ParameterSpace:
                     agent_overrides["LAMBDA_CLAMP_MIN"] = max(0.0, float(clamp_max) - 0.05)
 
         lp = merged.get("lambda_policy")
+        if not isinstance(lp, dict):
+            lp = {}
+            merged["lambda_policy"] = lp
         if isinstance(lp, dict):
             ramp = lp.get("late_stage_ramp")
             if isinstance(ramp, dict):
@@ -139,6 +166,32 @@ class ParameterSpace:
                 if isinstance(u_min, (int, float)) and isinstance(u_low, (int, float)):
                     if float(u_low) > float(u_min):
                         guard["u_low_thresh"] = float(u_min)
+
+        scales = merged.pop("stage_aware_scales", None)
+        if isinstance(scales, dict) and isinstance(agent_overrides, dict):
+            base_up = float(agent_overrides.get("LAMBDA_DELTA_UP", 0.10))
+            base_down = float(agent_overrides.get("LAMBDA_DELTA_DOWN", 0.10))
+
+            lp["stage_aware"] = True
+            if not isinstance(lp.get("stage_boundaries"), list):
+                lp["stage_boundaries"] = [5, 10]
+            lp["stage_deltas"] = {
+                "early": {
+                    "delta_up": base_up * float(scales.get("early_up_scale", 1.0)),
+                    "delta_down": base_down,
+                },
+                "mid": {
+                    "delta_up": base_up,
+                    "delta_down": base_down,
+                },
+                "late": {
+                    "delta_up": base_up * float(scales.get("late_up_scale", 1.0)),
+                    "delta_down": base_down * float(scales.get("late_down_scale", 1.0)),
+                }
+            }
+
+        if ignored_keys:
+            merged["_tuning_ignored_keys"] = ignored_keys
 
         return merged
 

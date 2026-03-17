@@ -609,6 +609,7 @@ def main() -> None:
     ap.add_argument("--orch-screen-epochs-per-round", type=int, default=8)
     ap.add_argument("--no-llm", action="store_true", default=False)
     ap.add_argument("--llm-config", type=str, default="")
+    ap.add_argument("--program", type=str, default="src/tuning_program.json")
     ap.add_argument("--start-monitor", action="store_true", default=False)
     ap.add_argument("--monitor-interval", type=int, default=30)
     ap.add_argument(
@@ -692,6 +693,8 @@ def main() -> None:
             cmd.append("--no-llm")
         if str(args.llm_config).strip():
             cmd.extend(["--llm-config", str(args.llm_config)])
+        if str(args.program).strip():
+            cmd.extend(["--program", str(args.program)])
         r = subprocess.run(cmd, cwd=str(repo_root))
         if r.returncode != 0:
             raise SystemExit(f"orchestrator failed with exit={int(r.returncode)}")

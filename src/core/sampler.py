@@ -133,7 +133,7 @@ class ADKUCSSampler:
         x = np.asarray(features)
         if x.ndim != 2 or len(x) < 2:
             return 0.0
-        x = x.astype(np.float32, copy=False)
+        x = x.astype(np.float64, copy=False)
         try:
             from scipy.spatial.distance import pdist
 
@@ -165,7 +165,7 @@ class ADKUCSSampler:
         lf = np.asarray(labeled_features)
 
         if x.ndim != 2 or len(x) == 0:
-            return np.zeros((0,), dtype=np.float32)
+            return np.zeros((0,), dtype=np.float64)
         if lf.ndim != 2 or len(lf) == 0:
             raise RuntimeError("coreset-to-labeled requires non-empty labeled_features")
         if x.shape[1] != lf.shape[1]:
@@ -173,16 +173,16 @@ class ADKUCSSampler:
                 f"coreset-to-labeled feature dim mismatch: unlabeled_dim={x.shape[1]} labeled_dim={lf.shape[1]}"
             )
 
-        x = x.astype(np.float32, copy=False)
-        lf = lf.astype(np.float32, copy=False)
+        x = x.astype(np.float64, copy=False)
+        lf = lf.astype(np.float64, copy=False)
 
         max_dist = self._max_pairwise_distance(lf)
         if max_dist < 1e-10:
-            return np.zeros((len(x),), dtype=np.float32)
+            return np.zeros((len(x),), dtype=np.float64)
 
         lf_norms2 = np.einsum("ij,ij->i", lf, lf)
         x_norms2 = np.einsum("ij,ij->i", x, x)
-        min_dist2 = np.full((len(x),), np.inf, dtype=np.float32)
+        min_dist2 = np.full((len(x),), np.inf, dtype=np.float64)
         lf_n = int(len(lf))
         chunk = int(min(256, lf_n))
         for start in range(0, lf_n, chunk):
@@ -195,7 +195,7 @@ class ADKUCSSampler:
         min_dist = np.sqrt(min_dist2)
         scores = min_dist / float(max_dist)
         scores = np.where(np.isfinite(scores), scores, 0.0)
-        return scores.astype(np.float32, copy=False)
+        return scores.astype(np.float64, copy=False)
 
     def _normalize_scores(self, scores: np.ndarray) -> np.ndarray:
         scores = np.asarray(scores)

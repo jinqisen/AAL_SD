@@ -60,6 +60,12 @@ class MultiSeedResult:
             return self.mean
         return self.mean + z * self.std / math.sqrt(len(self.seed_mious))
 
+    @property
+    def min_miou(self) -> Optional[float]:
+        if not self.seed_mious:
+            return None
+        return min(self.seed_mious)
+
 
 def parse_final_miou_from_md(md_path: Path) -> Optional[float]:
     if not md_path.exists():
@@ -258,6 +264,40 @@ class ExperimentEvaluator:
                 f"Partial results may be available via collect_results().",
                 file=sys.stderr,
             )
+
+    def extract_guardrail_stats(self, run_id: str, exp_name: str) -> Dict[str, Any]:
+        """Extract guardrail application statistics from trace files."""
+        run_dir = self.repo_root / "results" / "runs" / str(run_id)
+        trace_path = run_dir / f"{exp_name}_trace.jsonl"
+        stats = {"applied": 0, "total": 0, "fraction": None}
+        if not trace_path.exists():
+            return stats
+        
+        applied_count = 0
+        rounds_seen = set()
+        try:
+            with open(trace_path, "r", encoding="utf-8") as f:
+                for line in f:
+                    line = line.strip()
+                    if not line:
+                        continue
+                    try:
+                        data = json.loads(line)
+                        r = data.get("round", 0)
+                        if r:
+                            rounds_seen.add(r)
+                        if data.get("type") == "selection_guardrail" and data.get("applied") is True:
+                            applied_count += 1
+                    except Exception:
+                        pass
+            total_rounds = max(rounds_seen) if rounds_seen else 0
+            stats["applied"] = applied_count
+            stats["total"] = total_rounds
+            if total_rounds > 0:
+                stats["fraction"] = applied_count / total_rounds
+        except Exception:
+            pass
+        return stats
 
     def run_multi_seed(
         self,

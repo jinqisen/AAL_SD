@@ -19,7 +19,7 @@ class Proposal:
 
 
 _SYSTEM_PROMPT = """你是 AAL-SD 自动调参助手。你只能输出严格 JSON，不能输出多余文本。
-目标：提高最终 test mIoU，同时保持训练稳定，避免过拟合风险升高。
+目标：提高最终 val mIoU，同时保持训练稳定，避免过拟合风险升高。
 输出最多 6 个建议，每条建议包含：
 - direction: 简短方向名（字符串）
 - priority: 越小越优先（整数）
@@ -30,8 +30,6 @@ _SYSTEM_PROMPT = """你是 AAL-SD 自动调参助手。你只能输出严格 JSO
 - parameter_changes: 参数改动（对象），只允许以下 key（可以是子集）：
   - agent_threshold_overrides.LAMBDA_DELTA_UP
   - agent_threshold_overrides.LAMBDA_DELTA_DOWN
-  - agent_threshold_overrides.LAMBDA_CLAMP_MIN
-  - agent_threshold_overrides.LAMBDA_CLAMP_MAX
   - agent_threshold_overrides.OVERFIT_RISK_HI
   - agent_threshold_overrides.OVERFIT_RISK_LO
   - agent_threshold_overrides.OVERFIT_TVC_MIN_HI
@@ -49,7 +47,6 @@ _SYSTEM_PROMPT = """你是 AAL-SD 自动调参助手。你只能输出严格 JSO
   - lambda_policy.selection_guardrail.u_low_thresh
   - lambda_policy.selection_guardrail.u_low_frac_max
   - lambda_policy.selection_guardrail.lambda_step_down
-  - epochs_per_round_override
 数值必须是数字（int/float）。"""
 
 
@@ -65,8 +62,9 @@ def _try_parse_json(text: str) -> Optional[Dict[str, Any]]:
 
 
 class LLMProposer:
-    def __init__(self, client: TuningLLMClient):
+    def __init__(self, client: TuningLLMClient, system_prompt: Optional[str] = None):
         self.client = client
+        self.system_prompt = system_prompt or _SYSTEM_PROMPT
 
     def propose(self, *, context: Dict[str, Any]) -> List[Proposal]:
         if not self.client.is_available():
@@ -74,7 +72,7 @@ class LLMProposer:
         user_payload = json.dumps(context, ensure_ascii=False, indent=2)
         content = self.client.chat(
             messages=[
-                ChatMessage(role="system", content=_SYSTEM_PROMPT),
+                ChatMessage(role="system", content=self.system_prompt),
                 ChatMessage(role="user", content=user_payload),
             ]
         )
