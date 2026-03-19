@@ -4,6 +4,9 @@ import copy
 from dataclasses import dataclass
 from typing import Any, Dict, Iterable, List, Mapping, Optional, Tuple
 
+_LAMBDA_CLAMP_MIN_BOUND = 0.05
+_LAMBDA_CLAMP_MAX_BOUND = 0.95
+
 
 @dataclass(frozen=True)
 class Param:
@@ -137,8 +140,16 @@ class ParameterSpace:
             clamp_min = agent_overrides.get("LAMBDA_CLAMP_MIN")
             clamp_max = agent_overrides.get("LAMBDA_CLAMP_MAX")
             if isinstance(clamp_min, (int, float)) and isinstance(clamp_max, (int, float)):
-                if float(clamp_min) >= float(clamp_max):
-                    agent_overrides["LAMBDA_CLAMP_MIN"] = max(0.0, float(clamp_max) - 0.05)
+                min_v = float(clamp_min)
+                max_v = float(clamp_max)
+                min_v = min(_LAMBDA_CLAMP_MAX_BOUND, max(_LAMBDA_CLAMP_MIN_BOUND, min_v))
+                max_v = min(_LAMBDA_CLAMP_MAX_BOUND, max(_LAMBDA_CLAMP_MIN_BOUND, max_v))
+                if min_v >= max_v:
+                    min_v = max(_LAMBDA_CLAMP_MIN_BOUND, max_v - 0.05)
+                if min_v >= max_v:
+                    max_v = min(_LAMBDA_CLAMP_MAX_BOUND, min_v + 0.05)
+                agent_overrides["LAMBDA_CLAMP_MIN"] = float(min_v)
+                agent_overrides["LAMBDA_CLAMP_MAX"] = float(max_v)
 
         lp = merged.get("lambda_policy")
         if not isinstance(lp, dict):

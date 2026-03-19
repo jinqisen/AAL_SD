@@ -20,8 +20,8 @@ class AgentThresholds:
     OVERFIT_QUERY_RATIO_WARN = 0.75
     OVERFIT_QUERY_RATIO_SEVERE = 0.5
 
-    LAMBDA_CLAMP_MIN = 0.2
-    LAMBDA_CLAMP_MAX = 0.65
+    LAMBDA_CLAMP_MIN = 0.05
+    LAMBDA_CLAMP_MAX = 0.95
     OVERFIT_RISK_HI = 0.9
     OVERFIT_RISK_LO = 0.2
     OVERFIT_RISK_LAMBDA_UP_MAX = 0.5
@@ -40,8 +40,8 @@ class AgentThresholds:
 
 
 class AgentConstraints:
-    LAMBDA_MIN = 0.0
-    LAMBDA_MAX = 1.0
+    LAMBDA_MIN = 0.05
+    LAMBDA_MAX = 0.95
     QUERY_SIZE_MIN = 1
     EPOCHS_MIN = 1
     EPOCHS_MAX = 20

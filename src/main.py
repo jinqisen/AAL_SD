@@ -50,6 +50,11 @@ class ActiveLearningPipeline:
         self.exp_config = ABLATION_SETTINGS.get(canonical)
         if not self.exp_config:
             raise ValueError(f"Unknown experiment: {experiment_name}")
+        self._apply_agent_threshold_overrides(
+            self.exp_config.get("agent_threshold_overrides")
+            if isinstance(self.exp_config, dict)
+            else None
+        )
         self.experiment_spec = build_spec_from_legacy_dict(requested, self.exp_config)
         self.experiment_runtime = self.experiment_spec.build(config)
 
@@ -416,6 +421,20 @@ class ActiveLearningPipeline:
             logger.info(
                 f"Runtime: device={getattr(self.config, 'DEVICE', None)} num_workers={getattr(self.config, 'NUM_WORKERS', None)}"
             )
+
+    def _apply_agent_threshold_overrides(self, overrides):
+        if not isinstance(overrides, dict):
+            return
+        for key, value in overrides.items():
+            if not isinstance(key, str):
+                continue
+            name = key.strip()
+            if not name or not hasattr(AgentThresholds, name):
+                continue
+            applied = value
+            if isinstance(value, (int, float)):
+                applied = float(value)
+            setattr(AgentThresholds, name, applied)
 
     def _write_status(self, patch):
         import json

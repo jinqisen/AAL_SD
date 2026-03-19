@@ -309,6 +309,28 @@ class Toolbox:
         if not isinstance(self.current_scores, dict) or not self.current_scores:
             return {"applied": False, "sample_ids": list(sample_ids)}
 
+        # --- Warmup-phase exemption ---
+        # Data analysis shows early guardrail triggers (warmup rounds) strongly
+        # hurt final mIoU (r=-0.576). Skip guardrail until risk_control phase
+        # is active, controlled by guardrail_start_round or risk_control_start_round.
+        round_num = self._current_round()
+        policy = self._lambda_policy_config() or {}
+        guardrail_start = cfg.get("guardrail_start_round")
+        if guardrail_start is None:
+            guardrail_start = policy.get(
+                "risk_control_start_round",
+                int(policy.get("warmup_start_round", 2))
+                + int(policy.get("warmup_rounds", 1)),
+            )
+        if int(round_num) < int(guardrail_start):
+            return {
+                "applied": False,
+                "sample_ids": list(sample_ids),
+                "skipped_reason": "warmup_phase_exemption",
+                "round": int(round_num),
+                "guardrail_start_round": int(guardrail_start),
+            }
+
         controller_cfg = getattr(self.controller, "config", None)
         expected = int(getattr(controller_cfg, "QUERY_SIZE", 0) or 0)
         if expected <= 0:
@@ -892,7 +914,12 @@ class Toolbox:
                 round_num, policy, risk
             )
             if adaptive_delta is not None and adaptive_rule is not None:
-                applied = float(min(max(float(applied) + float(adaptive_delta), clamp_min), clamp_max))
+                applied = float(
+                    min(
+                        max(float(applied) + float(adaptive_delta), clamp_min),
+                        clamp_max,
+                    )
+                )
                 rule = str(adaptive_rule)
                 diagnostics["u_adaptive"]["triggered"] = True
                 diagnostics["u_adaptive"]["applied_delta"] = float(adaptive_delta)
@@ -1202,8 +1229,12 @@ class Toolbox:
                 "k_median_top": ts.get("k_median_top"),
                 "train_u_median_selected": ts.get("train_u_median_selected"),
                 "train_k_median_selected": ts.get("train_k_median_selected"),
-                "train_u_median_history": list(u_hist) if isinstance(u_hist, list) else [],
-                "train_k_median_history": list(k_hist) if isinstance(k_hist, list) else [],
+                "train_u_median_history": list(u_hist)
+                if isinstance(u_hist, list)
+                else [],
+                "train_k_median_history": list(k_hist)
+                if isinstance(k_hist, list)
+                else [],
                 "max_history_length": ts.get("max_history_length"),
             }
             self.controller._append_trace(
@@ -2585,7 +2616,9 @@ class Toolbox:
             if ranked:
                 return ranked
 
-            cache = self.candidates_cache if isinstance(self.candidates_cache, list) else []
+            cache = (
+                self.candidates_cache if isinstance(self.candidates_cache, list) else []
+            )
             scored: List[tuple] = []
             for raw in cache:
                 if not isinstance(raw, dict):
