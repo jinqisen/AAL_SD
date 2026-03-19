@@ -20,7 +20,7 @@
       "MIOU_LOW_GAIN_STREAK": 1,
       "LAMBDA_UP_K_U_GAP_MIN": 0.0,
       "LAMBDA_CLAMP_MIN": 0.05,
-      "LAMBDA_CLAMP_MAX": 0.8,
+      "LAMBDA_CLAMP_MAX": 0.95,
       "LAMBDA_DELTA_UP": 0.15,
       "LAMBDA_DELTA_DOWN": 0.1,
       "OVERFIT_RISK_EMA_ALPHA": 0.5825557212921313,
@@ -96,7 +96,7 @@
       "MIOU_LOW_GAIN_STREAK": 1,
       "LAMBDA_UP_K_U_GAP_MIN": 0.0,
       "LAMBDA_CLAMP_MIN": 0.05,
-      "LAMBDA_CLAMP_MAX": 0.8,
+      "LAMBDA_CLAMP_MAX": 0.95,
       "LAMBDA_DELTA_UP": 0.15,
       "LAMBDA_DELTA_DOWN": 0.1,
       "OVERFIT_RISK_EMA_ALPHA": 0.6,
@@ -172,7 +172,7 @@
       "MIOU_LOW_GAIN_STREAK": 1,
       "LAMBDA_UP_K_U_GAP_MIN": 0.0,
       "LAMBDA_CLAMP_MIN": 0.05,
-      "LAMBDA_CLAMP_MAX": 0.8,
+      "LAMBDA_CLAMP_MAX": 0.95,
       "LAMBDA_DELTA_UP": 0.15,
       "LAMBDA_DELTA_DOWN": 0.1,
       "OVERFIT_RISK_EMA_ALPHA": 0.6,
@@ -248,7 +248,7 @@
       "MIOU_LOW_GAIN_STREAK": 1,
       "LAMBDA_UP_K_U_GAP_MIN": 0.0,
       "LAMBDA_CLAMP_MIN": 0.05,
-      "LAMBDA_CLAMP_MAX": 0.8,
+      "LAMBDA_CLAMP_MAX": 0.95,
       "LAMBDA_DELTA_UP": 0.15,
       "LAMBDA_DELTA_DOWN": 0.1,
       "OVERFIT_RISK_EMA_ALPHA": 0.6455986498307229,
@@ -324,7 +324,7 @@
       "MIOU_LOW_GAIN_STREAK": 1,
       "LAMBDA_UP_K_U_GAP_MIN": 0.0,
       "LAMBDA_CLAMP_MIN": 0.05,
-      "LAMBDA_CLAMP_MAX": 0.8,
+      "LAMBDA_CLAMP_MAX": 0.95,
       "LAMBDA_DELTA_UP": 0.15,
       "LAMBDA_DELTA_DOWN": 0.12127526234115994,
       "OVERFIT_RISK_EMA_ALPHA": 0.6,
@@ -400,7 +400,7 @@
       "MIOU_LOW_GAIN_STREAK": 1,
       "LAMBDA_UP_K_U_GAP_MIN": 0.0,
       "LAMBDA_CLAMP_MIN": 0.05,
-      "LAMBDA_CLAMP_MAX": 0.8,
+      "LAMBDA_CLAMP_MAX": 0.95,
       "LAMBDA_DELTA_UP": 0.15,
       "LAMBDA_DELTA_DOWN": 0.1,
       "OVERFIT_RISK_EMA_ALPHA": 0.6,
@@ -516,7 +516,7 @@
       "MIOU_LOW_GAIN_STREAK": 1,
       "LAMBDA_UP_K_U_GAP_MIN": 0.0,
       "LAMBDA_CLAMP_MIN": 0.05,
-      "LAMBDA_CLAMP_MAX": 0.8,
+      "LAMBDA_CLAMP_MAX": 0.95,
       "LAMBDA_DELTA_UP": 0.15,
       "LAMBDA_DELTA_DOWN": 0.1,
       "OVERFIT_RISK_EMA_ALPHA": 0.6,
@@ -587,7 +587,7 @@
       "MIOU_LOW_GAIN_STREAK": 1,
       "LAMBDA_UP_K_U_GAP_MIN": 0.0,
       "LAMBDA_CLAMP_MIN": 0.05,
-      "LAMBDA_CLAMP_MAX": 0.8,
+      "LAMBDA_CLAMP_MAX": 0.95,
       "LAMBDA_DELTA_UP": 0.15,
       "LAMBDA_DELTA_DOWN": 0.1,
       "OVERFIT_RISK_EMA_ALPHA": 0.6,
@@ -658,7 +658,7 @@
       "MIOU_LOW_GAIN_STREAK": 1,
       "LAMBDA_UP_K_U_GAP_MIN": 0.0,
       "LAMBDA_CLAMP_MIN": 0.05,
-      "LAMBDA_CLAMP_MAX": 0.8,
+      "LAMBDA_CLAMP_MAX": 0.95,
       "LAMBDA_DELTA_UP": 0.15,
       "LAMBDA_DELTA_DOWN": 0.1,
       "OVERFIT_RISK_EMA_ALPHA": 0.6,
@@ -729,7 +729,7 @@
       "MIOU_LOW_GAIN_STREAK": 1,
       "LAMBDA_UP_K_U_GAP_MIN": 0.0,
       "LAMBDA_CLAMP_MIN": 0.05,
-      "LAMBDA_CLAMP_MAX": 0.8,
+      "LAMBDA_CLAMP_MAX": 0.95,
       "LAMBDA_DELTA_UP": 0.15,
       "LAMBDA_DELTA_DOWN": 0.1,
       "OVERFIT_RISK_EMA_ALPHA": 0.6,
@@ -800,7 +800,7 @@
       "MIOU_LOW_GAIN_STREAK": 1,
       "LAMBDA_UP_K_U_GAP_MIN": 0.0,
       "LAMBDA_CLAMP_MIN": 0.05,
-      "LAMBDA_CLAMP_MAX": 0.8,
+      "LAMBDA_CLAMP_MAX": 0.95,
       "LAMBDA_DELTA_UP": 0.15,
       "LAMBDA_DELTA_DOWN": 0.1,
       "OVERFIT_RISK_EMA_ALPHA": 0.6,
@@ -871,7 +871,7 @@
       "MIOU_LOW_GAIN_STREAK": 1,
       "LAMBDA_UP_K_U_GAP_MIN": 0.0,
       "LAMBDA_CLAMP_MIN": 0.05,
-      "LAMBDA_CLAMP_MAX": 0.8,
+      "LAMBDA_CLAMP_MAX": 0.95,
       "LAMBDA_DELTA_UP": 0.15,
       "LAMBDA_DELTA_DOWN": 0.11960208899340728,
       "OVERFIT_RISK_EMA_ALPHA": 0.6,
@@ -942,7 +942,7 @@
       "MIOU_LOW_GAIN_STREAK": 1,
       "LAMBDA_UP_K_U_GAP_MIN": 0.0,
       "LAMBDA_CLAMP_MIN": 0.05,
-      "LAMBDA_CLAMP_MAX": 0.8,
+      "LAMBDA_CLAMP_MAX": 0.95,
       "LAMBDA_DELTA_UP": 0.15,
       "LAMBDA_DELTA_DOWN": 0.11619460918636297,
       "OVERFIT_RISK_EMA_ALPHA": 0.6,
@@ -1016,7 +1016,7 @@
       "MIOU_LOW_GAIN_STREAK": 1,
       "LAMBDA_UP_K_U_GAP_MIN": 0.0,
       "LAMBDA_CLAMP_MIN": 0.05,
-      "LAMBDA_CLAMP_MAX": 0.8,
+      "LAMBDA_CLAMP_MAX": 0.95,
       "LAMBDA_DELTA_UP": 0.15,
       "LAMBDA_DELTA_DOWN": 0.11960208899340728,
       "OVERFIT_RISK_EMA_ALPHA": 0.6,
@@ -1090,7 +1090,7 @@
       "MIOU_LOW_GAIN_STREAK": 1,
       "LAMBDA_UP_K_U_GAP_MIN": 0.0,
       "LAMBDA_CLAMP_MIN": 0.05,
-      "LAMBDA_CLAMP_MAX": 0.8,
+      "LAMBDA_CLAMP_MAX": 0.95,
       "LAMBDA_DELTA_UP": 0.15,
       "LAMBDA_DELTA_DOWN": 0.11960208899340728,
       "OVERFIT_RISK_EMA_ALPHA": 0.6,
@@ -1164,7 +1164,7 @@
       "MIOU_LOW_GAIN_STREAK": 1,
       "LAMBDA_UP_K_U_GAP_MIN": 0.0,
       "LAMBDA_CLAMP_MIN": 0.05,
-      "LAMBDA_CLAMP_MAX": 0.8,
+      "LAMBDA_CLAMP_MAX": 0.95,
       "LAMBDA_DELTA_UP": 0.15,
       "LAMBDA_DELTA_DOWN": 0.1193158881307875,
       "OVERFIT_RISK_EMA_ALPHA": 0.6,
@@ -1238,7 +1238,7 @@
       "MIOU_LOW_GAIN_STREAK": 1,
       "LAMBDA_UP_K_U_GAP_MIN": 0.0,
       "LAMBDA_CLAMP_MIN": 0.05,
-      "LAMBDA_CLAMP_MAX": 0.8,
+      "LAMBDA_CLAMP_MAX": 0.95,
       "LAMBDA_DELTA_UP": 0.15,
       "LAMBDA_DELTA_DOWN": 0.11960208899340728,
       "OVERFIT_RISK_EMA_ALPHA": 0.6312351428995681,
@@ -1312,7 +1312,7 @@
       "MIOU_LOW_GAIN_STREAK": 1,
       "LAMBDA_UP_K_U_GAP_MIN": 0.0,
       "LAMBDA_CLAMP_MIN": 0.05,
-      "LAMBDA_CLAMP_MAX": 0.8,
+      "LAMBDA_CLAMP_MAX": 0.95,
       "LAMBDA_DELTA_UP": 0.15,
       "LAMBDA_DELTA_DOWN": 0.11960208899340728,
       "OVERFIT_RISK_EMA_ALPHA": 0.6,
@@ -1386,7 +1386,7 @@
       "MIOU_LOW_GAIN_STREAK": 1,
       "LAMBDA_UP_K_U_GAP_MIN": 0.0,
       "LAMBDA_CLAMP_MIN": 0.05,
-      "LAMBDA_CLAMP_MAX": 0.8,
+      "LAMBDA_CLAMP_MAX": 0.95,
       "LAMBDA_DELTA_UP": 0.15,
       "LAMBDA_DELTA_DOWN": 0.11960208899340728,
       "OVERFIT_RISK_EMA_ALPHA": 0.6,
@@ -1460,7 +1460,7 @@
       "MIOU_LOW_GAIN_STREAK": 1,
       "LAMBDA_UP_K_U_GAP_MIN": 0.0,
       "LAMBDA_CLAMP_MIN": 0.05,
-      "LAMBDA_CLAMP_MAX": 0.8,
+      "LAMBDA_CLAMP_MAX": 0.95,
       "LAMBDA_DELTA_UP": 0.15,
       "LAMBDA_DELTA_DOWN": 0.11960208899340728,
       "OVERFIT_RISK_EMA_ALPHA": 0.635192460798937,
@@ -1534,7 +1534,7 @@
       "MIOU_LOW_GAIN_STREAK": 1,
       "LAMBDA_UP_K_U_GAP_MIN": 0.0,
       "LAMBDA_CLAMP_MIN": 0.05,
-      "LAMBDA_CLAMP_MAX": 0.8,
+      "LAMBDA_CLAMP_MAX": 0.95,
       "LAMBDA_DELTA_UP": 0.1555665954620709,
       "LAMBDA_DELTA_DOWN": 0.11960208899340728,
       "OVERFIT_RISK_EMA_ALPHA": 0.6,
@@ -1608,7 +1608,7 @@
       "MIOU_LOW_GAIN_STREAK": 1,
       "LAMBDA_UP_K_U_GAP_MIN": 0.0,
       "LAMBDA_CLAMP_MIN": 0.05,
-      "LAMBDA_CLAMP_MAX": 0.8,
+      "LAMBDA_CLAMP_MAX": 0.95,
       "LAMBDA_DELTA_UP": 0.1509580202559759,
       "LAMBDA_DELTA_DOWN": 0.11960208899340728,
       "OVERFIT_RISK_EMA_ALPHA": 0.6,
@@ -1682,7 +1682,7 @@
       "MIOU_LOW_GAIN_STREAK": 1,
       "LAMBDA_UP_K_U_GAP_MIN": 0.0,
       "LAMBDA_CLAMP_MIN": 0.05,
-      "LAMBDA_CLAMP_MAX": 0.8,
+      "LAMBDA_CLAMP_MAX": 0.95,
       "LAMBDA_DELTA_UP": 0.15,
       "LAMBDA_DELTA_DOWN": 0.11635135612411403,
       "OVERFIT_RISK_EMA_ALPHA": 0.6,
@@ -1756,7 +1756,7 @@
       "MIOU_LOW_GAIN_STREAK": 1,
       "LAMBDA_UP_K_U_GAP_MIN": 0.0,
       "LAMBDA_CLAMP_MIN": 0.05,
-      "LAMBDA_CLAMP_MAX": 0.8,
+      "LAMBDA_CLAMP_MAX": 0.95,
       "LAMBDA_DELTA_UP": 0.1565836316076594,
       "LAMBDA_DELTA_DOWN": 0.11960208899340728,
       "OVERFIT_RISK_EMA_ALPHA": 0.5787678352030916,
@@ -1830,7 +1830,7 @@
       "MIOU_LOW_GAIN_STREAK": 1,
       "LAMBDA_UP_K_U_GAP_MIN": 0.0,
       "LAMBDA_CLAMP_MIN": 0.05,
-      "LAMBDA_CLAMP_MAX": 0.8,
+      "LAMBDA_CLAMP_MAX": 0.95,
       "LAMBDA_DELTA_UP": 0.14629058102171252,
       "LAMBDA_DELTA_DOWN": 0.11960208899340728,
       "OVERFIT_RISK_EMA_ALPHA": 0.6,
@@ -1904,7 +1904,7 @@
       "MIOU_LOW_GAIN_STREAK": 1,
       "LAMBDA_UP_K_U_GAP_MIN": 0.0,
       "LAMBDA_CLAMP_MIN": 0.05,
-      "LAMBDA_CLAMP_MAX": 0.8,
+      "LAMBDA_CLAMP_MAX": 0.95,
       "LAMBDA_DELTA_UP": 0.15,
       "LAMBDA_DELTA_DOWN": 0.11960208899340728,
       "OVERFIT_RISK_EMA_ALPHA": 0.6,
@@ -1978,7 +1978,7 @@
       "MIOU_LOW_GAIN_STREAK": 1,
       "LAMBDA_UP_K_U_GAP_MIN": 0.0,
       "LAMBDA_CLAMP_MIN": 0.05,
-      "LAMBDA_CLAMP_MAX": 0.8,
+      "LAMBDA_CLAMP_MAX": 0.95,
       "LAMBDA_DELTA_UP": 0.14251996258420416,
       "LAMBDA_DELTA_DOWN": 0.11960208899340728,
       "OVERFIT_RISK_EMA_ALPHA": 0.6,
@@ -2052,7 +2052,7 @@
       "MIOU_LOW_GAIN_STREAK": 1,
       "LAMBDA_UP_K_U_GAP_MIN": 0.0,
       "LAMBDA_CLAMP_MIN": 0.05,
-      "LAMBDA_CLAMP_MAX": 0.8,
+      "LAMBDA_CLAMP_MAX": 0.95,
       "LAMBDA_DELTA_UP": 0.15,
       "LAMBDA_DELTA_DOWN": 0.11960208899340728,
       "OVERFIT_RISK_EMA_ALPHA": 0.6,
@@ -2126,7 +2126,7 @@
       "MIOU_LOW_GAIN_STREAK": 1,
       "LAMBDA_UP_K_U_GAP_MIN": 0.0,
       "LAMBDA_CLAMP_MIN": 0.05,
-      "LAMBDA_CLAMP_MAX": 0.8,
+      "LAMBDA_CLAMP_MAX": 0.95,
       "LAMBDA_DELTA_UP": 0.15,
       "LAMBDA_DELTA_DOWN": 0.11960208899340728,
       "OVERFIT_RISK_EMA_ALPHA": 0.6,
@@ -2200,11 +2200,569 @@
       "MIOU_LOW_GAIN_STREAK": 1,
       "LAMBDA_UP_K_U_GAP_MIN": 0.0,
       "LAMBDA_CLAMP_MIN": 0.05,
-      "LAMBDA_CLAMP_MAX": 0.8,
+      "LAMBDA_CLAMP_MAX": 0.95,
       "LAMBDA_DELTA_UP": 0.15,
       "LAMBDA_DELTA_DOWN": 0.10942682804040804,
       "OVERFIT_RISK_EMA_ALPHA": 0.6337269896503179,
       "LAMBDA_DOWN_COOLING_ROUNDS": 1.9927036921871484
+    },
+    "enable_l3_selection_logging": true,
+    "enable_agent_prompt_logging": true,
+    "description": "AutoTuneOpt: cand5",
+    "grad_probe_source": "train_holdout",
+    "grad_probe_holdout_frac": 0.1,
+    "grad_probe_holdout_min": 8
+  },
+  "auto_opt_iter13_cand0_00": {
+    "use_agent": true,
+    "sampler_type": "ad_kucs",
+    "k_definition": "coreset_to_labeled",
+    "score_normalization": true,
+    "lambda_override": null,
+    "lambda_controller": null,
+    "lambda_policy": {
+      "mode": "warmup_risk_closed_loop",
+      "r1_lambda": 0.0,
+      "uncertainty_only_rounds": 2,
+      "warmup_start_round": 3,
+      "warmup_rounds": 1,
+      "warmup_lambda": 0.2,
+      "risk_control_start_round": 4,
+      "severe_logic": "and",
+      "severe_tvc_key": "grad_train_val_cos_last",
+      "risk_trigger": "ci",
+      "risk_ci_window": 6.226574618851265,
+      "risk_ci_quantile": 0.20469753331287005,
+      "risk_ci_min_samples": 3,
+      "lambda_smoothing": "ema",
+      "lambda_smoothing_alpha": 0.8893126171687081,
+      "lambda_max_step": 0.17163609388903353,
+      "late_stage_ramp": {
+        "start_round": 9,
+        "end_round": 12,
+        "start_lambda": 0.38422676935705147,
+        "end_lambda": 0.7
+      },
+      "selection_guardrail": {
+        "enabled": true,
+        "u_median_min": 0.4195784578519656,
+        "u_low_thresh": 0.3796891290514703,
+        "u_low_frac_max": 0.2,
+        "lambda_step_down": 0.12216098534348001,
+        "max_steps": 5,
+        "fallback_quota_u_frac": 0.7
+      },
+      "stage_aware": true,
+      "stage_boundaries": [
+        5,
+        10
+      ],
+      "stage_deltas": {
+        "early": {
+          "delta_up": 0.15895307259025823,
+          "delta_down": 0.11960208899340728
+        },
+        "mid": {
+          "delta_up": 0.12716245807220658,
+          "delta_down": 0.11960208899340728
+        },
+        "late": {
+          "delta_up": 0.07629747484332394,
+          "delta_down": 0.20930365573846274
+        }
+      }
+    },
+    "require_explicit_lambda": null,
+    "rollback_config": {
+      "mode": "adaptive_threshold",
+      "std_factor": 1.5,
+      "tau_min": 0.005
+    },
+    "control_permissions": {
+      "set_lambda": false,
+      "set_query_size": false,
+      "set_epochs_per_round": false,
+      "set_alpha": false
+    },
+    "agent_threshold_overrides": {
+      "OVERFIT_RISK_HI": 1.2,
+      "OVERFIT_RISK_LO": 0.6,
+      "OVERFIT_TVC_MIN_HI": 0.8,
+      "OVERFIT_RISK_LAMBDA_UP_MAX": 0.9,
+      "MIOU_LOW_GAIN_THRESH": 0.01,
+      "MIOU_LOW_GAIN_STREAK": 1,
+      "LAMBDA_UP_K_U_GAP_MIN": 0.0,
+      "LAMBDA_CLAMP_MIN": 0.05,
+      "LAMBDA_CLAMP_MAX": 0.95,
+      "LAMBDA_DELTA_UP": 0.12716245807220658,
+      "LAMBDA_DELTA_DOWN": 0.11960208899340728,
+      "OVERFIT_RISK_EMA_ALPHA": 0.6,
+      "LAMBDA_DOWN_COOLING_ROUNDS": 2.0
+    },
+    "enable_l3_selection_logging": true,
+    "enable_agent_prompt_logging": true,
+    "description": "AutoTuneOpt: cand0",
+    "grad_probe_source": "train_holdout",
+    "grad_probe_holdout_frac": 0.1,
+    "grad_probe_holdout_min": 8
+  },
+  "auto_opt_iter13_cand1_01": {
+    "use_agent": true,
+    "sampler_type": "ad_kucs",
+    "k_definition": "coreset_to_labeled",
+    "score_normalization": true,
+    "lambda_override": null,
+    "lambda_controller": null,
+    "lambda_policy": {
+      "mode": "warmup_risk_closed_loop",
+      "r1_lambda": 0.0,
+      "uncertainty_only_rounds": 2,
+      "warmup_start_round": 3,
+      "warmup_rounds": 1,
+      "warmup_lambda": 0.2,
+      "risk_control_start_round": 4,
+      "severe_logic": "and",
+      "severe_tvc_key": "grad_train_val_cos_last",
+      "risk_trigger": "ci",
+      "risk_ci_window": 6.542847124785933,
+      "risk_ci_quantile": 0.20469753331287005,
+      "risk_ci_min_samples": 3,
+      "lambda_smoothing": "ema",
+      "lambda_smoothing_alpha": 0.8214063400896322,
+      "lambda_max_step": 0.17163609388903353,
+      "late_stage_ramp": {
+        "start_round": 9,
+        "end_round": 12,
+        "start_lambda": 0.38422676935705147,
+        "end_lambda": 0.7
+      },
+      "selection_guardrail": {
+        "enabled": true,
+        "u_median_min": 0.45,
+        "u_low_thresh": 0.4,
+        "u_low_frac_max": 0.2,
+        "lambda_step_down": 0.12216098534348001,
+        "max_steps": 5,
+        "fallback_quota_u_frac": 0.7
+      },
+      "stage_aware": true,
+      "stage_boundaries": [
+        5,
+        10
+      ],
+      "stage_deltas": {
+        "early": {
+          "delta_up": 0.19208927743441623,
+          "delta_down": 0.11960208899340728
+        },
+        "mid": {
+          "delta_up": 0.15367142194753297,
+          "delta_down": 0.11960208899340728
+        },
+        "late": {
+          "delta_up": 0.09220285316851978,
+          "delta_down": 0.20967791943950914
+        }
+      }
+    },
+    "require_explicit_lambda": null,
+    "rollback_config": {
+      "mode": "adaptive_threshold",
+      "std_factor": 1.5,
+      "tau_min": 0.005
+    },
+    "control_permissions": {
+      "set_lambda": false,
+      "set_query_size": false,
+      "set_epochs_per_round": false,
+      "set_alpha": false
+    },
+    "agent_threshold_overrides": {
+      "OVERFIT_RISK_HI": 1.2,
+      "OVERFIT_RISK_LO": 0.6,
+      "OVERFIT_TVC_MIN_HI": 0.8,
+      "OVERFIT_RISK_LAMBDA_UP_MAX": 0.9,
+      "MIOU_LOW_GAIN_THRESH": 0.01,
+      "MIOU_LOW_GAIN_STREAK": 1,
+      "LAMBDA_UP_K_U_GAP_MIN": 0.0,
+      "LAMBDA_CLAMP_MIN": 0.05,
+      "LAMBDA_CLAMP_MAX": 0.95,
+      "LAMBDA_DELTA_UP": 0.15367142194753297,
+      "LAMBDA_DELTA_DOWN": 0.11960208899340728,
+      "OVERFIT_RISK_EMA_ALPHA": 0.6,
+      "LAMBDA_DOWN_COOLING_ROUNDS": 2.0
+    },
+    "enable_l3_selection_logging": true,
+    "enable_agent_prompt_logging": true,
+    "description": "AutoTuneOpt: cand1",
+    "grad_probe_source": "train_holdout",
+    "grad_probe_holdout_frac": 0.1,
+    "grad_probe_holdout_min": 8
+  },
+  "auto_opt_iter13_cand2_02": {
+    "use_agent": true,
+    "sampler_type": "ad_kucs",
+    "k_definition": "coreset_to_labeled",
+    "score_normalization": true,
+    "lambda_override": null,
+    "lambda_controller": null,
+    "lambda_policy": {
+      "mode": "warmup_risk_closed_loop",
+      "r1_lambda": 0.0,
+      "uncertainty_only_rounds": 2,
+      "warmup_start_round": 3,
+      "warmup_rounds": 1,
+      "warmup_lambda": 0.2,
+      "risk_control_start_round": 4,
+      "severe_logic": "and",
+      "severe_tvc_key": "grad_train_val_cos_last",
+      "risk_trigger": "ci",
+      "risk_ci_window": 6.226574618851265,
+      "risk_ci_quantile": 0.17614853978054773,
+      "risk_ci_min_samples": 3,
+      "lambda_smoothing": "ema",
+      "lambda_smoothing_alpha": 0.85,
+      "lambda_max_step": 0.16458405317494487,
+      "late_stage_ramp": {
+        "start_round": 9,
+        "end_round": 12,
+        "start_lambda": 0.38422676935705147,
+        "end_lambda": 0.7
+      },
+      "selection_guardrail": {
+        "enabled": true,
+        "u_median_min": 0.48848275043786593,
+        "u_low_thresh": 0.4,
+        "u_low_frac_max": 0.1833826199627072,
+        "lambda_step_down": 0.12216098534348001,
+        "max_steps": 5,
+        "fallback_quota_u_frac": 0.7
+      },
+      "stage_aware": true,
+      "stage_boundaries": [
+        5,
+        10
+      ],
+      "stage_deltas": {
+        "early": {
+          "delta_up": 0.18286322627714066,
+          "delta_down": 0.11960208899340728
+        },
+        "mid": {
+          "delta_up": 0.14629058102171252,
+          "delta_down": 0.11960208899340728
+        },
+        "late": {
+          "delta_up": 0.0877743486130275,
+          "delta_down": 0.20930365573846274
+        }
+      }
+    },
+    "require_explicit_lambda": null,
+    "rollback_config": {
+      "mode": "adaptive_threshold",
+      "std_factor": 1.5,
+      "tau_min": 0.005
+    },
+    "control_permissions": {
+      "set_lambda": false,
+      "set_query_size": false,
+      "set_epochs_per_round": false,
+      "set_alpha": false
+    },
+    "agent_threshold_overrides": {
+      "OVERFIT_RISK_HI": 1.2,
+      "OVERFIT_RISK_LO": 0.6,
+      "OVERFIT_TVC_MIN_HI": 0.8,
+      "OVERFIT_RISK_LAMBDA_UP_MAX": 0.9,
+      "MIOU_LOW_GAIN_THRESH": 0.01,
+      "MIOU_LOW_GAIN_STREAK": 1,
+      "LAMBDA_UP_K_U_GAP_MIN": 0.0,
+      "LAMBDA_CLAMP_MIN": 0.05,
+      "LAMBDA_CLAMP_MAX": 0.95,
+      "LAMBDA_DELTA_UP": 0.14629058102171252,
+      "LAMBDA_DELTA_DOWN": 0.11960208899340728,
+      "OVERFIT_RISK_EMA_ALPHA": 0.6,
+      "LAMBDA_DOWN_COOLING_ROUNDS": 2.0
+    },
+    "enable_l3_selection_logging": true,
+    "enable_agent_prompt_logging": true,
+    "description": "AutoTuneOpt: cand2",
+    "grad_probe_source": "train_holdout",
+    "grad_probe_holdout_frac": 0.1,
+    "grad_probe_holdout_min": 8
+  },
+  "auto_opt_iter13_cand3_03": {
+    "use_agent": true,
+    "sampler_type": "ad_kucs",
+    "k_definition": "coreset_to_labeled",
+    "score_normalization": true,
+    "lambda_override": null,
+    "lambda_controller": null,
+    "lambda_policy": {
+      "mode": "warmup_risk_closed_loop",
+      "r1_lambda": 0.0,
+      "uncertainty_only_rounds": 2,
+      "warmup_start_round": 3,
+      "warmup_rounds": 1,
+      "warmup_lambda": 0.2,
+      "risk_control_start_round": 4,
+      "severe_logic": "and",
+      "severe_tvc_key": "grad_train_val_cos_last",
+      "risk_trigger": "ci",
+      "risk_ci_window": 6.226574618851265,
+      "risk_ci_quantile": 0.20469753331287005,
+      "risk_ci_min_samples": 3,
+      "lambda_smoothing": "ema",
+      "lambda_smoothing_alpha": 0.85,
+      "lambda_max_step": 0.17163609388903353,
+      "late_stage_ramp": {
+        "start_round": 9,
+        "end_round": 12,
+        "start_lambda": 0.38422676935705147,
+        "end_lambda": 0.7
+      },
+      "selection_guardrail": {
+        "enabled": true,
+        "u_median_min": 0.45,
+        "u_low_thresh": 0.4,
+        "u_low_frac_max": 0.2,
+        "lambda_step_down": 0.12171875691191616,
+        "max_steps": 5,
+        "fallback_quota_u_frac": 0.7
+      },
+      "stage_aware": true,
+      "stage_boundaries": [
+        5,
+        10
+      ],
+      "stage_deltas": {
+        "early": {
+          "delta_up": 0.18286322627714066,
+          "delta_down": 0.11960208899340728
+        },
+        "mid": {
+          "delta_up": 0.14629058102171252,
+          "delta_down": 0.11960208899340728
+        },
+        "late": {
+          "delta_up": 0.0877743486130275,
+          "delta_down": 0.22872004210560362
+        }
+      }
+    },
+    "require_explicit_lambda": null,
+    "rollback_config": {
+      "mode": "adaptive_threshold",
+      "std_factor": 1.5,
+      "tau_min": 0.005
+    },
+    "control_permissions": {
+      "set_lambda": false,
+      "set_query_size": false,
+      "set_epochs_per_round": false,
+      "set_alpha": false
+    },
+    "agent_threshold_overrides": {
+      "OVERFIT_RISK_HI": 1.2,
+      "OVERFIT_RISK_LO": 0.6,
+      "OVERFIT_TVC_MIN_HI": 0.8313136847842137,
+      "OVERFIT_RISK_LAMBDA_UP_MAX": 0.9,
+      "MIOU_LOW_GAIN_THRESH": 0.01,
+      "MIOU_LOW_GAIN_STREAK": 1,
+      "LAMBDA_UP_K_U_GAP_MIN": 0.0,
+      "LAMBDA_CLAMP_MIN": 0.05,
+      "LAMBDA_CLAMP_MAX": 0.95,
+      "LAMBDA_DELTA_UP": 0.14629058102171252,
+      "LAMBDA_DELTA_DOWN": 0.11960208899340728,
+      "OVERFIT_RISK_EMA_ALPHA": 0.6,
+      "LAMBDA_DOWN_COOLING_ROUNDS": 1.7313511221991686
+    },
+    "enable_l3_selection_logging": true,
+    "enable_agent_prompt_logging": true,
+    "description": "AutoTuneOpt: cand3",
+    "grad_probe_source": "train_holdout",
+    "grad_probe_holdout_frac": 0.1,
+    "grad_probe_holdout_min": 8
+  },
+  "auto_opt_iter13_cand4_04": {
+    "use_agent": true,
+    "sampler_type": "ad_kucs",
+    "k_definition": "coreset_to_labeled",
+    "score_normalization": true,
+    "lambda_override": null,
+    "lambda_controller": null,
+    "lambda_policy": {
+      "mode": "warmup_risk_closed_loop",
+      "r1_lambda": 0.0,
+      "uncertainty_only_rounds": 2,
+      "warmup_start_round": 3,
+      "warmup_rounds": 1,
+      "warmup_lambda": 0.2,
+      "risk_control_start_round": 4,
+      "severe_logic": "and",
+      "severe_tvc_key": "grad_train_val_cos_last",
+      "risk_trigger": "ci",
+      "risk_ci_window": 6.226574618851265,
+      "risk_ci_quantile": 0.20469753331287005,
+      "risk_ci_min_samples": 3,
+      "lambda_smoothing": "ema",
+      "lambda_smoothing_alpha": 0.8513556527030963,
+      "lambda_max_step": 0.17163609388903353,
+      "late_stage_ramp": {
+        "start_round": 9,
+        "end_round": 12,
+        "start_lambda": 0.38422676935705147,
+        "end_lambda": 0.7
+      },
+      "selection_guardrail": {
+        "enabled": true,
+        "u_median_min": 0.45,
+        "u_low_thresh": 0.4,
+        "u_low_frac_max": 0.2,
+        "lambda_step_down": 0.14012627751290446,
+        "max_steps": 5,
+        "fallback_quota_u_frac": 0.7
+      },
+      "stage_aware": true,
+      "stage_boundaries": [
+        5,
+        10
+      ],
+      "stage_deltas": {
+        "early": {
+          "delta_up": 0.18286322627714066,
+          "delta_down": 0.10540092568905765
+        },
+        "mid": {
+          "delta_up": 0.14629058102171252,
+          "delta_down": 0.10540092568905765
+        },
+        "late": {
+          "delta_up": 0.0877743486130275,
+          "delta_down": 0.18445161995585088
+        }
+      }
+    },
+    "require_explicit_lambda": null,
+    "rollback_config": {
+      "mode": "adaptive_threshold",
+      "std_factor": 1.5,
+      "tau_min": 0.005
+    },
+    "control_permissions": {
+      "set_lambda": false,
+      "set_query_size": false,
+      "set_epochs_per_round": false,
+      "set_alpha": false
+    },
+    "agent_threshold_overrides": {
+      "OVERFIT_RISK_HI": 1.2,
+      "OVERFIT_RISK_LO": 0.6,
+      "OVERFIT_TVC_MIN_HI": 0.7919399406901224,
+      "OVERFIT_RISK_LAMBDA_UP_MAX": 0.9,
+      "MIOU_LOW_GAIN_THRESH": 0.01,
+      "MIOU_LOW_GAIN_STREAK": 1,
+      "LAMBDA_UP_K_U_GAP_MIN": 0.0,
+      "LAMBDA_CLAMP_MIN": 0.05,
+      "LAMBDA_CLAMP_MAX": 0.95,
+      "LAMBDA_DELTA_UP": 0.14629058102171252,
+      "LAMBDA_DELTA_DOWN": 0.10540092568905765,
+      "OVERFIT_RISK_EMA_ALPHA": 0.6,
+      "LAMBDA_DOWN_COOLING_ROUNDS": 2.0
+    },
+    "enable_l3_selection_logging": true,
+    "enable_agent_prompt_logging": true,
+    "description": "AutoTuneOpt: cand4",
+    "grad_probe_source": "train_holdout",
+    "grad_probe_holdout_frac": 0.1,
+    "grad_probe_holdout_min": 8
+  },
+  "auto_opt_iter13_cand5_05": {
+    "use_agent": true,
+    "sampler_type": "ad_kucs",
+    "k_definition": "coreset_to_labeled",
+    "score_normalization": true,
+    "lambda_override": null,
+    "lambda_controller": null,
+    "lambda_policy": {
+      "mode": "warmup_risk_closed_loop",
+      "r1_lambda": 0.0,
+      "uncertainty_only_rounds": 2,
+      "warmup_start_round": 3,
+      "warmup_rounds": 1,
+      "warmup_lambda": 0.2,
+      "risk_control_start_round": 4,
+      "severe_logic": "and",
+      "severe_tvc_key": "grad_train_val_cos_last",
+      "risk_trigger": "ci",
+      "risk_ci_window": 6.0013503870939235,
+      "risk_ci_quantile": 0.20469753331287005,
+      "risk_ci_min_samples": 3,
+      "lambda_smoothing": "ema",
+      "lambda_smoothing_alpha": 0.85,
+      "lambda_max_step": 0.17163609388903353,
+      "late_stage_ramp": {
+        "start_round": 9,
+        "end_round": 12,
+        "start_lambda": 0.38422676935705147,
+        "end_lambda": 0.7
+      },
+      "selection_guardrail": {
+        "enabled": true,
+        "u_median_min": 0.45,
+        "u_low_thresh": 0.4,
+        "u_low_frac_max": 0.18914044120504211,
+        "lambda_step_down": 0.12216098534348001,
+        "max_steps": 5,
+        "fallback_quota_u_frac": 0.7
+      },
+      "stage_aware": true,
+      "stage_boundaries": [
+        5,
+        10
+      ],
+      "stage_deltas": {
+        "early": {
+          "delta_up": 0.18286322627714066,
+          "delta_down": 0.1289139203377372
+        },
+        "mid": {
+          "delta_up": 0.14629058102171252,
+          "delta_down": 0.1289139203377372
+        },
+        "late": {
+          "delta_up": 0.0877743486130275,
+          "delta_down": 0.22559936059104008
+        }
+      }
+    },
+    "require_explicit_lambda": null,
+    "rollback_config": {
+      "mode": "adaptive_threshold",
+      "std_factor": 1.5,
+      "tau_min": 0.005
+    },
+    "control_permissions": {
+      "set_lambda": false,
+      "set_query_size": false,
+      "set_epochs_per_round": false,
+      "set_alpha": false
+    },
+    "agent_threshold_overrides": {
+      "OVERFIT_RISK_HI": 1.133639404087073,
+      "OVERFIT_RISK_LO": 0.6,
+      "OVERFIT_TVC_MIN_HI": 0.8,
+      "OVERFIT_RISK_LAMBDA_UP_MAX": 0.9,
+      "MIOU_LOW_GAIN_THRESH": 0.01,
+      "MIOU_LOW_GAIN_STREAK": 1,
+      "LAMBDA_UP_K_U_GAP_MIN": 0.0,
+      "LAMBDA_CLAMP_MIN": 0.05,
+      "LAMBDA_CLAMP_MAX": 0.95,
+      "LAMBDA_DELTA_UP": 0.14629058102171252,
+      "LAMBDA_DELTA_DOWN": 0.1289139203377372,
+      "OVERFIT_RISK_EMA_ALPHA": 0.6,
+      "LAMBDA_DOWN_COOLING_ROUNDS": 2.0
     },
     "enable_l3_selection_logging": true,
     "enable_agent_prompt_logging": true,
