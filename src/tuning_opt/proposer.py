@@ -66,13 +66,32 @@ class LLMProposer:
         self.client = client
         self.system_prompt = system_prompt or _SYSTEM_PROMPT
 
-    def propose(self, *, context: Dict[str, Any]) -> List[Proposal]:
+    def propose(
+        self, *, context: Dict[str, Any], allowed_keys: Optional[List[str]] = None
+    ) -> List[Proposal]:
         if not self.client.is_available():
             return []
+        allowed_set = (
+            {str(k).strip() for k in (allowed_keys or []) if str(k).strip()}
+            if allowed_keys is not None
+            else None
+        )
+        if allowed_set is not None:
+            context = dict(context)
+            context["allowed_parameter_keys"] = sorted(allowed_set)
+
         user_payload = json.dumps(context, ensure_ascii=False, indent=2)
+        sys_prompt = self.system_prompt
+        if allowed_set is not None:
+            sys_prompt = (
+                str(sys_prompt).rstrip()
+                + "\n"
+                + "本次只允许 parameter_changes 使用以下 key（必须是子集）：\n"
+                + "\n".join([f"- {k}" for k in sorted(allowed_set)])
+            )
         content = self.client.chat(
             messages=[
-                ChatMessage(role="system", content=self.system_prompt),
+                ChatMessage(role="system", content=sys_prompt),
                 ChatMessage(role="user", content=user_payload),
             ]
         )
@@ -103,6 +122,10 @@ class LLMProposer:
             changes = s.get("parameter_changes")
             if not isinstance(changes, dict):
                 changes = {}
+            if allowed_set is not None:
+                changes = {k: v for k, v in changes.items() if str(k) in allowed_set}
+                if not changes:
+                    continue
             out.append(
                 Proposal(
                     direction=direction,

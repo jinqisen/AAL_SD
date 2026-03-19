@@ -1,31 +1,35 @@
 {
-  "version": "1.0",
-  "strategy_notes": "AAL-SD Tuning Program. First stabilize risk signals, then optimize lambda dynamics, finally adjust guardrail strength.",
+  "version": "1.2",
+  "strategy_notes": "AAL-SD Tuning Program v1.2. Incorporate trajectory findings: early (warmup-like) guardrail misfires dominate performance; prioritize delaying guardrail until risk-control, softening early penalties, and stabilizing mid-phase risk CI. Keep space compact (10 params) while reintroducing key missing knobs (guardrail_start_round, risk_ci_quantile, u_median_min).",
   "llm_system_prompt": "你是 AAL-SD 自动调参助手。你只能输出严格 JSON，不能输出多余文本。\n目标：提高最终 val mIoU，同时保持训练稳定，避免过拟合风险升高。\n输出最多 6 个建议，每条建议包含：\n- direction: 简短方向名（字符串）\n- priority: 越小越优先（整数）\n- description: 一句话说明（字符串）\n- risk: 该方向的潜在风险描述（字符串）\n- expected_gain: 预期 mIoU 提升量\n- constraints: 硬约束触发条件（如 {\"overfit_risk_max\": 1.5}）\n- parameter_changes: 参数改动，只允许下方 parameter_space 中的 key。\n数值必须是数字（int/float）。",
   "parameter_space": [
-    {"key": "agent_threshold_overrides.LAMBDA_DELTA_UP", "lo": 0.02, "hi": 0.30},
-    {"key": "agent_threshold_overrides.LAMBDA_DELTA_DOWN", "lo": 0.02, "hi": 0.25},
-    {"key": "agent_threshold_overrides.OVERFIT_RISK_HI", "lo": 0.5, "hi": 2.0},
-    {"key": "agent_threshold_overrides.OVERFIT_RISK_LO", "lo": 0.1, "hi": 1.0},
-    {"key": "agent_threshold_overrides.OVERFIT_TVC_MIN_HI", "lo": 0.4, "hi": 0.95},
-    {"key": "agent_threshold_overrides.OVERFIT_RISK_EMA_ALPHA", "lo": 0.2, "hi": 0.95},
-    {"key": "agent_threshold_overrides.LAMBDA_DOWN_COOLING_ROUNDS", "lo": 0.0, "hi": 5.0},
-    {"key": "lambda_policy.lambda_smoothing_alpha", "lo": 0.5, "hi": 1.0},
-    {"key": "lambda_policy.lambda_max_step", "lo": 0.05, "hi": 0.35},
-    {"key": "lambda_policy.risk_ci_window", "lo": 3.0, "hi": 10.0},
-    {"key": "lambda_policy.risk_ci_quantile", "lo": 0.05, "hi": 0.50},
-    {"key": "lambda_policy.late_stage_ramp.start_round", "lo": 6.0, "hi": 12.0},
-    {"key": "lambda_policy.late_stage_ramp.end_round", "lo": 8.0, "hi": 16.0},
-    {"key": "lambda_policy.late_stage_ramp.start_lambda", "lo": 0.05, "hi": 0.70},
-    {"key": "lambda_policy.late_stage_ramp.end_lambda", "lo": 0.30, "hi": 0.95},
-    {"key": "lambda_policy.selection_guardrail.u_median_min", "lo": 0.20, "hi": 0.60},
-    {"key": "lambda_policy.selection_guardrail.u_low_thresh", "lo": 0.10, "hi": 0.60},
-    {"key": "lambda_policy.selection_guardrail.u_low_frac_max", "lo": 0.05, "hi": 0.60},
-    {"key": "lambda_policy.selection_guardrail.lambda_step_down", "lo": 0.02, "hi": 0.25},
-    {"key": "stage_aware_scales.early_up_scale", "lo": 0.5, "hi": 2.0},
-    {"key": "stage_aware_scales.late_down_scale", "lo": 0.5, "hi": 3.0},
-    {"key": "stage_aware_scales.late_up_scale", "lo": 0.2, "hi": 1.0}
+    {"key": "agent_threshold_overrides.LAMBDA_DELTA_UP", "lo": 0.10, "hi": 0.16},
+    {"key": "agent_threshold_overrides.LAMBDA_DELTA_DOWN", "lo": 0.10, "hi": 0.16},
+    {"key": "lambda_policy.lambda_max_step", "lo": 0.10, "hi": 0.20},
+    {"key": "lambda_policy.risk_ci_window", "lo": 6.0, "hi": 9.0},
+    {"key": "lambda_policy.risk_ci_quantile", "lo": 0.12, "hi": 0.30},
+    {"key": "lambda_policy.late_stage_ramp.end_lambda", "lo": 0.45, "hi": 0.65},
+    {"key": "lambda_policy.selection_guardrail.guardrail_start_round", "lo": 5.0, "hi": 10.0},
+    {"key": "lambda_policy.selection_guardrail.u_median_min", "lo": 0.34, "hi": 0.48},
+    {"key": "lambda_policy.selection_guardrail.u_low_thresh", "lo": 0.30, "hi": 0.42},
+    {"key": "lambda_policy.selection_guardrail.lambda_step_down", "lo": 0.05, "hi": 0.12}
   ],
+  "phase_param_allowlist": {
+    "f2": [
+      "agent_threshold_overrides.LAMBDA_DELTA_UP",
+      "agent_threshold_overrides.LAMBDA_DELTA_DOWN",
+      "lambda_policy.late_stage_ramp.end_lambda",
+      "lambda_policy.selection_guardrail.guardrail_start_round",
+      "lambda_policy.selection_guardrail.u_median_min",
+      "lambda_policy.selection_guardrail.u_low_thresh"
+    ],
+    "f3": [
+      "lambda_policy.lambda_max_step",
+      "lambda_policy.risk_ci_window",
+      "lambda_policy.risk_ci_quantile",
+      "lambda_policy.selection_guardrail.lambda_step_down"
+    ]
+  },
   "acceptance_gate": {
     "z": 1.645,
     "min_seed_epsilon": 0.01,

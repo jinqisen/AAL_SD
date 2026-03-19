@@ -364,6 +364,15 @@ class MultiFidelityTuningOrchestrator:
                 pass
 
         self.space = ParameterSpace.from_config(prog_cfg)
+        phase_allow = prog_cfg.get("phase_param_allowlist")
+        self.phase_param_allowlist: Dict[str, List[str]] = {}
+        if isinstance(phase_allow, dict):
+            for phase, keys in phase_allow.items():
+                if not isinstance(keys, list):
+                    continue
+                self.phase_param_allowlist[str(phase).strip().lower()] = [
+                    str(k).strip() for k in keys if str(k).strip()
+                ]
         self.pool_mgr = PoolResumeManager(results_dir=self.results_dir)
         self.evaluator = ExperimentEvaluator(repo_root=self.repo_root)
 
@@ -1035,7 +1044,7 @@ class MultiFidelityTuningOrchestrator:
     ) -> List[Dict[str, Any]]:
         if not self.llm_proposer:
             return []
-        ctx = {
+        base_ctx = {
             "iteration": int(iteration),
             "incumbent": {
                 "run_id": incumbent_run,
@@ -1045,11 +1054,29 @@ class MultiFidelityTuningOrchestrator:
             "center": dict(center),
             "target_miou": float(self.target_miou),
         }
-        proposals = self.llm_proposer.propose(context=ctx)
+
+        phases = []
+        f2_keys = self.phase_param_allowlist.get("f2")
+        f3_keys = self.phase_param_allowlist.get("f3")
+        if f2_keys:
+            phases.append(("f2", list(f2_keys)))
+        if f3_keys:
+            phases.append(("f3", list(f3_keys)))
+        if not phases:
+            phases.append(("default", None))
+
+        proposals: List[tuple[str, Any]] = []
+        for phase, keys in phases:
+            ctx = dict(base_ctx)
+            ctx["phase"] = str(phase)
+            ps = self.llm_proposer.propose(context=ctx, allowed_keys=keys)
+            for p in ps[:3]:
+                proposals.append((str(phase), p))
+
         out: List[Dict[str, Any]] = []
-        for p in proposals:
+        for phase, p in proposals:
             item = dict(p.parameter_changes)
-            item["_direction"] = p.direction
+            item["_direction"] = f"{phase}:{p.direction}"
 
             # Record constraints so they are visible/auditable
             if p.constraints:
@@ -1063,7 +1090,7 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--initial-run-id", required=True)
     parser.add_argument("--initial-exp", required=True)
-    parser.add_argument("--target-miou", type=float, default=0.725)
+    parser.add_argument("--target-miou", type=float, default=0.725) 
     parser.add_argument("--max-iterations", type=int, default=10)
     parser.add_argument("--seeds", type=str, default="42")
     parser.add_argument("--max-concurrent", type=int, default=1)
