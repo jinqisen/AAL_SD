@@ -738,48 +738,83 @@ def main() -> None:
         for seed in target_seeds:
             seed_run_id = f"{base_run_id}_seed{int(seed)}"
             seed_run_dir = runs_root / seed_run_id
-            seed_status_path = seed_run_dir / f"{best_exp}_status.json"
-            if seed_status_path.exists():
-                st = _status_str_from_status(seed_status_path)
-                rr = _progress_round_from_status(seed_status_path)
-                if st == "running":
-                    if not _is_stale_running(seed_status_path):
+
+            # Resume ALL experiments found in the seed run directory
+            current_exps = _list_exps_in_run(seed_run_dir)
+            for exp in current_exps:
+                seed_status_path = seed_run_dir / f"{exp}_status.json"
+                if seed_status_path.exists():
+                    st = _status_str_from_status(seed_status_path)
+                    rr = _progress_round_from_status(seed_status_path)
+                    if st == "running":
+                        if not _is_stale_running(seed_status_path):
+                            continue
+                        try:
+                            _mark_status_stale(
+                                seed_status_path,
+                                reason="status=running but no live owner process",
+                            )
+                        except Exception:
+                            pass
+                    if rr is not None and int(rr) >= int(args.confirm_end_round):
                         continue
-                    try:
-                        _mark_status_stale(
-                            seed_status_path,
-                            reason="status=running but no live owner process",
+
+                    # If we already have progress at or beyond branch_round, don't re-branch
+                    if rr is not None and int(rr) >= int(args.branch_round):
+                        jobs.append(
+                            (
+                                f"{seed_run_id}:{exp}",
+                                _build_parallel_strict_cmd(
+                                    run_id=seed_run_id,
+                                    seed=int(seed),
+                                    include=[exp],
+                                    n_rounds=int(args.confirm_end_round),
+                                    agent_workers=int(args.agent_workers),
+                                    dynamic_agent_workers=bool(
+                                        args.dynamic_agent_workers
+                                    ),
+                                    agent_workers_min=int(args.agent_workers_min),
+                                    reserve_free_gb=float(args.reserve_free_gb),
+                                    mem_per_agent_worker_gb=float(
+                                        args.mem_per_agent_worker_gb
+                                    ),
+                                    dynamic_poll_seconds=float(
+                                        args.dynamic_poll_seconds
+                                    ),
+                                ),
+                            )
                         )
-                    except Exception:
-                        pass
-                if rr is not None and int(rr) >= int(args.confirm_end_round):
-                    continue
-            if not seed_run_dir.exists():
-                seed_run_dir.mkdir(parents=True, exist_ok=True)
-            mgr.branch_from_round(
-                source_run_id=str(args.baseline_run_id),
-                source_exp=str(args.baseline_exp),
-                target_run_id=seed_run_id,
-                target_exps=[best_exp],
-                branch_round=int(args.branch_round),
-            )
-            jobs.append(
-                (
-                    f"{seed_run_id}:{best_exp}",
-                    _build_parallel_strict_cmd(
-                        run_id=seed_run_id,
-                        seed=int(seed),
-                        include=[best_exp],
-                        n_rounds=int(args.confirm_end_round),
-                        agent_workers=int(args.agent_workers),
-                        dynamic_agent_workers=bool(args.dynamic_agent_workers),
-                        agent_workers_min=int(args.agent_workers_min),
-                        reserve_free_gb=float(args.reserve_free_gb),
-                        mem_per_agent_worker_gb=float(args.mem_per_agent_worker_gb),
-                        dynamic_poll_seconds=float(args.dynamic_poll_seconds),
-                    ),
+                        continue
+
+            # Also ensure the current best_exp is started if it hasn't been yet
+            seed_status_path = seed_run_dir / f"{best_exp}_status.json"
+            if not seed_status_path.exists():
+                if not seed_run_dir.exists():
+                    seed_run_dir.mkdir(parents=True, exist_ok=True)
+                mgr.branch_from_round(
+                    source_run_id=str(args.baseline_run_id),
+                    source_exp=str(args.baseline_exp),
+                    target_run_id=seed_run_id,
+                    target_exps=[best_exp],
+                    branch_round=int(args.branch_round),
                 )
-            )
+                jobs.append(
+                    (
+                        f"{seed_run_id}:{best_exp}",
+                        _build_parallel_strict_cmd(
+                            run_id=seed_run_id,
+                            seed=int(seed),
+                            include=[best_exp],
+                            n_rounds=int(args.confirm_end_round),
+                            agent_workers=int(args.agent_workers),
+                            dynamic_agent_workers=bool(args.dynamic_agent_workers),
+                            agent_workers_min=int(args.agent_workers_min),
+                            reserve_free_gb=float(args.reserve_free_gb),
+                            mem_per_agent_worker_gb=float(args.mem_per_agent_worker_gb),
+                            dynamic_poll_seconds=float(args.dynamic_poll_seconds),
+                        ),
+                    )
+                )
 
         if jobs:
             _run_jobs(
@@ -802,6 +837,12 @@ def main() -> None:
             str(args.monitor_out_md),
         )
         if bool(args.continuous):
+            print(
+                f"[resume] --continuous: launching orchestrator "
+                f"initial_run_id={base_run_id} initial_exp={best_exp} "
+                f"target_miou={args.target_miou} max_iter={args.orch_max_iterations}",
+                flush=True,
+            )
             _run_orchestrator(initial_run_id=base_run_id, initial_exp=best_exp)
         return
 
@@ -870,48 +911,79 @@ def main() -> None:
             continue
         seed_run_id = f"{base_run_id}_seed{int(seed)}"
         seed_run_dir = runs_root / seed_run_id
-        seed_status_path = seed_run_dir / f"{best_exp}_status.json"
-        if seed_status_path.exists():
-            st = _status_str_from_status(seed_status_path)
-            rr = _progress_round_from_status(seed_status_path)
-            if st == "running":
-                if not _is_stale_running(seed_status_path):
+
+        # Resume ALL experiments found in the seed run directory
+        current_exps = _list_exps_in_run(seed_run_dir)
+        for exp in current_exps:
+            seed_status_path = seed_run_dir / f"{exp}_status.json"
+            if seed_status_path.exists():
+                st = _status_str_from_status(seed_status_path)
+                rr = _progress_round_from_status(seed_status_path)
+                if st == "running":
+                    if not _is_stale_running(seed_status_path):
+                        continue
+                    try:
+                        _mark_status_stale(
+                            seed_status_path,
+                            reason="status=running but no live owner process",
+                        )
+                    except Exception:
+                        pass
+                if rr is not None and int(rr) >= int(args.confirm_end_round):
                     continue
-                try:
-                    _mark_status_stale(
-                        seed_status_path,
-                        reason="status=running but no live owner process",
+
+                # If we already have progress at or beyond branch_round, don't re-branch
+                if rr is not None and int(rr) >= int(args.branch_round):
+                    jobs.append(
+                        (
+                            f"{seed_run_id}:{exp}",
+                            _build_parallel_strict_cmd(
+                                run_id=seed_run_id,
+                                seed=int(seed),
+                                include=[exp],
+                                n_rounds=int(args.confirm_end_round),
+                                agent_workers=int(args.agent_workers),
+                                dynamic_agent_workers=bool(args.dynamic_agent_workers),
+                                agent_workers_min=int(args.agent_workers_min),
+                                reserve_free_gb=float(args.reserve_free_gb),
+                                mem_per_agent_worker_gb=float(
+                                    args.mem_per_agent_worker_gb
+                                ),
+                                dynamic_poll_seconds=float(args.dynamic_poll_seconds),
+                            ),
+                        )
                     )
-                except Exception:
-                    pass
-            if rr is not None and int(rr) >= int(args.confirm_end_round):
-                continue
-        if not seed_run_dir.exists():
-            seed_run_dir.mkdir(parents=True, exist_ok=True)
-        mgr.branch_from_round(
-            source_run_id=str(args.baseline_run_id),
-            source_exp=str(args.baseline_exp),
-            target_run_id=seed_run_id,
-            target_exps=[best_exp],
-            branch_round=int(args.branch_round),
-        )
-        jobs.append(
-            (
-                f"{seed_run_id}:{best_exp}",
-                _build_parallel_strict_cmd(
-                    run_id=seed_run_id,
-                    seed=int(seed),
-                    include=[best_exp],
-                    n_rounds=int(args.confirm_end_round),
-                    agent_workers=int(args.agent_workers),
-                    dynamic_agent_workers=bool(args.dynamic_agent_workers),
-                    agent_workers_min=int(args.agent_workers_min),
-                    reserve_free_gb=float(args.reserve_free_gb),
-                    mem_per_agent_worker_gb=float(args.mem_per_agent_worker_gb),
-                    dynamic_poll_seconds=float(args.dynamic_poll_seconds),
-                ),
+                    continue
+
+        # Also ensure the current best_exp is started if it hasn't been yet
+        seed_status_path = seed_run_dir / f"{best_exp}_status.json"
+        if not seed_status_path.exists():
+            if not seed_run_dir.exists():
+                seed_run_dir.mkdir(parents=True, exist_ok=True)
+            mgr.branch_from_round(
+                source_run_id=str(args.baseline_run_id),
+                source_exp=str(args.baseline_exp),
+                target_run_id=seed_run_id,
+                target_exps=[best_exp],
+                branch_round=int(args.branch_round),
             )
-        )
+            jobs.append(
+                (
+                    f"{seed_run_id}:{best_exp}",
+                    _build_parallel_strict_cmd(
+                        run_id=seed_run_id,
+                        seed=int(seed),
+                        include=[best_exp],
+                        n_rounds=int(args.confirm_end_round),
+                        agent_workers=int(args.agent_workers),
+                        dynamic_agent_workers=bool(args.dynamic_agent_workers),
+                        agent_workers_min=int(args.agent_workers_min),
+                        reserve_free_gb=float(args.reserve_free_gb),
+                        mem_per_agent_worker_gb=float(args.mem_per_agent_worker_gb),
+                        dynamic_poll_seconds=float(args.dynamic_poll_seconds),
+                    ),
+                )
+            )
 
     if jobs:
         _run_jobs(
@@ -934,6 +1006,12 @@ def main() -> None:
         str(args.monitor_out_md),
     )
     if bool(args.continuous):
+        print(
+            f"[resume] --continuous: launching orchestrator "
+            f"initial_run_id={base_run_id} initial_exp={best_exp} "
+            f"target_miou={args.target_miou} max_iter={args.orch_max_iterations}",
+            flush=True,
+        )
         _run_orchestrator(initial_run_id=base_run_id, initial_exp=best_exp)
 
 

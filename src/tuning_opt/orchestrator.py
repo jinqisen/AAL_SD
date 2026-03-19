@@ -140,7 +140,11 @@ def _load_incumbent_objective(
     repo_root: Path, run_id: str, exp_name: str, objective: str
 ) -> Optional[float]:
     """Load incumbent metric using the SAME objective as confirm_objective."""
-    from tuning_opt.evaluator import parse_objective_from_status, parse_objective_miou_from_md
+    from tuning_opt.evaluator import (
+        parse_objective_from_status,
+        parse_objective_miou_from_md,
+    )
+
     run_dir = repo_root / "results" / "runs" / run_id
     status_path = run_dir / f"{exp_name}_status.json"
     v = parse_objective_from_status(status_path, objective)
@@ -149,7 +153,6 @@ def _load_incumbent_objective(
     # Fallback to md parsing with objective-aware logic
     md = run_dir / f"{exp_name}.md"
     return parse_objective_miou_from_md(md, objective)
-
 
 
 def _load_incumbent_cfg(
@@ -228,9 +231,12 @@ class IterationResult:
 class AcceptanceConfig:
     z: float = 1.645
     min_seed_epsilon: float = 0.01
-    max_guardrail_frac: float = 0.5  # Data-driven threshold (up to 50% rounds can have guardrail applied)
+    max_guardrail_frac: float = (
+        0.5  # Data-driven threshold (up to 50% rounds can have guardrail applied)
+    )
     require_min_seed_gate: bool = True
     require_guardrail_gate: bool = True
+
 
 def _statistically_better(
     candidate: float,
@@ -244,6 +250,7 @@ def _statistically_better(
     se = candidate_std / math.sqrt(n_seeds)
     return (candidate - se * z) > incumbent
 
+
 def _acceptance_gate(
     candidate_mean: float,
     incumbent_mean: float,
@@ -256,23 +263,29 @@ def _acceptance_gate(
 ) -> tuple[bool, dict[str, Any]]:
     cfg = config or AcceptanceConfig()
     reasons = {}
-    
+
     # Gate 1: Statistical mean improvement
-    mean_ok = _statistically_better(candidate_mean, incumbent_mean, candidate_std, n_seeds, cfg.z)
+    mean_ok = _statistically_better(
+        candidate_mean, incumbent_mean, candidate_std, n_seeds, cfg.z
+    )
     reasons["mean_improvement"] = mean_ok
-    
+
     # Gate 2: Min-seed protection
     min_ok = True
-    if cfg.require_min_seed_gate and candidate_min is not None and incumbent_min is not None:
+    if (
+        cfg.require_min_seed_gate
+        and candidate_min is not None
+        and incumbent_min is not None
+    ):
         min_ok = candidate_min >= incumbent_min - cfg.min_seed_epsilon
     reasons["min_seed_gate"] = min_ok
-    
+
     # Gate 3: Guardrail overload
     guardrail_ok = True
     if cfg.require_guardrail_gate and candidate_guardrail_frac is not None:
         guardrail_ok = candidate_guardrail_frac <= cfg.max_guardrail_frac
     reasons["guardrail_gate"] = guardrail_ok
-    
+
     accepted = mean_ok and min_ok and guardrail_ok
     return accepted, reasons
 
@@ -360,8 +373,14 @@ class MultiFidelityTuningOrchestrator:
         if self.enable_llm:
             cfg_path = llm_config_path or TuningLLMConfig.default_path(self.repo_root)
             llm_cfg = TuningLLMConfig.load(cfg_path)
-            sys_prompt = prog_cfg.get("llm_system_prompt") if isinstance(prog_cfg.get("llm_system_prompt"), str) else None
-            self.llm_proposer = LLMProposer(TuningLLMClient(llm_cfg), system_prompt=sys_prompt)
+            sys_prompt = (
+                prog_cfg.get("llm_system_prompt")
+                if isinstance(prog_cfg.get("llm_system_prompt"), str)
+                else None
+            )
+            self.llm_proposer = LLMProposer(
+                TuningLLMClient(llm_cfg), system_prompt=sys_prompt
+            )
 
         ac_raw = prog_cfg.get("acceptance_gate", {})
         if isinstance(ac_raw, dict):
@@ -454,6 +473,7 @@ class MultiFidelityTuningOrchestrator:
         if not isinstance(tuning_progress, dict):
             return
         manifest_path, lock_path = self._manifest_paths(run_id=str(run_id))
+
         def _merge(existing: dict) -> dict:
             merged = dict(existing)
             cur = merged.get("tuning_progress")
@@ -468,14 +488,17 @@ class MultiFidelityTuningOrchestrator:
     def run(self, *, initial_run_id: str, initial_exp: str) -> List[IterationResult]:
         incumbent_run = str(initial_run_id)
         incumbent_exp = str(initial_exp)
-        
+
         # Determine internal objective for validation (instead of test) logic early
         # confirm_objective is default to 'val' if not provided based on __init__
-        # Use target_objective instead of hardcoded 'val', here we use the one initialized 
+        # Use target_objective instead of hardcoded 'val', here we use the one initialized
         obj_to_load = str(getattr(self, "confirm_objective", "val")).strip().lower()
-        
+
         incumbent_miou = (
-            _load_incumbent_objective(self.repo_root, incumbent_run, incumbent_exp, obj_to_load) or 0.0
+            _load_incumbent_objective(
+                self.repo_root, incumbent_run, incumbent_exp, obj_to_load
+            )
+            or 0.0
         )
         it0 = _next_opt_iteration_index(self.repo_root)
 
@@ -524,23 +547,59 @@ class MultiFidelityTuningOrchestrator:
 
             stop_reason = ""
             last_iter_run_id: Optional[str] = None
+            print(
+                f"[orchestrator] === Tuning loop START === "
+                f"incumbent={incumbent_run}/{incumbent_exp} "
+                f"mIoU={incumbent_miou:.4f} target={self.target_miou:.4f} "
+                f"max_iter={self.max_iterations} seeds={self.seeds}",
+                flush=True,
+            )
             try:
                 for local_it in range(self.max_iterations):
                     it = int(it0) + int(local_it)
+                    print(
+                        f"[orchestrator] --- iter {it} (local {local_it}/{self.max_iterations}) --- "
+                        f"incumbent_mIoU={incumbent_miou:.4f} target={self.target_miou:.4f} "
+                        f"gap={self.target_miou - incumbent_miou:+.4f} "
+                        f"radius={self._radius:.4f} no_improve_streak={self._no_improve_streak}",
+                        flush=True,
+                    )
                     if _shutdown_requested.is_set():
                         stop_reason = "interrupted"
+                        print(
+                            f"[orchestrator] STOP: interrupted (signal received)",
+                            flush=True,
+                        )
                         break
                     if float(incumbent_miou) >= float(self.target_miou):
                         stop_reason = "target_reached"
+                        print(
+                            f"[orchestrator] STOP: target_reached — "
+                            f"incumbent_mIoU={incumbent_miou:.4f} >= target={self.target_miou:.4f}",
+                            flush=True,
+                        )
                         break
                     if _plateau_detected(self.history, _PLATEAU_WINDOW, _PLATEAU_EPS):
                         stop_reason = "plateau_detected"
+                        recent = [h.best_miou for h in self.history[-_PLATEAU_WINDOW:]]
+                        print(
+                            f"[orchestrator] STOP: plateau_detected — "
+                            f"last {_PLATEAU_WINDOW} best_mIoUs={[f'{v:.4f}' for v in recent]} "
+                            f"mean_gain < {_PLATEAU_EPS}",
+                            flush=True,
+                        )
                         break
                     if (
                         self._radius <= 0.02
                         and self._no_improve_streak >= _TR_COLLAPSE_PATIENCE
                     ):
                         stop_reason = "trust_region_collapse"
+                        print(
+                            f"[orchestrator] STOP: trust_region_collapse — "
+                            f"radius={self._radius:.4f} <= 0.02 and "
+                            f"no_improve_streak={self._no_improve_streak} >= {_TR_COLLAPSE_PATIENCE}",
+                            flush=True,
+                        )
                         break
 
                     incumbent_cfg = _load_incumbent_cfg(
@@ -567,7 +626,17 @@ class MultiFidelityTuningOrchestrator:
                     candidates = candidates[:8]
                     if not candidates:
                         stop_reason = "no_candidates"
+                        print(
+                            f"[orchestrator] STOP: no_candidates — "
+                            f"dedup yielded 0 candidates from {len(llm_overrides)} LLM + {len(tr_samples)} TR samples",
+                            flush=True,
+                        )
                         break
+                    print(
+                        f"[orchestrator] iter {it}: {len(candidates)} candidates, "
+                        f"run_id={f'autotune_opt_iter{it:03d}_...'}",
+                        flush=True,
+                    )
 
                     ts = datetime.now().strftime("%Y%m%d_%H%M")
                     run_id = f"autotune_opt_iter{it:03d}_{ts}"
@@ -603,13 +672,32 @@ class MultiFidelityTuningOrchestrator:
 
                     _write_sidecar(self.repo_root, exp_map)
 
-                    self.pool_mgr.branch_from_round(
-                        source_run_id=incumbent_run,
-                        source_exp=incumbent_exp,
-                        target_run_id=run_id,
-                        target_exps=exp_names,
-                        branch_round=int(self.branch_round),
-                    )
+                    # Skip branch if all experiments already have checkpoints
+                    any_missing_ckpt = False
+                    for exp_name in exp_names:
+                        ckpt_path = (
+                            self.repo_root
+                            / "results"
+                            / "checkpoints"
+                            / run_id
+                            / f"{exp_name}_state.json"
+                        )
+                        if not ckpt_path.exists():
+                            any_missing_ckpt = True
+                            break
+
+                    if any_missing_ckpt:
+                        self.pool_mgr.branch_from_round(
+                            source_run_id=incumbent_run,
+                            source_exp=incumbent_exp,
+                            target_run_id=run_id,
+                            target_exps=exp_names,
+                            branch_round=int(self.branch_round),
+                        )
+                    else:
+                        print(
+                            f"[orchestrator] Skipping branch for {run_id}: checkpoints already exist."
+                        )
 
                     phase_a_seed = int(self.seeds[0])
 
@@ -681,13 +769,28 @@ class MultiFidelityTuningOrchestrator:
 
                         def _run_seed(seed: int) -> None:
                             seed_run_id = str(run_ids_by_seed[int(seed)])
-                            self.pool_mgr.branch_from_round(
-                                source_run_id=incumbent_run,
-                                source_exp=incumbent_exp,
-                                target_run_id=seed_run_id,
-                                target_exps=[best_exp],
-                                branch_round=int(self.branch_round),
+
+                            # Check for existing checkpoint before branching
+                            ckpt_path = (
+                                self.repo_root
+                                / "results"
+                                / "checkpoints"
+                                / seed_run_id
+                                / f"{best_exp}_state.json"
                             )
+                            if not ckpt_path.exists():
+                                self.pool_mgr.branch_from_round(
+                                    source_run_id=incumbent_run,
+                                    source_exp=incumbent_exp,
+                                    target_run_id=seed_run_id,
+                                    target_exps=[best_exp],
+                                    branch_round=int(self.branch_round),
+                                )
+                            else:
+                                print(
+                                    f"[orchestrator] Skipping branch for {seed_run_id}/{best_exp}: checkpoint exists."
+                                )
+
                             self.evaluator.run_batch(
                                 run_id=seed_run_id,
                                 exp_names=[best_exp],
@@ -734,22 +837,31 @@ class MultiFidelityTuningOrchestrator:
                             best_miou = ms.mean
                             best_std = ms.std
                             candidate_min = ms.min_miou
-                            
+
                         # Extract guardrail stats
                         total_applied = 0
                         total_rounds = 0
                         for sid, run_id_s in run_ids_by_seed.items():
-                            g_stats = self.evaluator.extract_guardrail_stats(run_id_s, best_exp)
+                            g_stats = self.evaluator.extract_guardrail_stats(
+                                run_id_s, best_exp
+                            )
                             total_applied += g_stats.get("applied", 0)
                             total_rounds += g_stats.get("total", 0)
                         if total_rounds > 0:
                             candidate_guardrail_frac = total_applied / total_rounds
 
                         # Fetch incumbent min seed for gate
-                        incumbent_ms_results = self.evaluator.collect_multi_seed_results(
-                            run_ids_by_seed={s: f"{incumbent_run}_seed{s}" if s != self.seeds[0] else incumbent_run for s in self.seeds},
-                            exp_names=[incumbent_exp],
-                            objective=self.confirm_objective,
+                        incumbent_ms_results = (
+                            self.evaluator.collect_multi_seed_results(
+                                run_ids_by_seed={
+                                    s: f"{incumbent_run}_seed{s}"
+                                    if s != self.seeds[0]
+                                    else incumbent_run
+                                    for s in self.seeds
+                                },
+                                exp_names=[incumbent_exp],
+                                objective=self.confirm_objective,
+                            )
                         )
                         inc_ms = incumbent_ms_results.get(incumbent_exp)
                         if inc_ms is not None:
@@ -771,12 +883,13 @@ class MultiFidelityTuningOrchestrator:
                         candidate_guardrail_frac=candidate_guardrail_frac,
                         config=self.acceptance_config,
                     )
-                    
+
                     # Update overrides with gate info for auditing
                     best_overrides["_tuning_gate_ok"] = improved
                     best_overrides["_tuning_gate_details"] = gate_reasons
 
                     if improved:
+                        prev_miou = float(incumbent_miou)
                         incumbent_run, incumbent_exp, incumbent_miou = (
                             run_id,
                             best_exp,
@@ -784,9 +897,30 @@ class MultiFidelityTuningOrchestrator:
                         )
                         self._radius = min(0.25, self._radius * 1.25)
                         self._no_improve_streak = 0
+                        print(
+                            f"[orchestrator] iter {it} ACCEPTED: "
+                            f"mIoU {prev_miou:.4f} -> {best_miou:.4f} "
+                            f"(+{best_miou - prev_miou:.4f}) "
+                            f"best_exp={best_exp} "
+                            f"std={f'{best_std:.4f}' if best_std is not None else 'N/A'} "
+                            f"new_radius={self._radius:.4f} "
+                            f"gate={gate_reasons}",
+                            flush=True,
+                        )
                     else:
                         self._radius = max(0.02, self._radius * 0.70)
                         self._no_improve_streak += 1
+                        print(
+                            f"[orchestrator] iter {it} REJECTED: "
+                            f"candidate_mIoU={best_miou:.4f} vs incumbent={incumbent_miou:.4f} "
+                            f"({best_miou - incumbent_miou:+.4f}) "
+                            f"best_exp={best_exp} "
+                            f"std={f'{best_std:.4f}' if best_std is not None else 'N/A'} "
+                            f"new_radius={self._radius:.4f} "
+                            f"no_improve_streak={self._no_improve_streak} "
+                            f"gate={gate_reasons}",
+                            flush=True,
+                        )
 
                     self.history.append(
                         IterationResult(
@@ -828,6 +962,21 @@ class MultiFidelityTuningOrchestrator:
 
             if not stop_reason:
                 stop_reason = "max_iterations"
+                print(
+                    f"[orchestrator] STOP: max_iterations — "
+                    f"exhausted {self.max_iterations} iterations without reaching target",
+                    flush=True,
+                )
+
+            print(
+                f"[orchestrator] === Tuning loop END === "
+                f"stop_reason={stop_reason} "
+                f"incumbent={incumbent_run}/{incumbent_exp} "
+                f"mIoU={incumbent_miou:.4f} target={self.target_miou:.4f} "
+                f"total_iters={len(self.history)} "
+                f"radius={self._radius:.4f} no_improve_streak={self._no_improve_streak}",
+                flush=True,
+            )
 
             self._save_state(
                 incumbent_run=incumbent_run,
@@ -901,11 +1050,11 @@ class MultiFidelityTuningOrchestrator:
         for p in proposals:
             item = dict(p.parameter_changes)
             item["_direction"] = p.direction
-            
+
             # Record constraints so they are visible/auditable
             if p.constraints:
                 item["_tuning_constraints"] = dict(p.constraints)
-                
+
             out.append(item)
         return out
 
@@ -949,9 +1098,7 @@ def main() -> None:
         else None
     )
     prog_path = (
-        Path(args.program).expanduser().resolve()
-        if str(args.program).strip()
-        else None
+        Path(args.program).expanduser().resolve() if str(args.program).strip() else None
     )
     screen_obj = str(args.screen_objective).strip() or None
     confirm_obj = str(args.confirm_objective).strip() or None
