@@ -74,18 +74,18 @@ def parse_final_miou_from_md(md_path: Path) -> Optional[float]:
         text = md_path.read_text(encoding="utf-8", errors="ignore")
     except Exception:
         return None
-    m = _RE_FINAL_TEST.search(text)
-    if m:
+    matches_test = _RE_FINAL_TEST.findall(text)
+    if matches_test:
         try:
-            return float(m.group(1))
+            return float(matches_test[-1])
         except Exception:
-            return None
-    m = _RE_FINAL_OUT.search(text)
-    if m:
+            pass
+    matches_out = _RE_FINAL_OUT.findall(text)
+    if matches_out:
         try:
-            return float(m.group(1))
+            return float(matches_out[-1])
         except Exception:
-            return None
+            pass
     return None
 
 
@@ -96,11 +96,11 @@ def parse_last_val_miou_from_md(md_path: Path) -> Optional[float]:
         text = md_path.read_text(encoding="utf-8", errors="ignore")
     except Exception:
         return None
-    m = _RE_LAST_VAL.search(text)
-    if not m:
+    matches = _RE_LAST_VAL.findall(text)
+    if not matches:
         return None
     try:
-        return float(m.group(1))
+        return float(matches[-1])
     except Exception:
         return None
 
