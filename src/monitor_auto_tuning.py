@@ -81,22 +81,22 @@ def _parse_objective_miou_from_md(md_path: Path, objective: str) -> Optional[flo
         return None
     obj = str(objective or "").strip().lower()
     if obj in ("val", "best_val", "last_val"):
-        m = _RE_MIOU_LAST_VAL.search(text)
-        if m:
+        matches = _RE_MIOU_LAST_VAL.findall(text)
+        if matches:
             try:
-                return float(m.group(1))
+                return float(matches[-1])
             except Exception:
                 return None
-    m = _RE_MIOU_TEST.search(text)
-    if m:
+    matches = _RE_MIOU_TEST.findall(text)
+    if matches:
         try:
-            return float(m.group(1))
+            return float(matches[-1])
         except Exception:
             return None
-    m = _RE_MIOU_OUT.search(text)
-    if m:
+    matches = _RE_MIOU_OUT.findall(text)
+    if matches:
         try:
-            return float(m.group(1))
+            return float(matches[-1])
         except Exception:
             return None
     return None
@@ -174,6 +174,7 @@ class RunSummary:
     objective: str
     best_exp: Optional[str]
     best_miou: Optional[float]
+    best_rd: Optional[int]
     counts: Dict[str, int]
 
 @dataclass(frozen=True)
@@ -196,6 +197,10 @@ class AutoTuningIterSummary:
     topk_status: Dict[str, str]
     seed_done: Dict[int, bool]
     seed_round: Dict[int, Optional[int]]
+    seed_score: Dict[int, Optional[float]]
+    f3_mean: Optional[float]
+    f3_std: Optional[float]
+    f3_min: Optional[float]
     running_experiments: List[Dict[str, Any]]
 
 
@@ -221,6 +226,7 @@ def _summarize_run(run_dir: Path, objective: str) -> RunSummary:
     counts: Dict[str, int] = {"completed": 0, "running": 0, "failed": 0, "unknown": 0}
     best_exp: Optional[str] = None
     best_miou: Optional[float] = None
+    best_rd: Optional[int] = None
 
     for sp in status_files:
         payload = _read_json(sp) or {}
@@ -240,6 +246,8 @@ def _summarize_run(run_dir: Path, objective: str) -> RunSummary:
         if best_miou is None or v > best_miou:
             best_miou = v
             best_exp = exp_name
+            rd_val, _ = _best_round_miou_from_md(md_path)
+            best_rd = rd_val
 
     return RunSummary(
         run_id=run_id,
@@ -248,6 +256,7 @@ def _summarize_run(run_dir: Path, objective: str) -> RunSummary:
         objective=str(objective),
         best_exp=best_exp,
         best_miou=best_miou,
+        best_rd=best_rd,
         counts=counts,
     )
 
@@ -303,6 +312,13 @@ def _objective_from_status(run_dir: Path, exp: str, objective: str) -> Optional[
         v = res.get("final_f1")
         return float(v) if isinstance(v, (int, float)) else None
     return None
+
+
+def _objective_from_status_or_md(run_dir: Path, exp: str, objective: str) -> Optional[float]:
+    v = _objective_from_status(run_dir, exp, objective)
+    if v is not None:
+        return v
+    return _parse_objective_miou_from_md(run_dir / f"{exp}.md", objective)
 
 
 def _autotune_iter_summary(
@@ -392,26 +408,41 @@ def _autotune_iter_summary(
 
     seed_done: Dict[int, bool] = {}
     seed_round: Dict[int, Optional[int]] = {}
+    seed_score: Dict[int, Optional[float]] = {}
+    f3_mean: Optional[float] = None
+    f3_std: Optional[float] = None
+    f3_min: Optional[float] = None
     f3_done = False
     if expected_seeds:
         seed_runs = _find_seed_runs(run_dir.parent, run_dir.name)
         if confirm_best_exp:
             for seed in expected_seeds:
-                if int(seed) == int(expected_seeds[0]):
-                    seed_done[int(seed)] = f2_done
-                    seed_round[int(seed)] = progress_round.get(confirm_best_exp)
-                    continue
-                sdir = seed_runs.get(int(seed))
+                sdir = run_dir if int(seed) == int(expected_seeds[0]) else seed_runs.get(int(seed))
                 if sdir is None:
                     seed_done[int(seed)] = False
                     seed_round[int(seed)] = None
+                    seed_score[int(seed)] = None
                     continue
+
                 sp = _read_json(sdir / f"{confirm_best_exp}_status.json") or {}
                 prog = sp.get("progress") if isinstance(sp.get("progress"), dict) else {}
                 rr = prog.get("round")
-                seed_round[int(seed)] = int(rr) if isinstance(rr, int) else None
-                seed_done[int(seed)] = bool(isinstance(rr, int) and rr >= int(confirm_end_round))
+                rr_i = int(rr) if isinstance(rr, int) else None
+                seed_round[int(seed)] = rr_i
+                seed_done[int(seed)] = bool(rr_i is not None and rr_i >= int(confirm_end_round))
+                if seed_done[int(seed)]:
+                    seed_score[int(seed)] = _objective_from_status_or_md(
+                        sdir, confirm_best_exp, confirm_objective
+                    )
+                else:
+                    seed_score[int(seed)] = None
             f3_done = all(seed_done.values()) if seed_done else False
+            if f3_done:
+                xs = [float(v) for v in seed_score.values() if isinstance(v, (int, float))]
+                if len(xs) == len(seed_score) and xs:
+                    f3_mean = _mean(xs)
+                    f3_std = _std(xs)
+                    f3_min = min(xs)
 
     return AutoTuningIterSummary(
         iteration=int(iteration),
@@ -432,6 +463,10 @@ def _autotune_iter_summary(
         topk_status=topk_status,
         seed_done=seed_done,
         seed_round=seed_round,
+        seed_score=seed_score,
+        f3_mean=f3_mean,
+        f3_std=f3_std,
+        f3_min=f3_min,
         running_experiments=running_experiments,
     )
 
@@ -668,36 +703,76 @@ def _print_overview(
     show_limit: int,
 ) -> None:
     print(f"[{datetime.now().strftime('%H:%M:%S')}] Auto-Tuning Overview (objective={objective})")
-    print("=" * 110)
-    print(f"{'Run':<40} | {'Done':<4} | {'Run':<4} | {'Fail':<4} | {'Best':<6} | {'BestExp'}")
-    print("-" * 110)
+    print("=" * 115)
+    print(f"{'Run':<40} | {'Done':<4} | {'Run':<4} | {'Fail':<4} | {'Best':<6} | {'BestExp(Rd)'}")
+    print("-" * 115)
     for r in runs[:show_limit]:
         done = int(r.counts.get("completed", 0))
         running = int(r.counts.get("running", 0))
         failed = int(r.counts.get("failed", 0))
         best = "-" if r.best_miou is None else f"{r.best_miou:.4f}"
-        be = str(r.best_exp or "-")
+        if r.best_exp is None:
+            be = "-"
+        else:
+            rd_str = f"(R{r.best_rd})" if r.best_rd is not None else ""
+            be = f"{r.best_exp}{rd_str}"
         print(f"{r.run_id:<40} | {done:<4} | {running:<4} | {failed:<4} | {best:<6} | {be}")
     print()
 
 
 def _print_tuning_curve(runs: List[RunSummary]) -> None:
     ordered = sorted(runs, key=lambda r: _iter_order_key(r.run_id))
-    best_so_far: Optional[float] = None
+    best_so_far_by_type: Dict[str, float] = {}
     print("Tuning Curve (best-per-iter vs best-so-far)")
-    print("-" * 110)
+    print("-" * 115)
     print(f"{'IterRun':<40} | {'Best':<8} | {'BestSoFar':<9} | {'Improved'}")
     for r in ordered:
+        if "_seed" in r.run_id:
+            seed_type = r.run_id.split("_seed")[-1]
+            run_type = f"seed{seed_type}"
+        else:
+            run_type = "base"
+
+        best_so_far = best_so_far_by_type.get(run_type)
         b = r.best_miou
         if b is None:
             print(f"{r.run_id:<40} | {'-':<8} | {('-' if best_so_far is None else f'{best_so_far:.4f}'):<9} | -")
             continue
         if best_so_far is None or b > best_so_far + 1e-12:
+            best_so_far_by_type[run_type] = b
             best_so_far = b
             improved = "Y"
         else:
             improved = "N"
         print(f"{r.run_id:<40} | {b:.4f}   | {best_so_far:.4f}     | {improved}")
+    print()
+
+
+def _print_autotune_f3_curve(
+    iters: List[AutoTuningIterSummary],
+    *,
+    confirm_objective: str,
+    confirm_end_round: int,
+) -> None:
+    ordered = sorted(iters, key=lambda x: (int(x.iteration), str(x.run_id)))
+    best_so_far: Optional[float] = None
+    print(f"Tuning Curve (F3 @R{int(confirm_end_round)}, objective={confirm_objective})")
+    print("-" * 115)
+    print(f"{'IterRun':<40} | {'F3Mean':<8} | {'BestSoFar':<9} | {'Improved'} | {'BestExp'}")
+    for s in ordered:
+        b = s.f3_mean
+        if b is None:
+            bs = "-" if best_so_far is None else f"{best_so_far:.4f}"
+            exp = str(s.confirm_best_exp or "-")
+            print(f"{s.run_id:<40} | {'-':<8} | {bs:<9} | -        | {exp}")
+            continue
+        if best_so_far is None or float(b) > float(best_so_far) + 1e-12:
+            best_so_far = float(b)
+            improved = "Y"
+        else:
+            improved = "N"
+        exp = str(s.confirm_best_exp or "-")
+        print(f"{s.run_id:<40} | {b:.4f}   | {best_so_far:.4f}     | {improved:<8} | {exp}")
     print()
 
 
@@ -763,9 +838,35 @@ def main() -> None:
         summaries.sort(key=lambda r: r.run_id)
         summaries.sort(key=lambda r: _iter_order_key(r.run_id))
 
+        seeds: List[int] = []
+        iters: List[AutoTuningIterSummary] = []
+        if bool(args.autotune_report):
+            seeds = [int(s) for s in str(args.autotune_seeds).split(",") if s.strip()]
+            base_runs = _list_autotune_base_runs(runs_dir, max_runs=int(args.max_runs))
+            iters = [
+                _autotune_iter_summary(
+                    d,
+                    iteration=it,
+                    screen_objective=str(args.autotune_screen_objective),
+                    confirm_objective=str(args.autotune_confirm_objective),
+                    screen_end_round=int(args.autotune_screen_end_round),
+                    confirm_end_round=int(args.autotune_confirm_end_round),
+                    screen_topk=int(args.autotune_screen_topk),
+                    expected_seeds=seeds,
+                )
+                for it, d in base_runs
+            ]
+
         os.system("clear")
         _print_overview(summaries, objective=str(args.objective), show_limit=int(args.show))
-        _print_tuning_curve(summaries)
+        if bool(args.autotune_report):
+            _print_autotune_f3_curve(
+                iters,
+                confirm_objective=str(args.autotune_confirm_objective),
+                confirm_end_round=int(args.autotune_confirm_end_round),
+            )
+        else:
+            _print_tuning_curve(summaries)
 
         running_curves: List[TrainingCurveSummary] = []
         for d in run_dirs:
@@ -786,21 +887,6 @@ def main() -> None:
         _print_training_curves(running_curves)
 
         if bool(args.autotune_report):
-            seeds = [int(s) for s in str(args.autotune_seeds).split(",") if s.strip()]
-            base_runs = _list_autotune_base_runs(runs_dir, max_runs=int(args.max_runs))
-            iters = [
-                _autotune_iter_summary(
-                    d,
-                    iteration=it,
-                    screen_objective=str(args.autotune_screen_objective),
-                    confirm_objective=str(args.autotune_confirm_objective),
-                    screen_end_round=int(args.autotune_screen_end_round),
-                    confirm_end_round=int(args.autotune_confirm_end_round),
-                    screen_topk=int(args.autotune_screen_topk),
-                    expected_seeds=seeds,
-                )
-                for it, d in base_runs
-            ]
             running_exps: List[Dict[str, Any]] = []
             for d in run_dirs:
                 for sp in d.glob("*_status.json"):

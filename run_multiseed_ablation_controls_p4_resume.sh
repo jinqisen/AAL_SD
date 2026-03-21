@@ -30,28 +30,45 @@ if [[ -z "${BASE_RUN_ID:-}" ]]; then
   echo "示例：BASE_RUN_ID=baseline_20260309_123456 ./run_multiseed_ablation_controls_p4_resume.sh" 1>&2
   exit 2
 fi
-SEEDS="${SEEDS:-42 43 44 45}"
+SEEDS="${SEEDS:-42 43 44}"
 WORKERS="${WORKERS:-1}"
 EXP_WORKERS="${EXP_WORKERS:-4}"
 N_ROUNDS="${N_ROUNDS:-}"
 
 EXPERIMENTS=(
-  no_agent
-  fixed_lambda
-  random_lambda
-  rule_based_controller_r1
-  rule_based_controller_r2
-  rule_based_controller_r3
+  full_model_A_lambda_policy
   full_model_B_lambda_agent
+  no_cold_start
+  no_late_stage_ramp
+  no_risk_modulation
+  no_guardrail
+  no_ema_smoothing
+  no_cooling_period
+  no_normalization
+  no_agent
   uncertainty_only
   knowledge_only
-  no_cold_start
-  fixed_k
-  no_normalization
-  bald_uncertainty
+  fixed_lambda
 )
 
-if ! "${PYTHON_BIN}" -c "import sys; sys.path.insert(0,'src'); from experiments.ablation_config import ABLATION_SETTINGS, EXPERIMENT_NAME_ALIASES; exps=sys.argv[1:]; missing=[]; resolved=[]; \nfor e in exps:\n  c=EXPERIMENT_NAME_ALIASES.get(e,e)\n  resolved.append(c)\n  if c not in ABLATION_SETTINGS:\n    missing.append(e)\nprint('Resolved experiments:', ' '.join(resolved))\nif missing:\n  print('错误：存在未知实验名：'+' '.join(missing), file=sys.stderr)\n  sys.exit(3)\n" "${EXPERIMENTS[@]}"; then
+if ! "${PYTHON_BIN}" - "${EXPERIMENTS[@]}" <<'PY'; then
+import sys
+sys.path.insert(0, "src")
+from experiments.ablation_config import ABLATION_SETTINGS, EXPERIMENT_NAME_ALIASES
+
+exps = sys.argv[1:]
+missing = []
+resolved = []
+for e in exps:
+  c = EXPERIMENT_NAME_ALIASES.get(e, e)
+  resolved.append(c)
+  if c not in ABLATION_SETTINGS:
+    missing.append(e)
+print("Resolved experiments:", " ".join(resolved))
+if missing:
+  print("错误：存在未知实验名：" + " ".join(missing), file=sys.stderr)
+  raise SystemExit(3)
+PY
   exit 3
 fi
 
