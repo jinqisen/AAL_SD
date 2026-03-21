@@ -277,6 +277,22 @@ def main():
     arrow(ax, (14.4, 6.6), (14.4, 5.9), C_PURPLE)
     label_text(ax, (14.65, 6.25), "selected\nQt + reason", fontsize=6.5)
 
+    rounded_box(
+        ax,
+        (10.9, 5.05),
+        2.2,
+        0.9,
+        "Qualitative\nVisualization\n─────────\nGT vs Pred\n(overlay)",
+        C_GRAY_LIGHT,
+        fontsize=7.5,
+        text_color="#2c3e50",
+        alpha=0.95,
+        lw=1.2,
+        edgecolor=C_GRAY,
+    )
+    arrow(ax, (13.0, 6.0), (12.0, 5.95), C_PURPLE, lw=1.4, connectionstyle="arc3,rad=0.10")
+    label_text(ax, (12.2, 6.25), "inspection", fontsize=6.5, color=C_PURPLE, ha="left")
+
     # Return arrow back to Data Pools (curved)
     arrow(
         ax,
@@ -381,6 +397,9 @@ def main():
 
     arrow(ax, (14.4, 5.0), (14.4, 2.5), C_GRAY, lw=1.2)
     label_text(ax, (14.65, 3.8), "save state", fontsize=6.5, color=C_GRAY)
+
+    arrow(ax, (12.0, 5.05), (13.3, 2.35), C_GRAY, lw=1.0, connectionstyle="arc3,rad=-0.25")
+    label_text(ax, (12.4, 3.35), "export figs", fontsize=6.5, color=C_GRAY)
 
     arrow(ax, (13.3, 2.0), (12.4, 3.1), C_GRAY, lw=1.2, connectionstyle="arc3,rad=0.2")
     label_text(ax, (12.5, 2.3), "recovery\nsupport", fontsize=6.5, color=C_GRAY)
