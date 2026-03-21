@@ -622,6 +622,14 @@ class Toolbox:
         warmup_rounds = int(policy.get("warmup_rounds", 1))
         warmup_lambda = policy.get("warmup_lambda", 0.22)
         warmup_lambda_range = policy.get("warmup_lambda_range")
+        warmup_floor = None
+        if isinstance(warmup_lambda_range, (list, tuple)) and len(warmup_lambda_range) == 2:
+            try:
+                lo = float(warmup_lambda_range[0])
+                hi = float(warmup_lambda_range[1])
+                warmup_floor = float(min(lo, hi))
+            except Exception:
+                warmup_floor = None
         risk_control_start_round = int(
             policy.get("risk_control_start_round", warmup_start_round + warmup_rounds)
         )
@@ -762,6 +770,10 @@ class Toolbox:
                 "base": None,
                 "diagnostics": diagnostics,
             }
+
+        post_warmup_start = int(warmup_start_round) + int(max(warmup_rounds, 0))
+        if warmup_floor is not None and int(round_num) >= int(post_warmup_start):
+            clamp_min = float(max(float(clamp_min), float(warmup_floor)))
 
         base = self._last_lambda_applied
         if base is None:
@@ -1714,8 +1726,8 @@ class Toolbox:
                 b_max = float(bounds.get("max"))
                 if b_min > b_max:
                     b_min, b_max = b_max, b_min
-                b_min = float(max(float(AgentConstraints.LAMBDA_MIN), b_min))
-                b_max = float(min(float(AgentConstraints.LAMBDA_MAX), b_max))
+                b_min = float(max(0.0, b_min))
+                b_max = float(min(1.0, b_max))
                 clamp_min = float(b_min)
                 clamp_max = float(b_max)
         lambda_before = float(final_lambda)
@@ -1797,10 +1809,10 @@ class Toolbox:
                 )
             )
 
-        if v_req < AgentConstraints.LAMBDA_MIN:
-            raise ValueError(f"lambda {v_req} < min {AgentConstraints.LAMBDA_MIN}")
-        if v_req > AgentConstraints.LAMBDA_MAX:
-            raise ValueError(f"lambda {v_req} > max {AgentConstraints.LAMBDA_MAX}")
+        if v_req < 0.0:
+            raise ValueError(f"lambda {v_req} < min 0.0")
+        if v_req > 1.0:
+            raise ValueError(f"lambda {v_req} > max 1.0")
 
         v = float(v_req)
         clamped = False
@@ -1813,19 +1825,23 @@ class Toolbox:
         )
         policy = self._lambda_policy_config()
         in_uncertainty_phase = False
-        if (
-            isinstance(policy, dict)
-            and str(policy.get("mode") or "") == "warmup_risk_closed_loop"
-        ):
+        if isinstance(policy, dict) and str(policy.get("mode") or "") == "warmup_risk_closed_loop":
+            round_num = int(getattr(self.controller, "current_round", 0) or 0)
             try:
-                r1_lambda = float(policy.get("r1_lambda", 0.0))
-                uncertainty_only_rounds = int(
-                    policy.get("uncertainty_only_rounds", 0) or 0
-                )
-                round_num = int(getattr(self.controller, "current_round", 0) or 0)
+                payload = self._compute_policy_lambda_for_round(int(round_num), policy)
+                bounds = payload.get("bounds") if isinstance(payload, dict) else None
+                if isinstance(bounds, dict) and ("min" in bounds) and ("max" in bounds):
+                    b_min = float(bounds.get("min"))
+                    b_max = float(bounds.get("max"))
+                    if b_min > b_max:
+                        b_min, b_max = b_max, b_min
+                    b_min = float(max(0.0, b_min))
+                    b_max = float(min(1.0, b_max))
+                    clamp_min = float(b_min)
+                    clamp_max = float(b_max)
+                uncertainty_only_rounds = int(policy.get("uncertainty_only_rounds", 0) or 0)
                 if round_num > 0 and round_num <= max(1, uncertainty_only_rounds):
                     in_uncertainty_phase = True
-                    clamp_min = float(min(float(clamp_min), float(r1_lambda)))
             except Exception:
                 pass
         if v < clamp_min:
