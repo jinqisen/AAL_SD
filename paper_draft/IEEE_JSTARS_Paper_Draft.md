@@ -329,6 +329,41 @@ To validate the contribution of each component, we conduct ablation experiments 
 
 Figure 6 visualizes the round-by-round mIoU trajectories for the full model and each ablation variant. The full AAL-SD model consistently outperforms or matches all ablation variants across the entire learning budget. Removing the agent or fixing the weighting scheme results in a visible gap by the later rounds, while the knowledge-only variant shows the weakest overall trajectory.
 
+### D-2. Risk Control Ablation
+
+To isolate the contribution of the three-phase λ strategy (warmup + gradient-based risk modulation + late-stage ramp + selection guardrail), we introduce a dedicated ablation variant: **w/o Risk Control**. In this configuration, the entire closed-loop λ policy is disabled; λ is determined solely by the sigmoid progress-based formula $\lambda(t) = \sigma(\alpha \cdot (t/T - 0.5))$, which increases monotonically with the annotation progress ratio $t/T$. The LLM agent still participates in candidate inspection and final subset selection, but receives no gradient-derived risk signals and operates without warmup or guardrail constraints.
+
+**TABLE IV-B**
+**Risk Control Ablation (Seed-42)**
+
+| Configuration | ALC | Final mIoU | Final F1-Score |
+|---------------|-----|------------|----------------|
+| AAL-SD (policy full, A) | 0.6693 | 0.7651 | 0.8490 |
+| w/o Risk Control (sigmoid-only λ) | [TBD] | [TBD] | [TBD] |
+
+This ablation directly answers the question "how much does the gradient-feedback-driven λ policy contribute?" If the w/o Risk Control variant performs comparably, the three-phase strategy adds complexity without proportional benefit. If it degrades, the risk-aware closed-loop is validated as a core contributor to AAL-SD's performance. The results will be populated after running the experiment with `python src/experiments/run_sensitivity_sweep.py --no_risk_control_only --seeds 42`.
+
+### D-3. Hyperparameter Sensitivity Analysis
+
+The closed-loop λ policy introduces five key hyperparameters whose sensitivity must be characterized for reproducibility and practical deployment. We conduct a one-at-a-time sweep on seed-42, varying each parameter across five values while holding all others at their default (tuned) values.
+
+**TABLE VI**
+**Hyperparameter Sensitivity (Seed-42, One-at-a-Time Sweep)**
+
+| Parameter | Symbol | Default | Sweep Range | Metric |
+|-----------|--------|---------|-------------|--------|
+| Risk threshold | $\tau_{risk}$ | 1.20 | {0.6, 0.9, 1.2, 1.5, 1.8} | OVERFIT_RISK_HI |
+| EMA smoothing | $\beta$ | 0.6 | {0.2, 0.4, 0.6, 0.8, 1.0} | OVERFIT_RISK_EMA_ALPHA |
+| Lambda upper bound | $\lambda_{max}$ | 0.8 | {0.4, 0.6, 0.8, 0.95, 1.0} | LAMBDA_CLAMP_MAX |
+| Max step size | $k_{max}$ | 0.17 | {0.05, 0.10, 0.17, 0.25, 0.35} | lambda_max_step |
+| Cooling period | $n_{cool}$ | 2 | {0, 1, 2, 3, 4} | LAMBDA_DOWN_COOLING_ROUNDS |
+
+The full results table (final mIoU and ALC for each of the 25 configurations) will be populated after running `python src/experiments/run_sensitivity_sweep.py --seeds 42`. Figure 14 visualizes the sensitivity curves.
+
+![Figure 14. Hyperparameter sensitivity analysis: one-at-a-time sweep of five key control parameters.](figures/Fig14_Sensitivity_Sweep_Lines.png)
+
+Figure 14 shows the final mIoU (left axis, red) and ALC (right axis, blue) as each hyperparameter is varied independently. Vertical dashed lines indicate the default (tuned) values. The analysis reveals which parameters the framework is most sensitive to and whether the tuned operating point lies in a stable region of the hyperparameter space.
+
 ### E. Analysis of λ_t Trajectory
 
 ![Figure 3. Seed-42 controller trajectory: mIoU, effective λ, gradient cosine, and overfit risk for the two full-model variants.](figures/Fig3_Controller_Trajectory_Seed42.png)
@@ -441,6 +476,12 @@ The implementation of AAL-SD, including the active learning pipeline, ablation c
 **Figure 10.** Paired mIoU difference: AAL-SD (A) minus each baseline, averaged across four seeds with 95% CI. Positive regions (green shading) indicate AAL-SD outperformance. The plot amplifies differences that are visually compressed in the absolute learning curves.
 
 **Figure 11.** Seed-42 AAL-SD (A) score distributions per round. Violins show the candidate pool distribution for uncertainty $U(x)$, knowledge gain $K(x)$, and fused score; red dots mark actually selected samples. Early rounds select from high-uncertainty regions; later rounds show broader knowledge-gain exploration before reverting to uncertainty under risk signals.
+
+**Figure 12.** Segmentation visualization comparison on selected Landslide4Sense test samples. Columns show the input RGB composite, ground truth overlay (green), and prediction overlays (red) from AAL-SD and baseline methods. Per-cell IoU scores quantify segmentation quality for each method on each sample.
+
+**Figure 13.** Hyperparameter sensitivity heatmap from autotune exploration runs. The top panel shows mean final mIoU as a function of $\tau_{risk}$ and $\beta$ (EMA alpha). Bottom panels show scatter trends for $\lambda_{max}$, $k_{max}$ (max step), and $n_{cool}$ (cooling rounds).
+
+**Figure 14.** Hyperparameter sensitivity analysis from the dedicated one-at-a-time sweep (seed-42). Each subplot varies one control parameter while holding all others at their tuned defaults. Red lines (left axis) show final mIoU; blue dashed lines (right axis) show ALC. Vertical dotted lines mark the default operating point.
 
 ## Template Notes
 

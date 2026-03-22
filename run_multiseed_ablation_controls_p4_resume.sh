@@ -32,8 +32,18 @@ if [[ -z "${BASE_RUN_ID:-}" ]]; then
 fi
 SEEDS="${SEEDS:-42 43 44}"
 WORKERS="${WORKERS:-1}"
-EXP_WORKERS="${EXP_WORKERS:-4}"
+EXP_WORKERS="${EXP_WORKERS:-3}"
 N_ROUNDS="${N_ROUNDS:-}"
+
+if [[ -n "${TRAIN_ROUNDS:-}" ]]; then
+  N_ROUNDS=$((TRAIN_ROUNDS + 1))
+fi
+
+if [[ -n "${N_ROUNDS}" && "${N_ROUNDS}" -lt 2 ]]; then
+  echo "错误：N_ROUNDS=${N_ROUNDS} 不合法。最后一轮固定为 test-only 轮，因此至少需要 2 轮（1轮训练+1轮test）。" 1>&2
+  echo "请设置 N_ROUNDS=16 或 TRAIN_ROUNDS=15。" 1>&2
+  exit 1
+fi
 
 EXPERIMENTS=(
   full_model_A_lambda_policy

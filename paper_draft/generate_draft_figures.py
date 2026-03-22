@@ -112,6 +112,7 @@ def t_critical_95(n: int) -> float:
     table = {1: 12.706, 2: 4.303, 3: 3.182, 4: 2.776, 5: 2.571}
     return table.get(n - 1, 1.96)
 
+
 def _safe_float(x: object) -> float | None:
     try:
         v = float(x)
@@ -121,10 +122,12 @@ def _safe_float(x: object) -> float | None:
     except Exception:
         return None
 
+
 def _read_json(path: Path) -> dict:
     with open(path, "r", encoding="utf-8") as f:
         obj = json.load(f)
     return obj if isinstance(obj, dict) else {}
+
 
 def _discover_latest_seed_run_dir(seed: int, prefix: str = "baseline_") -> Path | None:
     candidates = []
@@ -148,6 +151,7 @@ def _discover_latest_seed_run_dir(seed: int, prefix: str = "baseline_") -> Path 
     candidates.sort()
     return candidates[-1][2]
 
+
 def _load_paper_round_curves() -> pd.DataFrame:
     path = PAPER / "multiseed_round_curves.csv"
     if not path.exists():
@@ -157,6 +161,7 @@ def _load_paper_round_curves() -> pd.DataFrame:
         if col in df.columns:
             df[col] = pd.to_numeric(df[col], errors="coerce")
     return df
+
 
 def _load_controller_trajectories() -> pd.DataFrame:
     path = PAPER / "controller_trajectories.csv"
@@ -309,7 +314,11 @@ def fig2_multiseed_learning_curves():
 # ── Fig 3: seed-42 controller trajectory (A vs B) ────────────────────────
 def fig3_controller_trajectory():
     df = _load_controller_trajectories()
-    focus = df[df["experiment"].isin(["full_model_A_lambda_policy", "full_model_B_lambda_agent"])]
+    focus = df[
+        df["experiment"].isin(
+            ["full_model_A_lambda_policy", "full_model_B_lambda_agent"]
+        )
+    ]
     fig, axes = plt.subplots(4, 1, figsize=(10, 10), sharex=True)
     panels = [
         ("final_miou", "mIoU"),
@@ -427,6 +436,7 @@ def fig6_ablation_curves():
             )
             plotted += 1
     else:
+
         def _parse_round_summaries(trace_path: Path) -> pd.DataFrame:
             rows = []
             if not trace_path.exists():
@@ -462,7 +472,13 @@ def fig6_ablation_curves():
             out = out.dropna(subset=["round", "miou"]).sort_values("round")
             return out
 
-        seed42_runs = [p for p in RUNS.iterdir() if p.is_dir() and p.name.startswith("baseline_") and p.name.endswith("_seed42")]
+        seed42_runs = [
+            p
+            for p in RUNS.iterdir()
+            if p.is_dir()
+            and p.name.startswith("baseline_")
+            and p.name.endswith("_seed42")
+        ]
         best_dir = None
         best_count = -1
         for p in seed42_runs:
@@ -922,6 +938,7 @@ def fig11_score_distribution():
     plt.close(fig)
     print("  Fig11: U/K/Score distribution violins")
 
+
 def fig12_segmentation_visual_comparison():
     try:
         import torch
@@ -1001,8 +1018,14 @@ def fig12_segmentation_visual_comparison():
 
     def _load_model(ckpt_path: Path):
         payload = torch.load(ckpt_path, map_location="cpu")
-        state = payload["state_dict"] if isinstance(payload, dict) and "state_dict" in payload else payload
-        model = LandslideDeepLabV3(in_channels=14, classes=2, encoder_weights=None, mc_dropout=0.0)
+        state = (
+            payload["state_dict"]
+            if isinstance(payload, dict) and "state_dict" in payload
+            else payload
+        )
+        model = LandslideDeepLabV3(
+            in_channels=14, classes=2, encoder_weights=None, mc_dropout=0.0
+        )
         model.load_state_dict(state, strict=False)
         model.to(device)
         model.eval()
@@ -1018,7 +1041,11 @@ def fig12_segmentation_visual_comparison():
         hi = np.quantile(rgb, 0.98)
         if not np.isfinite(lo) or not np.isfinite(hi) or hi <= lo:
             lo = float(np.min(rgb))
-            hi = float(np.max(rgb)) if float(np.max(rgb)) > float(np.min(rgb)) else float(np.min(rgb) + 1.0)
+            hi = (
+                float(np.max(rgb))
+                if float(np.max(rgb)) > float(np.min(rgb))
+                else float(np.min(rgb) + 1.0)
+            )
         rgb = (rgb - lo) / (hi - lo + 1e-6)
         return np.clip(rgb, 0.0, 1.0)
 
@@ -1048,23 +1075,48 @@ def fig12_segmentation_visual_comparison():
 
             for j, (mname, model) in enumerate(models.items(), start=2):
                 logits = model(x)
-                pred = torch.argmax(logits, dim=1).squeeze(0).detach().cpu().numpy().astype(np.uint8)
+                pred = (
+                    torch.argmax(logits, dim=1)
+                    .squeeze(0)
+                    .detach()
+                    .cpu()
+                    .numpy()
+                    .astype(np.uint8)
+                )
                 axes[i, j].imshow(rgb)
                 axes[i, j].imshow(pred > 0, cmap="Reds", alpha=0.45, vmin=0, vmax=1)
                 axes[i, j].axis("off")
 
-            sid = str(sample.get("sample_id") or sample.get("image_name") or f"sample_{i}")
-            axes[i, 0].text(0.02, 0.02, sid, transform=axes[i, 0].transAxes, fontsize=9, color="white",
-                            bbox=dict(facecolor="black", alpha=0.35, pad=2, edgecolor="none"))
+            sid = str(
+                sample.get("sample_id") or sample.get("image_name") or f"sample_{i}"
+            )
+            axes[i, 0].text(
+                0.02,
+                0.02,
+                sid,
+                transform=axes[i, 0].transAxes,
+                fontsize=9,
+                color="white",
+                bbox=dict(facecolor="black", alpha=0.35, pad=2, edgecolor="none"),
+            )
 
     fig.tight_layout()
-    fig.savefig(FIG_DIR / "Fig12_Segmentation_Visual_Comparison.png", bbox_inches="tight")
+    fig.savefig(
+        FIG_DIR / "Fig12_Segmentation_Visual_Comparison.png", bbox_inches="tight"
+    )
     plt.close(fig)
     print("  Fig12: segmentation visual comparison")
 
+
 def fig13_hyperparam_sensitivity():
     rows = []
-    for run_dir in sorted([p for p in RUNS.iterdir() if p.is_dir() and p.name.startswith("autotune_opt_iter")]):
+    for run_dir in sorted(
+        [
+            p
+            for p in RUNS.iterdir()
+            if p.is_dir() and p.name.startswith("autotune_opt_iter")
+        ]
+    ):
         man_path = run_dir / "manifest.json"
         if not man_path.exists():
             continue
@@ -1082,9 +1134,21 @@ def fig13_hyperparam_sensitivity():
             res = st.get("result") if isinstance(st.get("result"), dict) else {}
             final_miou = _safe_float(res.get("final_mIoU"))
             alc = _safe_float(res.get("alc"))
-            lp = exp_cfg.get("lambda_policy") if isinstance(exp_cfg.get("lambda_policy"), dict) else {}
-            guard = lp.get("selection_guardrail") if isinstance(lp.get("selection_guardrail"), dict) else {}
-            thr = exp_cfg.get("agent_threshold_overrides") if isinstance(exp_cfg.get("agent_threshold_overrides"), dict) else {}
+            lp = (
+                exp_cfg.get("lambda_policy")
+                if isinstance(exp_cfg.get("lambda_policy"), dict)
+                else {}
+            )
+            guard = (
+                lp.get("selection_guardrail")
+                if isinstance(lp.get("selection_guardrail"), dict)
+                else {}
+            )
+            thr = (
+                exp_cfg.get("agent_threshold_overrides")
+                if isinstance(exp_cfg.get("agent_threshold_overrides"), dict)
+                else {}
+            )
 
             rows.append(
                 {
@@ -1118,18 +1182,17 @@ def fig13_hyperparam_sensitivity():
     else:
         sub["tau_risk_r"] = sub["tau_risk"].round(3)
         sub["beta_ema_r"] = sub["beta_ema"].round(3)
-        pivot = (
-            sub.pivot_table(
-                index="beta_ema_r",
-                columns="tau_risk_r",
-                values="final_miou",
-                aggfunc="mean",
-            )
-            .sort_index()
-        )
+        pivot = sub.pivot_table(
+            index="beta_ema_r",
+            columns="tau_risk_r",
+            values="final_miou",
+            aggfunc="mean",
+        ).sort_index()
         im = ax_hm.imshow(pivot.values, aspect="auto", origin="lower", cmap="viridis")
         ax_hm.set_xticks(np.arange(pivot.shape[1]))
-        ax_hm.set_xticklabels([str(x) for x in pivot.columns.tolist()], rotation=45, ha="right")
+        ax_hm.set_xticklabels(
+            [str(x) for x in pivot.columns.tolist()], rotation=45, ha="right"
+        )
         ax_hm.set_yticks(np.arange(pivot.shape[0]))
         ax_hm.set_yticklabels([str(x) for x in pivot.index.tolist()])
         ax_hm.set_xlabel("τ_risk (risk_ci_quantile)")
@@ -1161,7 +1224,9 @@ def fig13_hyperparam_sensitivity():
         x_sorted = x[order]
         y_sorted = y[order]
         if len(x_sorted) >= 8:
-            bins = np.unique(np.quantile(x_sorted, [0.0, 0.2, 0.4, 0.6, 0.8, 1.0]).round(6))
+            bins = np.unique(
+                np.quantile(x_sorted, [0.0, 0.2, 0.4, 0.6, 0.8, 1.0]).round(6)
+            )
             if len(bins) >= 3:
                 bx = []
                 by = []
@@ -1184,6 +1249,168 @@ def fig13_hyperparam_sensitivity():
     print("  Fig13: hyperparameter sensitivity (heatmap + trends)")
 
 
+def fig14_sensitivity_sweep_lines():
+    csv_candidates = sorted(RUNS.glob("sensitivity_*/sensitivity_summary.csv"))
+    if not csv_candidates:
+        csv_candidates = sorted(RUNS.glob("*/sensitivity_summary.csv"))
+    if not csv_candidates:
+        print("  Fig14: SKIP - no sensitivity_summary.csv found")
+        return
+
+    df = pd.read_csv(csv_candidates[-1])
+    df = df.dropna(subset=["final_miou"])
+    if df.empty:
+        print("  Fig14: SKIP - sensitivity_summary.csv is empty")
+        return
+
+    param_meta = {
+        "tau_risk": {
+            "label": r"$\tau_{risk}$ (OVERFIT_RISK_HI)",
+            "values": [0.6, 0.9, 1.2, 1.5, 1.8],
+        },
+        "beta_ema": {
+            "label": r"$\beta$ (EMA alpha)",
+            "values": [0.2, 0.4, 0.6, 0.8, 1.0],
+        },
+        "lambda_max": {
+            "label": r"$\lambda_{max}$",
+            "values": [0.4, 0.6, 0.8, 0.95, 1.0],
+        },
+        "k_max": {
+            "label": r"$k_{max}$ (max step)",
+            "values": [0.05, 0.10, 0.17, 0.25, 0.35],
+        },
+        "n_cool": {"label": r"$n_{cool}$ (cooling rounds)", "values": [0, 1, 2, 3, 4]},
+    }
+    default_vals = {
+        "tau_risk": 1.2,
+        "beta_ema": 0.6,
+        "lambda_max": 0.8,
+        "k_max": 0.17,
+        "n_cool": 2,
+    }
+
+    fig, axes = plt.subplots(2, 3, figsize=(15, 9))
+    axes_flat = axes.flatten()
+
+    for idx, (param, meta) in enumerate(param_meta.items()):
+        ax = axes_flat[idx]
+        sub = df[df["param_name"] == param].sort_values("param_value")
+        if sub.empty:
+            ax.text(
+                0.5,
+                0.5,
+                f"No data for {param}",
+                ha="center",
+                va="center",
+                transform=ax.transAxes,
+            )
+            ax.set_title(meta["label"])
+            continue
+
+        grouped = (
+            sub.groupby("param_value")
+            .agg(
+                miou_mean=("final_miou", "mean"),
+                miou_std=("final_miou", "std"),
+                alc_mean=("alc", "mean"),
+                n=("final_miou", "count"),
+            )
+            .reset_index()
+        )
+        grouped["miou_std"] = grouped["miou_std"].fillna(0)
+
+        x = grouped["param_value"].values
+        y_miou = grouped["miou_mean"].values
+        y_alc = grouped["alc_mean"].values
+        yerr = grouped["miou_std"].values
+
+        ax.errorbar(
+            x,
+            y_miou,
+            yerr=yerr,
+            fmt="-o",
+            color="#d62728",
+            linewidth=2,
+            markersize=7,
+            capsize=4,
+            label="final mIoU",
+            zorder=3,
+        )
+        ax2 = ax.twinx()
+        ax2.plot(
+            x,
+            y_alc,
+            "--s",
+            color="#1f77b4",
+            linewidth=1.5,
+            markersize=5,
+            alpha=0.7,
+            label="ALC",
+        )
+        ax2.set_ylabel("ALC", color="#1f77b4", fontsize=9)
+        ax2.tick_params(axis="y", labelcolor="#1f77b4")
+
+        if default_vals.get(param) is not None:
+            ax.axvline(
+                default_vals[param],
+                color="#999",
+                linestyle=":",
+                linewidth=1.2,
+                alpha=0.7,
+            )
+            ax.annotate(
+                "default",
+                xy=(default_vals[param], ax.get_ylim()[0]),
+                fontsize=7,
+                color="#999",
+                ha="center",
+                va="bottom",
+            )
+
+        ax.set_xlabel(meta["label"], fontsize=10)
+        ax.set_ylabel("final mIoU", color="#d62728", fontsize=9)
+        ax.tick_params(axis="y", labelcolor="#d62728")
+        ax.set_title(meta["label"], fontsize=11)
+        ax.grid(alpha=0.2)
+
+    axes_flat[-1].set_visible(False)
+
+    handles1 = [
+        plt.Line2D(
+            [0], [0], color="#d62728", marker="o", linewidth=2, label="final mIoU"
+        )
+    ]
+    handles2 = [
+        plt.Line2D(
+            [0],
+            [0],
+            color="#1f77b4",
+            marker="s",
+            linestyle="--",
+            linewidth=1.5,
+            label="ALC",
+        )
+    ]
+    fig.legend(
+        handles=handles1 + handles2,
+        loc="lower right",
+        fontsize=10,
+        bbox_to_anchor=(0.95, 0.08),
+        frameon=True,
+    )
+
+    fig.suptitle(
+        "Hyperparameter Sensitivity Analysis (One-at-a-Time Sweep, Seed-42)",
+        fontsize=14,
+        y=1.01,
+    )
+    fig.tight_layout()
+    fig.savefig(FIG_DIR / "Fig14_Sensitivity_Sweep_Lines.png", bbox_inches="tight")
+    plt.close(fig)
+    print("  Fig14: sensitivity sweep line plots")
+
+
 # ── main ─────────────────────────────────────────────────────────────────
 def main():
     FIG_DIR.mkdir(parents=True, exist_ok=True)
@@ -1201,6 +1428,7 @@ def main():
     fig11_score_distribution()
     fig12_segmentation_visual_comparison()
     fig13_hyperparam_sensitivity()
+    fig14_sensitivity_sweep_lines()
     print(f"Done. All figures saved to {FIG_DIR}")
 
 

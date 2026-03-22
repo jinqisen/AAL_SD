@@ -62,6 +62,25 @@ SEEDS="${SEEDS:-42 43 44}"
 WORKERS="${WORKERS:-2}"
 EXP_WORKERS="${EXP_WORKERS:-2}"
 N_ROUNDS="${N_ROUNDS:-}"
+TRAIN_ROUNDS="${TRAIN_ROUNDS:-}"
+if [[ -z "${N_ROUNDS}" && -n "${TRAIN_ROUNDS}" ]]; then
+  if [[ "${TRAIN_ROUNDS}" =~ ^[0-9]+$ ]]; then
+    N_ROUNDS="$((TRAIN_ROUNDS + 1))"
+  else
+    echo "错误：TRAIN_ROUNDS 需要是整数，当前=${TRAIN_ROUNDS}" 1>&2
+    exit 4
+  fi
+fi
+if [[ -n "${N_ROUNDS}" ]]; then
+  if [[ ! "${N_ROUNDS}" =~ ^[0-9]+$ ]]; then
+    echo "错误：N_ROUNDS 需要是整数，当前=${N_ROUNDS}" 1>&2
+    exit 4
+  fi
+  if [[ "${N_ROUNDS}" -lt 2 ]]; then
+    echo "错误：N_ROUNDS 必须 >= 2（最后一轮用于 test-only），例如 15轮训练+1轮测试请设 N_ROUNDS=16 或 TRAIN_ROUNDS=15" 1>&2
+    exit 4
+  fi
+fi
 
 AB_TUNING="${AB_TUNING:-}"
 if [[ "${AB_TUNING}" == "lo" ]]; then
