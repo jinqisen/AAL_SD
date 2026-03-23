@@ -814,9 +814,45 @@ class ADKUCSSampler:
             features_array, n_clusters=n_clusters
         )
 
+        # Calculate cluster saturation for Cluster-Balanced K'
+        unlabeled_counts = np.bincount(cluster_labels, minlength=n_clusters)
+        labeled_counts = np.zeros(n_clusters, dtype=int)
+        if labeled_features is not None and len(labeled_features) > 0:
+            from scipy.spatial.distance import cdist
+            # Assign labeled features to the nearest unlabeled cluster center
+            dists = cdist(labeled_features, cluster_centers)
+            labeled_cluster_assignments = np.argmin(dists, axis=1)
+            labeled_counts = np.bincount(labeled_cluster_assignments, minlength=n_clusters)
+
+        pool_counts = unlabeled_counts + labeled_counts
+        
+        # Laplace smoothing: (labeled + eps) / (pool + eps) to prevent numerical instability
+        eps = 1.0  # Changed to 1.0 as per AAL-SD-Doc methodology
+        sat = (labeled_counts + eps) / (pool_counts + eps)
+        
+        # Calculate cluster weights: w(c) = (1 - sat(c))^gamma
+        gamma = 1.0  # Linear penalty
+        
+        # Apply noise cluster filtering (min_cluster_size)
+        min_cluster_size = 5
+        w_c = np.zeros(n_clusters, dtype=np.float32)
+        for c in range(n_clusters):
+            if pool_counts[c] < min_cluster_size:
+                w_c[c] = 0.0  # Filter out noise clusters
+            else:
+                w_c[c] = np.power(max(1.0 - sat[c], 0.0), gamma)
+                
+        # Apply ratio floor to prevent winner-takes-all
+        ratio_floor = 0.1
+        w_max = np.max(w_c)
+        if w_max > 0:
+            for c in range(n_clusters):
+                if w_c[c] > 0:
+                    w_c[c] = max(w_c[c], w_max * ratio_floor)
+        
+        w_c = w_c / (np.sum(w_c) + 1e-10)  # Normalize weights
+        
         # 2. Calculate Cluster-based Representativeness (K score)
-        # Smaller distance to assigned cluster center means MORE representative.
-        # Vectorized: compute all distances at once instead of looping
         diffs = features_array - cluster_centers[cluster_labels]
         k_scores_dist = np.linalg.norm(diffs, axis=1).astype(np.float32)
         max_dist = (
@@ -827,7 +863,11 @@ class ADKUCSSampler:
 
         # Invert normalized distance so 1.0 is exactly at cluster center (most representative)
         # and 0.0 is the furthest outlier.
-        k_scores = (1.0 - (k_scores_dist / max_dist)).tolist()
+        k_scores_raw = 1.0 - (k_scores_dist / max_dist)
+        
+        # Apply cluster weights to K score (Cluster-Balanced K')
+        sample_weights = w_c[cluster_labels]
+        k_scores = (k_scores_raw * sample_weights).tolist()
 
         u_scores_arr = self._calibrate_uncertainty_scores(
             np.array(u_scores, dtype=np.float32)

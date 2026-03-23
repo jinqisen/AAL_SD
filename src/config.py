@@ -168,6 +168,9 @@ class Config:
     except ValueError:
         FEATURE_PREFETCH_FACTOR = 2
 
+    # A1 experiment: background undersampling ratio
+    BG_UNDERSAMPLE_RATIO = 1.0
+
     AMP_ENABLED = _coerce_bool(os.getenv("AAL_SD_AMP"), default=False)
     AMP_DTYPE = str(os.getenv("AAL_SD_AMP_DTYPE", "float16") or "float16").strip().lower()
     TORCH_COMPILE = _coerce_bool(os.getenv("AAL_SD_TORCH_COMPILE"), default=False)
