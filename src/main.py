@@ -166,7 +166,11 @@ class ActiveLearningPipeline:
         train_split = (
             str(getattr(config, "TRAIN_SPLIT", "train") or "train").strip().lower()
         )
-        self.full_dataset = Landslide4SenseDataset(config.DATA_DIR, split=train_split)
+        self.full_dataset = Landslide4SenseDataset(
+            config.DATA_DIR, 
+            split=train_split,
+            bg_undersample_ratio=getattr(config, "BG_UNDERSAMPLE_RATIO", 1.0)
+        )
         self.query_dataset = Landslide4SenseDataset(
             config.DATA_DIR, split=train_split, with_mask=False
         )
@@ -1823,27 +1827,12 @@ class ActiveLearningPipeline:
                     elif grad_probe_source == "train_holdout":
                         grad_probe_loader = probe_loader
                 if not is_test_only_round:
-                    skip_training_ckpt = getattr(self.config, "SKIP_TRAINING_AND_LOAD_CKPT", None)
-                    if skip_training_ckpt and round_idx == start_round:
-                        logger.info(f"Skipping training for Round {round_idx + 1}, loading checkpoint {skip_training_ckpt}")
-                        self._append_md(log_path, f"- Skipped training for Round {round_idx + 1}, loaded checkpoint {skip_training_ckpt}\n")
-                        payload = torch.load(skip_training_ckpt, map_location="cpu")
-                        trainer.model.load_state_dict(payload["state_dict"], strict=True)
-                        meta = payload.get("metadata", {})
-                        best_epoch = meta.get("best_epoch", self.config.EPOCHS_PER_ROUND)
-                        best_miou = meta.get("best_miou", 0.0)
-                        best_f1 = meta.get("best_f1", 0.0)
-                        best_state_dict = payload["state_dict"]
-                        last_miou_epoch = best_miou
-                        last_f1_epoch = best_f1
-                        selected_epoch = best_epoch
-                    else:
-                        for epoch in range(self.config.EPOCHS_PER_ROUND):
-                            grad = None
-                            out = trainer.train_one_epoch(
-                                labeled_loader,
-                                grad_probe_loader=grad_probe_loader,
-                            )
+                    for epoch in range(self.config.EPOCHS_PER_ROUND):
+                        grad = None
+                        out = trainer.train_one_epoch(
+                            labeled_loader,
+                            grad_probe_loader=grad_probe_loader,
+                        )
 
                         if isinstance(out, tuple) and len(out) == 2:
                             loss, grad = out
@@ -1915,7 +1904,6 @@ class ActiveLearningPipeline:
                                 "loss": float(loss),
                                 "mIoU": float(metrics["mIoU"]),
                                 "f1": float(metrics["f1_score"]),
-                                "per_class_iou": metrics.get("per_class_iou", []),
                                 "eval_source": str(val_eval_source),
                                 "eval_split": str(self.val_split),
                                 "eval_img_dir": getattr(val_dataset, "img_dir", None),
@@ -2036,24 +2024,24 @@ class ActiveLearningPipeline:
                         }
                     )
 
-                    performance_history.append(
-                        {
-                            "round": round_idx + 1,
-                            "mIoU": float(selected_miou),
-                            "f1_score": float(selected_f1),
-                            "labeled_size": len(self.labeled_indices),
-                            "model_selection": str(model_selection),
-                            "selected_epoch": int(selected_epoch),
-                            "selected_from_round": int(selected_from_round),
-                            "best_val_epoch": int(best_epoch),
-                            "best_val_mIoU": float(best_miou),
-                            "best_val_f1": float(best_f1),
-                            "best_val_checkpoint": str(round_best_ckpt_path),
-                        }
-                    )
-                    if float(selected_miou) > best_miou_so_far:
-                        best_miou_so_far = float(selected_miou)
-                    budget_history.append(len(self.labeled_indices))
+                performance_history.append(
+                    {
+                        "round": round_idx + 1,
+                        "mIoU": float(selected_miou),
+                        "f1_score": float(selected_f1),
+                        "labeled_size": len(self.labeled_indices),
+                        "model_selection": str(model_selection),
+                        "selected_epoch": int(selected_epoch),
+                        "selected_from_round": int(selected_from_round),
+                        "best_val_epoch": int(best_epoch),
+                        "best_val_mIoU": float(best_miou),
+                        "best_val_f1": float(best_f1),
+                        "best_val_checkpoint": str(round_best_ckpt_path),
+                    }
+                )
+                if float(selected_miou) > best_miou_so_far:
+                    best_miou_so_far = float(selected_miou)
+                budget_history.append(len(self.labeled_indices))
                 selection_audit = (
                     f"{model_selection} (source_round={selected_from_round}, epoch={selected_epoch})"
                     if int(selected_from_round) != int(round_idx + 1)
@@ -2508,26 +2496,6 @@ class ActiveLearningPipeline:
                         else float(selected_f1),
                         int(len(self.labeled_indices)),
                     )
-
-                if not is_final_round:
-                    performance_history.append(
-                        {
-                            "round": int(round_idx + 1),
-                            "mIoU": float(selected_miou),
-                            "f1_score": float(selected_f1),
-                            "labeled_size": int(len(self.labeled_indices)),
-                            "model_selection": str(model_selection),
-                            "selected_epoch": int(selected_epoch),
-                            "selected_from_round": int(selected_from_round),
-                            "best_val_epoch": int(best_epoch),
-                            "best_val_mIoU": float(best_miou),
-                            "best_val_f1": float(best_f1),
-                            "best_val_checkpoint": str(round_best_ckpt_path),
-                        }
-                    )
-                    if float(selected_miou) > float(best_miou_so_far):
-                        best_miou_so_far = float(selected_miou)
-                    budget_history.append(int(len(self.labeled_indices)))
 
                 self._save_pool_states()
 
@@ -3921,12 +3889,6 @@ def main():
         default=None,
         help="Number of active learning rounds to run (default: use config value)",
     )
-    parser.add_argument(
-        "--skip-training-ckpt",
-        type=str,
-        default=None,
-        help="Path to checkpoint to load for the FIRST round (skips training for that round)",
-    )
     args = parser.parse_args()
 
     config = Config()
@@ -3967,8 +3929,6 @@ def main():
     config.START_MODE = args.start
     if args.n_rounds is not None and args.n_rounds > 0:
         config.N_ROUNDS = int(args.n_rounds)
-    if getattr(args, "skip_training_ckpt", None):
-        config.SKIP_TRAINING_AND_LOAD_CKPT = args.skip_training_ckpt
     pipeline = ActiveLearningPipeline(config, args.experiment_name, run_id=args.run_id)
     pipeline.run()
 

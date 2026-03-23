@@ -442,7 +442,6 @@ class Trainer:
             "loss": running_loss / len(loader),
             "mIoU": mean_iou,
             "f1_score": mean_f1,
-            "per_class_iou": iou.tolist() if conf is not None and int(conf.size) > 0 else [],
         }
 
     def extract_features(self, data_loader):

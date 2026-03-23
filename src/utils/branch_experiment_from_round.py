@@ -239,8 +239,8 @@ def main() -> None:
         raise SystemExit("target_exps is empty")
 
     start_round = int(args.start_round)
-    if start_round <= 0:
-        raise SystemExit("start_round must be >= 1")
+    if start_round <= 1:
+        raise SystemExit("start_round must be >= 2")
     resume_round = int(start_round - 1)
 
     pools_dir = Path(str(args.pools_dir)).expanduser().resolve()
