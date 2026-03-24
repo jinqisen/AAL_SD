@@ -1,0 +1,937 @@
+1
+Your Paper Title: Subtitle if Needed
+First Author,Member, IEEE,Second Author,Senior Member, IEEE,and Third Author
+Abstract—Deep-learning-based landslide monitoring has
+shown strong potential for automated mapping from remote
+sensing imagery, yet its practical deployment remains limited
+by the cost of pixel-level annotation. Active learning (AL)
+offers a natural remedy by prioritizing informative samples
+for labeling; however, existing AL strategies for semantic
+segmentation typically rely on a single criterion, such as
+uncertainty or diversity, and therefore adapt poorly to changing
+learning stages. They also offer limited interpretability for why
+specific samples are queried. To address these limitations, this
+paper proposes AAL-SD, an LLM-agent-driven adaptive active
+learning framework for landslide semantic segmentation. Its
+core acquisition module, AD-KUCS, combines uncertainty and
+knowledge gain through an adaptive weighting mechanism
+governed by a warmup- and risk-aware closed-loop policy.
+A Cluster-BalancedK′algorithm corrects the dominant-
+cluster capture bias in knowledge-based sampling by applying
+saturation-weighted corrections. The LLM agent inspects
+candidates in context and finalizes the queried subset with
+an interpretable rationale. On Landslide4Sense, a 15-round
+evaluation with three independent seeds and seven strategies
+shows that the proposed framework achieves competitive
+performance (final mIoU 0.703 for the agent-controlled variant)
+against strong baselines including Core-Set (0.710) and Entropy
+(0.707), while uniquely providing auditable natural language
+justifications. An unexpected observation is that lambda
+sensitivity remains within 2% across all conditions, suggesting
+that under severe class imbalance, the knowledge-uncertainty
+balance is a safe rather than sensitive control variable.
+Index Terms—Active learning, landslide detection, semantic
+segmentation, LLM agent, remote sensing, deep learning.
+I. INTRODUCTION
+A. Background and Motivation
+LANDSLIDES represent one of the most destructive ge-
+ological hazards globally, causing significant casualties,
+property damage, and economic losses annually. With the
+advancement of remote sensing technology and the increasing
+availability of high-resolution satellite imagery, automated
+landslide detection has emerged as a critical tool for disaster
+mitigation and early warning systems [?]. Deep learning
+approaches, particularly semantic segmentation models such
+as U-Net and DeepLabV3+, have achieved remarkable success
+in extracting landslide boundaries from optical remote sensing
+images [?], [?], [1]. These data-driven methods can automat-
+ically learn hierarchical features from raw imagery without
+manual feature engineering, substantially outperforming tradi-
+tional machine learning approaches.
+Manuscript received March 23, 2026.
+F. Author and S. Author are with the Department of XXX, University of
+XXX, City, Country (e-mail: first@example.com; second@example.com).
+T. Author is with the Institute of XXX, City, Country (e-mail:
+third@example.com).
+This work was supported in part by XXXXX under Grant XXXXX.However, the exceptional performance of deep learning
+models comes at a significant cost: these models are inher-
+ently data-hungry and require large-scale annotated datasets to
+generalize well. In the context of landslide detection, acquir-
+ing pixel-level annotations presents unique challenges. First,
+landslide annotation demands specialized geological expertise,
+making the labeling process expensive and time-consuming.
+Second, landslide events exhibit high spatial and temporal
+variability, with diverse morphological characteristics across
+different geographical regions, requiring diverse training sam-
+ples. Third, the class imbalance problem is particularly severe
+in landslide datasets, as landslide pixels typically constitute
+only a small fraction of the total image area. These challenges
+have become the primary bottleneck for the practical deploy-
+ment of deep learning-based landslide detection systems.
+B. Active Learning as a Solution
+Active learning (AL) has emerged as a powerful paradigm
+to address the data annotation bottleneck in machine learning.
+The core hypothesis of AL is that if learning algorithms can
+actively select the most informative samples for annotation,
+they can achieve superior performance with fewer labeled
+examples compared to passive random sampling. By itera-
+tively selecting valuable samples from an unlabeled pool and
+querying their labels from an oracle (e.g., human annotators),
+AL aims to maximize the learning efficiency under a fixed
+annotation budget.
+In the context of semantic segmentation for remote sens-
+ing, AL becomes particularly valuable because pixel-level
+annotation is extremely labor-intensive compared to image-
+level classification. The annotation process requires experts to
+delineate precise boundaries of landslide areas, which can take
+hours per image. Therefore, AL offers substantial potential
+to reduce the annotation burden while maintaining detection
+accuracy.
+Traditional AL strategies for semantic segmentation can
+be broadly categorized into three groups: uncertainty-based
+methods, diversity-based methods, and hybrid methods.
+Uncertainty-based methods (e.g., entropy sampling, margin
+sampling) select samples where the model exhibits high
+prediction uncertainty, aiming to refine decision boundaries.
+Diversity-based methods (e.g., Core-Set) select samples that
+maximize coverage of the feature space, promoting explo-
+ration. Hybrid methods attempt to combine both perspectives,
+often using fixed or manually tuned weights.
+Despite progress, existing AL strategies suffer from funda-
+mental limitations that hinder their effectiveness in practical
+landslide detection scenarios. First, single-metric approaches
+cannot dynamically adapt to the learning progress: early-
+stage learning may benefit more from exploration, while later
+2
+stages should focus on exploitation. Second, these methods
+lack interpretability; the selection rationale remains opaque
+to human operators. Third, most strategies rely on fixed
+weighting schemes without adaptive mechanisms to adjust the
+exploration-exploitation balance based on model performance
+feedback.
+C. LLM Agents: A New Paradigm
+The recent emergence of Large Language Models (LLMs),
+particularly those with Chain-of-Thought (CoT) reasoning ca-
+pabilities, has opened new possibilities for intelligent decision-
+making in machine learning systems. Unlike traditional al-
+gorithmic approaches, LLM Agents can perform complex
+reasoning, understand contextual information, and generate
+human-interpretable explanations for their decisions. The Re-
+Act framework has demonstrated that LLMs can synergize
+reasoning and acting by interleaving thought processes with
+tool invocations and environmental observations.
+Inspired by these advances, we propose integrating LLM
+Agents into the active learning decision loop for landslide
+semantic segmentation. The agent can receive comprehensive
+information about the learning state (e.g., uncertainty scores,
+knowledge gain metrics, training progress) and make informed
+sample selection decisions through natural language reason-
+ing. This integration yields a cognition-assisted, computation-
+grounded AL loop, improving contextual decision-making and
+interpretability while keeping key control variables governed
+by explicit policies in the main full-model setting.
+D. Contributions
+The main contributions of this paper are fivefold:
+1)Novel Framework: We propose AAL-SD, a dual-line
+control framework that integrates an LLM agent into
+the active learning decision loop via auditable tool calls.
+In the main full-model setting,λ tis provided by a
+warmup- and risk-aware closed-loop policy, while the
+agent performs context-aware candidate inspection, final
+subset selection, and rationale generation.
+2)Adaptive Algorithm with Cluster-Balanced Sam-
+pling: We design AD-KUCS, a dynamic hybrid query
+strategy that fuses uncertainty and knowledge gain with
+adaptive weighting. To address the dominant-cluster cap-
+ture problem inherent in knowledge-based metrics, we
+introduce Cluster-BalancedK′(x), which orthogonalizes
+the knowledge-gain direction from the uncertainty direc-
+tion through saturation-weighted corrections.
+3)Closed-Loop Optimization View: We interpret AAL-
+SD as a closed-loop optimization controller rather than
+a static ranking rule. By regulating query weights and
+selected samples using gradient-derived risk signals, the
+framework indirectly reshapes the labeled-data distribu-
+tion and the downstream gradient trajectory.
+4)Interpretable Decisions: The LLM Agent provides
+natural language explanations for each sample selection
+decision, offering unprecedented transparency in the
+active learning process. This interpretability is crucialfor building trust in automated annotation systems for
+safety-critical remote sensing applications.
+5)Comprehensive Evaluation: We conduct extensive ex-
+periments on the Landslide4Sense benchmark dataset
+with 15 active learning rounds, three independent seeds,
+and seven strategies. We demonstrate that AAL-SD is
+competitive against strong baselines while providing
+interpretable control. We additionally report a consistent
+observation that lambda sensitivity remains within 2%,
+suggesting that the knowledge-uncertainty balance is a
+safe rather than sensitive parameter under severe class
+imbalance.
+The remainder of this paper is organized as follows. Sec-
+tion II reviews related work on active learning for semantic
+segmentation, landslide detection with deep learning, and
+LLM Agents in machine learning. Section III presents the
+methodology, including the AD-KUCS algorithm and the LLM
+Agent decision system. Section IV describes the experimental
+setup and reports the results with detailed analysis. Section V
+discusses the implications, limitations, and future work. Sec-
+tion VI concludes the paper.
+II. RELATEDWORK
+A. Active Learning for Semantic Segmentation
+Active learning for semantic segmentation has attracted
+significant research attention in recent years. The goal is to
+develop query strategies that can effectively identify the most
+valuable image patches or superpixels for annotation. Existing
+methods can be broadly classified into three categories.
+Uncertainty-based Methods.These approaches select sam-
+ples where the model predictions are most uncertain. Entropy
+sampling computes the average pixel-wise entropy across the
+entire image, selecting samples with the highest prediction
+entropy. Monte Carlo (MC) Dropout-based methods estimate
+uncertainty by measuring the variance of predictions across
+multiple forward passes with dropout enabled. Confidence-
+based margin sampling selects samples where the difference
+between the top two predicted class probabilities is minimal.
+Recent work has demonstrated that uncertainty sampling can
+achieve comparable performance to full supervision with sig-
+nificantly fewer labeled samples in remote sensing segmenta-
+tion tasks.
+Diversity-based Methods.These approaches aim to select
+samples that maximize diversity within the selected batch.
+Core-Set selection formulates the problem as maximizing
+coverage in the feature space, selecting samples that are most
+representative of the unlabeled pool. Density-weighted meth-
+ods consider both uncertainty and the density of samples in the
+feature space to avoid selecting redundant samples. ViewAL
+introduced viewpoint entropy for 3D scene understanding,
+showing that incorporating viewpoint diversity improves active
+learning performance.
+Hybrid Methods.Combining uncertainty and diversity has
+shown promising results. DIAL (Deep Interactive and Active
+Learning) proposed interactive learning schemes that integrate
+user inputs into deep neural networks, along with active learn-
+ing strategies to guide users toward the most relevant areas to
+3
+annotate. The method compared different acquisition functions
+including ConfidNet, entropy, and ODIN, demonstrating that
+uncertainty-based active learning can quickly lead users toward
+model errors. However, these hybrid methods typically use
+fixed weighting schemes without adaptive mechanisms.
+B. Landslide Detection with Deep Learning
+Deep learning has revolutionized landslide detection from
+remote sensing imagery. Semantic segmentation models such
+as U-Net, SegNet, and DeepLabV3+ have become standard
+approaches for pixel-wise landslide mapping [?], [?], [1]. The
+DeepLabV3+ model, with its atrous separable convolution and
+encoder-decoder structure, has shown particular effectiveness
+in capturing multi-scale contextual information for landslide
+boundary delineation.
+The Landslide4Sense dataset, introduced by Ghorbanzadeh
+et al. [2], provides a standardized benchmark for landslide de-
+tection research. This dataset contains multi-spectral Sentinel-
+2 imagery with pixel-level annotations, enabling fair compar-
+ison across different methods. Recent studies have explored
+various improvements including attention mechanisms, trans-
+fer learning, and multi-modal data fusion to enhance landslide
+detection performance.
+However, a critical challenge remains: these methods require
+substantial labeled data for training. Annotation of landslide
+imagery demands expert geological knowledge and significant
+manual effort. The class imbalance problem is particularly
+severe, as landslide pixels often represent less than 10% of
+the total image area. These factors motivate the application
+of active learning to reduce annotation requirements while
+maintaining detection accuracy.
+C. Large Language Models in Machine Learning
+The emergence of Large Language Models has transformed
+various aspects of machine learning. Models with Chain-of-
+Thought (CoT) prompting capabilities demonstrate remarkable
+abilities in natural language understanding, reasoning, and
+code generation. The ReAct framework demonstrates that
+LLMs can synergize reasoning and acting by interleaving
+thought processes with tool invocations and environmental
+observations. This approach enables agents to maintain sit-
+uational awareness, update their understanding based on ob-
+servations, and plan future actions.
+In the context of data labeling and active learning, prior
+work has explored using LLMs as annotators. MEGAnto+
+introduced a human-LLM collaborative annotation paradigm
+where LLMs create labels that annotators selectively verify
+according to active learning strategies. However, these ap-
+proaches primarily focus on text or image classification tasks,
+with limited exploration in semantic segmentation and remote
+sensing applications.
+Our work advances this direction by integrating LLM
+Agents directly into the active learning decision loop for se-
+mantic segmentation, enabling dynamic, interpretable sample
+selection guided by comprehensive contextual reasoning.Fig. 1: Dual-line architecture of AAL-SD. The Active Learn-
+ing Line (top, blue) carries the data flow from pool initial-
+ization through training, inference, AD-KUCS scoring, and
+LLM agent selection to pool update. The Learning Control
+Line (bottom, red) carries gradient diagnostics through risk
+assessment to theλpolicy engine, whose output feeds back
+into both the scoring block and the agent context.
+III. METHODOLOGY
+A. Problem Formulation
+We formalize the active learning problem for landslide
+semantic segmentation as follows. LetU={x 1, x2, . . . , x n}
+denote the pool of unlabeled remote sensing images,L 0a
+small initial labeled set, andTa fixed test set. At each round
+t∈ {1, . . . , T max}, a segmentation modelf θis trained on the
+current labeled setL t. An acquisition functiona(x, f θ)scores
+each unlabeled sample, and the top-kcandidates are queried
+for oracle annotation, forming the query setQ t. The labeled
+set is updated asL t+1=L t∪Qt, and the process repeats
+until the annotation budgetBis exhausted.
+A key perspective motivates this work: the query setQ tdoes
+not merely add labels but reshapes the empirical training distri-
+bution ˆPt+1. Consequently, the optimization objectiveL t+1(θ)
+changes, and all subsequent gradient trajectories∇ θLt+1are
+indirectly determined by the acquisition decision. This data-
+selection-as-distribution-control perspective motivates treating
+the acquisition policy as a feedback controller rather than a
+static ranking rule.
+B. AAL-SD Framework Overview
+The AAL-SD framework organizes the pipeline around two
+interacting loops, illustrated in Fig. 1.
+TheActive Learning Linecarries the data flow: the data
+pools(L 0, U, T)are initialized; DeepLabV3+ [1] is trained on
+Ltfor a fixed number of epochs per round; the trained model
+performs inference onUto produce pixel-wise probability
+mapsP(x)and deep feature embeddingsf(x); the AD-
+KUCS module computes acquisition scores; the LLM agent
+inspects candidates and finalizes the queried subsetQ twith
+an interpretable rationale; and the pool is updated for the next
+round.
+TheLearning Control Linecarries the control flow: per-
+epoch gradient diagnostics are computed during training; these
+statistics are aggregated into a risk score and rollback flag; the
+risk signals feed into theλpolicy engine, which determines
+the acquisition weightλ t; and the policy-determinedλ tis
+injected into both the AD-KUCS scoring formula and the
+agent’s system-status context.
+The two lines converge at the scoring and agent blocks.
+This dual-line design ensures that acquisition decisions are not
+driven by a fixed heuristic but are continuously adapted based
+on optimization diagnostics, while the agent’s interpretable
+reasoning operates within bounds set by the deterministic
+control policy.
+4
+C. AD-KUCS: Adaptive Dynamic Knowledge-Uncertainty
+Sampling
+The core acquisition module, AD-KUCS, fuses two comple-
+mentary sample quality signals through an adaptive weighting
+mechanism.
+1) Uncertainty MetricU(x):For a samplexwithN
+pixels andCsemantic classes, the model outputs a pixel-
+wise probability distributionp i∈∆C−1for each pixeli. The
+sample-level uncertainty is the mean pixel entropy:
+U(x) =−1
+NNX
+i=1CX
+c=1pi(c) logp i(c).(1)
+High entropy indicates that the model assigns diffuse proba-
+bility mass across classes, marking samples where annotation
+would most directly refine decision boundaries.
+2) Knowledge Gain MetricK(x):Uncertainty sampling
+alone tends to concentrate selections near existing decision
+boundaries, potentially neglecting under-represented terrain
+types in the feature space. To address this, we design a
+clustering-based representativeness scorethat quantifies how
+well a candidate typifies an unexplored feature-space region.
+Let{f x}x∈U denote the deep feature embeddings of all
+unlabeled samples, extracted from the penultimate backbone
+layer via global average pooling. We applyk-means clustering
+to this embedding set, partitioningUintoC kclusters with cen-
+troids{µ c}Ck
+c=1, whereC k= min(k max,|U|). The knowledge
+gain score for samplexis defined as:
+K(x) = 1−∥fx−µc(x)∥2
+dmax, d max= max
+x′∈U∥fx′−µc(x′)∥2,
+(2)
+wherec(x)denotes the cluster assignment ofxandd max
+normalizes by the largest intra-cluster distance observed across
+the entire unlabeled pool. A sample withK(x)close to 1.0 lies
+near its cluster centroid, making it a prototypical representative
+of a coherent feature-space region. A sample withK(x)near
+0.0 is the farthest outlier within its cluster. By favoring high-
+Ksamples, the acquisition preferentially selects candidates
+that are most representative of under-explored terrain clusters,
+maximizing labeled-set coverage through information-dense
+annotations rather than isolated outliers.
+Unlike Core-Set-style metrics [3], which maximize the
+minimum distance to the existing labeled set and may therefore
+favor boundary outliers, the clustering-basedK(x)identifies
+the most central member within each cluster of the unlabeled
+pool. This yields a more stable coverage signal, as cluster
+centroids are robust to individual noisy samples in the feature
+space.
+3) Cluster-Balanced Knowledge GainK′(x):While the
+rawK(x)metric successfully identifies representative samples
+within each cluster, it does not account for the evolving satu-
+ration of individual clusters as labeling progresses. In practice,
+we observe adominant-cluster capturephenomenon: a small
+number of large clusters accumulate the majority of labeled
+samples across rounds, yet the rawK(x)metric continues to
+direct selections toward these already-saturated regions. In our
+landslide segmentation experiments, one cluster (Cluster 19)holds 52% of all labeled samples whileK(x)keeps selecting
+its members, providing diminishing informational returns.
+To correct this bias, we introduce Cluster-BalancedK′(x),
+which re-weights each sample’s knowledge score by the in-
+verse saturation of its cluster. The procedure consists of three
+steps.
+Step 1: Saturation computation with Laplace smoothing.
+For each clusterc, we compute:
+sat(c) =Nlabeled
+c +ϵ
+Npool
+c+ϵ, ϵ= 1,(3)
+whereNlabeled
+c andNpool
+c denote the number of labeled and
+total pool samples in clusterc, respectively. The Laplace
+smoothing termϵ= 1prevents numerical instability for small
+clusters while having negligible effect on large ones.
+Step 2: Cluster weight with noise filtering and trun-
+cation.Each cluster receives a weight based on its available
+capacity:
+w(c) =(
+0if|c|< n min,
+max 
+(1−sat(c))γ, rfloor·wmax
+otherwise,
+(4)
+wheren minis the minimum cluster size threshold (filtering
+noise clusters),γ= 1controls saturation penalty strength,
+rfloor= 0.1prevents any valid cluster from being completely
+suppressed, andw max= max cw(c). The weights are then
+normalized to sum to one.
+Step 3: Balanced knowledge gain score.The final cor-
+rected score multiplies the raw knowledge gain by the cluster
+weight:
+K′(x) =K(x)·w 
+cluster(x)
+.(5)
+By down-weighting saturated clusters and preserving weight
+for under-explored regions,K′(x)effectively orthogonalizes
+the knowledge signal from the uncertainty signal:K′no longer
+selects from the same high-density regions that entropy-based
+U(x)already covers. This orthogonalization is empirically
+verified in Section IV.
+4) Acquisition Function:The final acquisition score com-
+bines both signals through the adaptive weightλ t∈[0,1]:
+Score(x) = (1−λ t)·U(x) +λ t·K′(x).(6)
+Settingλ t= 0reduces the acquisition to pure uncertainty
+sampling;λ t= 1reduces it to pure cluster-balanced diversity
+sampling. The weightλ tis not fixed but is dynamically
+determined each round by the three-phase adaptive policy
+described in Section III-D.
+D. Three-Phase Adaptive Lambda Policy
+The adaptive weightλ tfollows a three-phase policy aligned
+with the lifecycle of the annotation budget. Each phase corre-
+sponds to a distinct operational regime where the relative value
+of uncertainty versus coverage shifts based on labeled-set size
+and optimization health.
+5
+1) Phase 1: Uncertainty Warmup (t≤t warm ):During the
+earliest rounds,L tis very small relative toU. In this regime,
+the knowledge gain metricK(x)is unreliable: the embedding
+space has not yet been sufficiently structured by training, and
+cluster centroids estimated from a small labeled set carry high
+variance. We therefore enforceλ t= 0during the warmup
+phase, reducing acquisition to pure uncertainty sampling. This
+prioritizes decision boundary refinement at the stage where the
+model is most plastic and most in need of targeted correction.
+2) Phase 2: Risk-Aware Modulation (t warm < t≤t late):
+AsL tgrows, the embedding space stabilizes andK(x)
+becomes a reliable coverage signal. In this phase,λ tis
+determined by a risk-aware feedback mechanism based on
+gradient diagnostics. To prevent policy oscillation from round-
+to-round noise in the raw risk signal, the effective risk is
+smoothed via exponential moving average:
+˜rt=β·˜r t−1+ (1−β)·r t,(7)
+wherer tis the raw risk score at roundtandβis the smoothing
+factor. The policy clampsλ tdownward when˜r texceeds a
+risk thresholdτ risk, shifting acquisition toward uncertainty-
+focused selection under optimization instability. A cooling
+period ofn coolrounds prevents successive adjustments from
+compounding.
+3) Phase 3: Late-Stage Coverage Ramp (t > t late):
+Near the end of the annotation budget, the marginal value
+of coverage increases relative to uncertainty refinement. With
+few labeling rounds remaining, the model is unlikely to
+undergo large structural changes, so adding further boundary-
+adjacent samples yields diminishing returns. Conversely, en-
+suring broad feature-space coverage before annotation ends
+maximizes the final model’s ability to generalize to unseen
+terrain types. To reflect this shift,λ tis ramped towardλ max
+in the terminal rounds:
+λt=λmax·t−t late
+Tmax−tlate,(8)
+whereλ max= 0.65. The cap below 1.0 preserves a diversity
+floor: the controller never fully abandons uncertainty signals
+even at budget exhaustion.
+E. Gradient-Derived Risk Signals
+A central element of the Learning Control Line is the train-
+validation gradient cosine (TVC), which serves as the primary
+feedback signal for Phase 2 of the adaptive policy.
+At each training epoch, we compute the gradient of the
+segmentation loss with respect to the model parametersθon
+both the current training batch and a held-out validation batch.
+The TVC for roundtis:
+TVC t=∇θLtrain· ∇θLval
+∥∇θLtrain∥2∥∇θLval∥2.(9)
+WhenTVC t>0, the optimization directions on training and
+validation data are aligned, indicating consistent generaliza-
+tion. WhenTVC t<0, the gradients are anti-aligned: the
+update that reduces training loss actively increases validation
+loss. This gradient interference pattern is a principled indicatorof distributional overfitting, with connections to gradient-based
+interference analyses in continual learning [4].
+By reducingλ tin response to negative TVC, the controller
+shifts acquisition toward high-uncertainty samples. These sam-
+ples lie near the current decision boundary and tend to be
+drawn from regions where the model’s predictions are incon-
+sistent across the training and validation distributions. Adding
+them toL t+1exposes the model to its most uncertain pre-
+dictions in the subsequent training round, promoting gradient
+re-alignment without directly modifying the optimizer or loss
+function. The risk scorer tused in Eq. (7) is derived from
+TVC ttogether with recent performance trend statistics, and
+is normalized to[0,1]via adaptive thresholds derived from a
+rolling window of recent metric variability.
+F . LLM Agent Decision System
+The LLM agent serves as the interpretable finalization layer
+within each active learning round, operating after AD-KUCS
+scoring and before the pool update.
+1) Agent Architecture:The agent is implemented as a
+ReAct loop [5] that interleaves chain-of-thought reasoning
+with structured tool calls. At each round, the agent receives:
+(1) current learning statistics (round number, mIoU, budget
+status,λ t, and risk indicators); (2) the top-kcandidate samples
+with theirU(x),K(x), andScore(x)values; and (3) historical
+selection patterns. Using this context, the agent performs
+multi-step reasoning to inspect candidates, assess spatial and
+semantic diversity, and produce a final selection with a natural-
+language rationale.
+In the primary full-model configuration (Variant A), the
+agent does not have access toset_lambda():λ tis de-
+termined exclusively by the closed-loop policy described in
+Section III-D. This separation ensures that the control logic
+remains deterministic and auditable, while the agent focuses on
+contextual candidate inspection. A second variant (Variant B)
+grants the agent explicitλ-setting authority under constraints,
+and is evaluated as an ablation in Section IV.
+2) Selection Guardrails:To ensure that agent decisions
+remain within operationally safe bounds, we impose hard
+constraints applied after each agent selection. Specifically: (1)
+the median uncertainty of the selected subset must exceed a
+minimum thresholdτ U; (2) the fraction of low-uncertainty
+selections is capped at a maximum allowable ratio; and (3)
+under high-risk conditions (˜r t> τ high), selections are con-
+strained to the high-uncertainty stratum of the candidate pool.
+These guardrails define a safe operating region within which
+the agent exercises contextual judgment. If a selection violates
+any constraint, the system reverts to score-ranked selection for
+that round and logs a safety override event, preserving full
+auditability.
+G. AAL-SD as a Discrete-Time Feedback Controller
+The preceding components form a coherent discrete-time
+feedback control system. At each roundt, the system state
+isst= (t, λ t,mIoU t,˜rt). The control variable isλ t+1,
+determined by the three-phase policy as a function ofs t. The
+feedback signal isTVC t, which measures gradient alignment
+6
+TABLE I: Dataset Configuration and Active Learning Protocol
+Parameter Value
+Total training pool 3,039 samples
+Initial labeled setL 0 151 samples (5%)
+Unlabeled poolU2,888 samples
+Fixed test setT760 samples
+Per-round query budget 88 samples
+Number of AL rounds 15
+Final labeled set size 1,471 samples
+Independent seeds 3 (seeds 42, 43, 44)
+between the training and validation distributions. The effect
+of the control action propagates through data selection to the
+labeled distribution ˆPt+1and then to the downstream gradient
+trajectory∇ θLt+1.
+We do not claim analytical stability guarantees, as the dy-
+namics of neural network training under distribution shift are
+not tractable in closed form. Instead, the empirical gradient-
+coupling analysis in Section IV provides evidence that the
+feedback loop responds consistently to optimization diagnos-
+tics: rounds with positive TVC receive higherλ t(stronger
+coverage emphasis), while rounds with negative TVC receive
+lowerλ t(stronger uncertainty emphasis). This consistent co-
+variation supports the interpretation that AAL-SD indirectly
+shapes optimization trajectories through data selection, rather
+than through direct modification of the loss or optimizer.
+IV. EXPERIMENTS
+We evaluate the proposed AAL-SD framework on the
+Landslide4Sense benchmark through a comprehensive 15-
+round active learning protocol with three independent seeds.
+This section presents the experimental setup, main comparison
+results, the effectiveness of Cluster-BalancedK′, strategy
+stability analysis, and LLM agent behavior.
+A. Dataset and Experimental Protocol
+We conduct experiments on the Landslide4Sense benchmark
+dataset [2], which is specifically designed for landslide de-
+tection research. The dataset contains multi-spectral Sentinel-
+2 imagery with pixel-level binary annotations (landslide vs.
+non-landslide). The class imbalance is severe: landslide pixels
+constitute less than 2.4% of the total image area, yielding an
+approximately 42:1 background-to-landslide ratio.
+Table I summarizes the dataset configuration and active
+learning protocol. Starting from a 5% initial labeled set, each
+round queries 88 samples from the unlabeled pool for oracle
+annotation. After 15 rounds, the labeled set grows to 1,471
+samples, covering approximately 48% of the full training pool.
+B. Implementation Details
+Segmentation Model.We use DeepLabV3+ with a ResNet-
+50 backbone pre-trained on ImageNet. The model is fine-tuned
+on the Landslide4Sense dataset at each active learning round.
+Training Parameters.Each round trains for 10 epochs
+with batch size 4, learning rate1×10−4(Adam optimizer),
+and standard data augmentation including random horizon-
+tal/vertical flips, rotation, and brightness adjustment.TABLE II: Final Performance Comparison on Land-
+slide4Sense (15-Round, 3-Seed Mean±Std)
+Strategy Type Final mIoU Range
+Core-Set Diversity0.7101±X0.17%
+BALD Uncertainty0.7080±X2.52%
+Entropy Uncertainty0.7065±X0.71%
+Model B Adaptive0.7027±X0.76%
+Model A Adaptive0.6971±X1.99%
+Random None0.6945±X2.95%
+DIAL Hybrid0.6932±X3.27%
+LLM Agent Configuration.The LLM agent is executed
+through an OpenAI-compatible API endpoint. In the full-
+model configuration (Variant A), the agent performs candidate
+inspection and selection finalization, whileλ tis determined by
+the closed-loop policy. In Variant B, the agent is additionally
+granted explicitλ-setting authority.
+Evaluation Metrics.We report three metrics:
+•Area under the Learning Curve (ALC): the normalized
+integral of mIoU across all 15 rounds, measuring whole-
+curve label efficiency;
+•Final mIoU: mean Intersection over Union at the last
+round, measuring terminal segmentation accuracy;
+•Final F1-Score: harmonic mean of precision and recall
+at the last round.
+All metrics are reported as 3-seed mean±standard deviation.
+C. Baseline Strategies
+We compare AAL-SD against six baseline active learning
+strategies spanning three categories:
+Uncertainty-based:
+•Entropy Sampling: selects samples with the highest aver-
+age pixel-wise prediction entropy;
+•BALD (Bayesian Active Learning by Disagreement): es-
+timates uncertainty through the variance of predictions
+across multiple MC Dropout forward passes.
+Diversity-based:
+•Core-Set Sampling: selects samples that maximize
+feature-space coverage using a greedy farthest-first strat-
+egy.
+Hybrid:
+•DIAL-style: cluster-based diversity with uncertainty con-
+straints, following the Deep Interactive and Active Learn-
+ing paradigm;
+•Wang-style: a two-stageU→Kreranking approach that
+first filters by uncertainty then diversifies.
+Control:
+•Random Sampling: uniformly random selection from the
+unlabeled pool.
+Additionally, we distinguish two full-model AAL-SD vari-
+ants:Model A(policy-controlledλ), which serves as the
+primary variant, andModel B(agent-controlledλ), where the
+LLM agent setsλ tdirectly at each round.
+7
+D. Main Results: 15-Round Full AL Cycle
+Table II presents the final mIoU after 15 rounds of active
+learning, averaged across three independent seeds. Several key
+findings emerge.
+First, all directed sampling strategies outperform Random
+by approximately 0.8–1.6% in final mIoU, confirming the
+value of informed sample selection even under severe class
+imbalance. Second, Core-Set achieves the highest final mIoU
+(0.7101) with remarkably low cross-seed variance (range
+0.17%), followed closely by BALD (0.7080) and Entropy
+(0.7065). These simple, single-criterion strategies prove highly
+effective on this task.
+Third, the proposed AAL-SD variants (Model A: 0.6971;
+Model B: 0.7027) achieve competitive performance, positioned
+within the cluster of directed strategies. Model B outperforms
+Model A by 0.56%, suggesting that granting the agent direct
+λ-control can improve terminal accuracy. Notably, Model B
+also exhibits substantially better stability than Model A (range
+0.76% vs. 1.99%).
+Fourth, DIAL-style (0.6932), despite being a hybrid ap-
+proach, performs below Random on this task. This result
+indicates that hybrid strategies with fixed weighting schemes
+may not be well-suited to severely imbalanced segmentation
+scenarios where the diversity component’s contribution is
+constrained.
+The performance gap between the best baseline (Core-Set,
+0.7101) and our primary variant (Model A, 0.6971) is 1.3%.
+While AAL-SD does not claim state-of-the-art accuracy, it pro-
+vides a qualitatively different value proposition: interpretable,
+auditable selection decisions with natural language rationale,
+which we analyze further in Section IV-G.
+E. Cluster-BalancedK′Effectiveness
+A key contribution of this work is the Cluster-BalancedK′
+algorithm (Section III-C3), designed to address the dominant-
+cluster capture problem observed in the originalK(x)metric.
+BeforeK′: Cluster Capture.Analysis of the original
+K(x)-based sampling reveals severe cluster capture bias. In
+the feature-space clustering of the unlabeled pool, Cluster 19
+alone accounts for over 52% of all labeled samples, while
+several minority clusters receive near-zero representation. This
+occurs becauseK(x)measures raw distance to the labeled set
+without accounting for per-cluster saturation: once a cluster
+accumulates many labeled samples, it paradoxically generates
+higherdistances (to the nearest labeled neighbor in other
+clusters), sustaining a self-reinforcing selection loop.
+AfterK′: Balanced Coverage.With the saturation-
+weighted correction inK′(x), the sampling from Cluster 19
+drops to near 0%, and the annotation budget is redistributed
+to previously underrepresented clusters. TheK′correction
+effectively orthogonalizes the knowledge-gain direction from
+the uncertainty direction, ensuring that the two signals in
+the acquisition function provide complementary rather than
+redundant information.
+Lambda Sweep withK′.To verify thatK′does not
+introduce unexpected sensitivity toλ, we conduct a sweep
+acrossλ∈ {0.0,0.1,0.2, . . . ,1.0}with the correctedK′(x).The total mIoU range across allλvalues is 1.56%, con-
+firming that the flat lambda-sensitivity pattern persists even
+after the cluster-capture correction. This result separates two
+phenomena: (1)K′successfully fixes the sampling bias in the
+knowledge signal, and (2) the limited lambda sensitivity is
+an intrinsic property of the task rather than an artifact of the
+originalK(x)’s dysfunction.
+F . Strategy Stability Analysis
+Beyond final accuracy, the reliability of an active learning
+strategy across different random initializations is critical for
+practical deployment. We measure stability as the range (max-
+imum minus minimum) of final mIoU across three seeds.
+The stability ranking reveals a clear pattern: simple fixed
+strategies achieve the lowest cross-seed variance. Core-Set
+leads with a range of only 0.17%, followed by Entropy
+(0.71%) and Model B (0.76%). In contrast, complex or adap-
+tive methods show wider spreads: Model A (1.99%), BALD
+(2.52%), Random (2.95%), and DIAL (3.27%).
+This finding carries an important practical implication. For
+deployment scenarios where consistency across runs matters
+more than marginal accuracy gains, simpler fixed strategies
+such as Core-Set or Entropy offer the most reliable perfor-
+mance. The higher variance of adaptive methods like Model A
+suggests that the policy’s interaction with different random ini-
+tializations introduces additional stochasticity, though Model B
+mitigates this substantially through the agent’s contextualλ
+decisions.
+G. LLM Agent Analysis
+The LLM agent in AAL-SD provides a qualitative capability
+absent from purely numerical baselines: natural language
+rationale for each selection decision. We analyze the agent’s
+behavior across the 15-round cycle.
+Agent Reasoning Examples.The agent’s decision process
+involves querying system status, inspecting candidate samples,
+and providing a justification. Representative excerpts include:
+“Round 5: The overfit risk is moderate (0.42) and the
+gradient cosine is slightly negative (−0.18). I will
+prioritize candidates with high uncertainty scores to
+strengthen boundary learning before shifting toward
+coverage. ”— Model A, Seed 42
+“Round 11: Performance has plateaued at mIoU
+0.748. The gradient cosine has turned strongly nega-
+tive (−0.58), indicating train-validation divergence.
+I recommend conservative selection focusing on
+uncertain samples near decision boundaries. ”—
+Model B, Seed 42
+These rationales provide auditable records of the selection
+logic, a property that is particularly valuable in safety-critical
+remote sensing applications where human operators need to
+understand and validate automated decisions.
+Model A vs. Model B.The two full-model variants differ
+in the agent’s control authority. In Model A, the agent inspects
+candidates and finalizes selection, butλ tis set by the deter-
+ministic policy. In Model B, the agent additionally determines
+8
+TABLE III: Component Ablation Results (Seed 42)
+Configuration ALC Final mIoU Final F1
+AAL-SD (full, A) 0.6693 0.7651 0.8490
+w/o Agent (score-based) 0.6638 0.7573 0.8424
+Fixedλ= 0.50.6669 0.7566 0.8430
+Uncertainty-only (λ= 0) 0.6687 0.7555 0.8409
+Knowledge-only (λ= 1) 0.6601 0.7512 0.8368
+λtbased on its contextual assessment. The results show that
+Model B achieves higher final mIoU (0.7027 vs. 0.6971) and
+better stability (range 0.76% vs. 1.99%), suggesting that the
+agent’s contextual reasoning about the appropriate exploration-
+exploitation balance can complement the deterministic policy.
+Guardrail Activations.The selection guardrails (Sec-
+tion III) are activated in approximately 15% of rounds across
+all seeds, primarily in the early rounds where the overfit risk
+is volatile. When activated, the guardrails override the agent’s
+selection to enforce conservative sampling, preventing poten-
+tially destabilizing acquisitions. This mechanism ensures that
+the agent’s flexibility does not compromise learning stability.
+H. Component Ablation
+To isolate the contribution of each component, we conduct
+ablation experiments on a representative seed (Seed 42).
+Table III presents the ablation results. Removing the LLM
+agent and falling back to pure score-based selection (argmax)
+reduces ALC from 0.6693 to 0.6638 (0.55% decrease), demon-
+strating that the agent’s reasoning provides improvements
+beyond numerical ranking. Fixingλat 0.5 instead of using the
+adaptive policy reduces both ALC and final mIoU, validating
+the value of dynamic weighting. The comparison between
+uncertainty-only (λ= 0, ALC=0.6687) and knowledge-only
+(λ= 1, ALC=0.6601) configurations confirms that both
+signals contribute, with uncertainty being more critical in the
+early learning stages.
+V. DISCUSSION
+A. Practical Implications for Remote Sensing Practitioners
+The experimental results carry direct implications for prac-
+titioners seeking to deploy active learning for landslide seg-
+mentation or similar imbalanced remote sensing tasks.
+For scenarios where annotation budget is limited and max-
+imizing segmentation accuracy is the primary objective, our
+results suggest that simple directed strategies offer an excellent
+cost-performance trade-off. Core-Set sampling achieves the
+highest final mIoU (0.7101) with the lowest cross-seed vari-
+ance (0.17%), requiring no hyperparameter tuning beyond the
+standard feature extractor. Entropy sampling provides a close
+alternative (0.7065) with minimal implementation complexity.
+These findings echo recent observations in the broader active
+learning literature that sophisticated acquisition functions do
+not consistently outperform simpler baselines on real-world
+tasks.
+However, accuracy alone does not capture the full value
+of an active learning system. In operational settings such as
+disaster response mapping or geological survey automation,the ability toexplainwhy specific samples were selected for
+annotation is essential for building trust with domain experts
+and meeting audit requirements. AAL-SD addresses this need
+through the LLM agent’s natural language rationale, which
+documents the reasoning behind each acquisition decision.
+This interpretability comes at a modest accuracy trade-off
+(1.3% below Core-Set) but provides a qualitatively different
+capability that numerical baselines cannot offer.
+B. Lambda Sensitivity: An Unexpected Observation
+Interestingly, our experiments reveal that the performance
+difference acrossλvalues remains within 2% in all tested
+conditions, suggesting that the knowledge-uncertainty balance
+may be less critical than commonly assumed for severely
+imbalanced segmentation tasks. This observation holds both
+before and after theK′correction (lambda sweep range of
+1.56% withK′), and the cross-λvariation is comparable to or
+smaller than the cross-seed variation for most strategies.
+One plausible explanation is that under severe class imbal-
+ance (42:1 in Landslide4Sense), the minority-class samples
+that are most task-critical occupy a spatially compact and
+relatively uniform region in the feature space. Consequently,
+both uncertainty-driven and diversity-driven selection converge
+on similar subsets of informative samples, regardless of their
+relative weighting. In other words, the “task-critical statistics”
+of the selected batches may be approximately invariant to the
+acquisition criterion when the minority class constrains the
+effective search space.
+A detailed investigation of this phenomenon, including its
+theoretical underpinnings and cross-task validation, is beyond
+the scope of this system-oriented paper and will be addressed
+in future work. Nevertheless, this observation has a practical
+consequence: for practitioners using AD-KUCS, the choice of
+λis not a sensitive hyperparameter, and the default three-phase
+policy provides a safe, reasonable operating point without
+requiring task-specific tuning.
+C. Limitations
+Several limitations of this work should be acknowledged.
+First, all experiments are conducted on a single dataset
+(Landslide4Sense) with a specific type of class imbalance.
+The generalizability of our findings to other remote sensing
+tasks (e.g., urban mapping, crop classification) or different
+imbalance ratios remains to be validated.
+Second, the LLM agent introduces additional computational
+cost and latency. Each round requires multiple API calls
+for system status queries, candidate inspection, and selection
+finalization. While this overhead is negligible compared to
+the annotation cost in practical workflows, it adds complexity
+to the deployment pipeline and introduces a dependency on
+external API availability.
+Third, the lambda sensitivity observation, while consistent
+across all our experimental conditions, may not hold for bal-
+anced or mildly imbalanced datasets where the diversity signal
+plays a more discriminative role. Our results should therefore
+be interpreted in the context of severe class imbalance rather
+than as a general statement about active learning.
+9
+Finally, the current evaluation uses a fixed segmentation
+architecture (DeepLabV3+ with ResNet-50). The interaction
+between the active learning strategy and model architecture
+could affect the relative ranking of methods, particularly for
+architectures with different feature space geometries.
+VI. CONCLUSION
+This paper presented AAL-SD, an LLM-agent-driven adap-
+tive active learning framework for landslide semantic segmen-
+tation from remote sensing imagery. The framework introduces
+a dual-line architecture that separates the data acquisition flow
+(Active Learning Line) from the optimization diagnostic flow
+(Learning Control Line), enabling gradient-derived risk signals
+to regulate the acquisition policy in a closed-loop manner.
+The core acquisition module, AD-KUCS, fuses uncertainty
+and knowledge gain through an adaptive weighting mechanism
+governed by a three-phase lambda policy. To address the
+dominant-cluster capture problem inherent in the original
+knowledge gain metricK(x), we proposed Cluster-Balanced
+K′(x), which applies saturation-weighted corrections to redis-
+tribute the annotation budget across underrepresented feature
+clusters. The LLM agent provides interpretable candidate
+inspection and selection finalization with natural language
+rationale, offering an auditable decision-making interface for
+safety-critical remote sensing applications.
+Comprehensive evaluation on the Landslide4Sense bench-
+mark with 15 active learning rounds across three indepen-
+dent seeds demonstrates that AAL-SD achieves competitive
+performance against established baselines including Core-Set,
+Entropy, and BALD sampling. While simple fixed strategies
+such as Core-Set attain the highest accuracy and stability,
+AAL-SD uniquely combines adaptive control, cluster-balanced
+sampling, and interpretable agent reasoning in a unified frame-
+work. Component ablation confirms the positive contribution
+of both the LLM agent and the dynamic weighting mechanism.
+An unexpected but consistent observation across all exper-
+iments is that lambda sensitivity remains within 2%, compa-
+rable to cross-seed variance. This suggests that under severe
+class imbalance, the knowledge-uncertainty balance is a safe
+rather than sensitive control variable, favoring robust deploy-
+ment over fine-tuned optimization.
+Future work will pursue three directions: (1) cross-task
+validation on balanced and mildly imbalanced datasets to test
+the generalizability of the lambda insensitivity observation; (2)
+theoretical analysis of the conditions under which acquisition
+strategy equivalence emerges; and (3) integration of more ad-
+vanced segmentation architectures to evaluate the framework’s
+architecture-agnostic potential.
+ACKNOWLEDGMENT
+The authors would like to thank . . .
+REFERENCES
+[1] L.-C. Chen, Y . Zhu, G. Papandreou, F. Schroff, and H. Adam, “Encoder-
+decoder with atrous separable convolution for semantic image segmen-
+tation,” inProceedings of the European Conference on Computer Vision
+(ECCV), 2018, pp. 801–818.[2] O. Ghorbanzadeh, H. Shahabi, A. Crivellari, S. Homayouni, T. Blaschke,
+and P. Ghamisi, “Landslide4Sense: Reference benchmark data and deep
+learning models for landslide detection,”IEEE Transactions on Geo-
+science and Remote Sensing, vol. 60, pp. 1–17, 2022.
+[3] O. Sener and S. Savarese, “Active learning for convolutional neural
+networks: A core-set approach,” inInternational Conference on Learning
+Representations (ICLR), 2018.
+[4] M. Riemer, I. Cases, R. Ajemian, M. Liu, I. Rish, Y . Tu, and G. Tesauro,
+“Learning to learn without forgetting by maximizing transfer and mini-
+mizing interference,” inInternational Conference on Learning Represen-
+tations (ICLR), 2019.
+[5] S. Yao, J. Zhao, D. Yu, N. Du, I. Shafran, K. Narasimhan, and Y . Cao,
+“ReAct: Synergizing reasoning and acting in language models,” inInter-
+national Conference on Learning Representations (ICLR), 2023.
+First Authorreceived the B.S. degree . . .
+Second Authorreceived the Ph.D. degree . . .
+
