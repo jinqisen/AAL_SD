@@ -9,13 +9,16 @@ RUNS_DIR="${RUNS_DIR:-${RESULTS_DIR}/runs}"
 POOLS_DIR="${POOLS_DIR:-${RESULTS_DIR}/pools}"
 
 SOURCE_BASE_RUN_ID="${SOURCE_BASE_RUN_ID:-baselines_only_p3_20260313_212023}"
-BASE_RUN_ID="${BASE_RUN_ID:-ablation_matrix_p3_20260323_155500}"
+BASE_RUN_ID="${BASE_RUN_ID:-ablation_matrix_p3_20260323_235540}"
 SEEDS="${SEEDS:-42,43,44,45,46}"
-START_MODE="${START_MODE:-fresh}"
+START_MODE="${START_MODE:-resume}"
 N_ROUNDS="${N_ROUNDS:-16}"
+WORKERS="${WORKERS:-2}"
+EXP_WORKERS="${EXP_WORKERS:-1}"
 
 EXPERIMENTS=(
   full_model_A_lambda_policy
+  full_model_B_lambda_agent
   no_agent
   fixed_lambda
   uncertainty_only
@@ -35,7 +38,7 @@ if missing:
   raise SystemExit("Unknown experiments: " + " ".join(missing))
 PY
 
-python - <<PY
+"${PYTHON_BIN}" - <<PY
 import os
 seeds = "${SEEDS}".split(",")
 src_base = "${SOURCE_BASE_RUN_ID}"
@@ -53,13 +56,26 @@ PY
 for seed in ${SEEDS//,/ }; do
   SRC="${POOLS_DIR}/${SOURCE_BASE_RUN_ID}_seed${seed}/_base"
   DST="${POOLS_DIR}/${BASE_RUN_ID}_seed${seed}/_base"
-  if [ ! -d "${SRC}" ]; then
-    echo "Missing source pools: ${SRC}" 1>&2
-    exit 2
+  if [ "${START_MODE}" = "fresh" ]; then
+    if [ ! -d "${SRC}" ]; then
+      echo "Missing source pools: ${SRC}" 1>&2
+      exit 2
+    fi
+    rm -rf "${DST}"
+    mkdir -p "$(dirname "${DST}")"
+    cp -a "${SRC}" "${DST}"
+  else
+    if [ -d "${DST}" ]; then
+      echo "Keeping existing base pools: ${DST}"
+    else
+      if [ ! -d "${SRC}" ]; then
+        echo "Missing source pools: ${SRC}" 1>&2
+        exit 2
+      fi
+      mkdir -p "$(dirname "${DST}")"
+      cp -a "${SRC}" "${DST}"
+    fi
   fi
-  rm -rf "${DST}"
-  mkdir -p "$(dirname "${DST}")"
-  cp -a "${SRC}" "${DST}"
 done
 
 cmd=(
@@ -70,6 +86,9 @@ cmd=(
   "--seeds" "${SEEDS}"
   "--start" "${START_MODE}"
   "--n_rounds" "${N_ROUNDS}"
+  "--parallel"
+  "--workers" "${WORKERS}"
+  "--exp_workers" "${EXP_WORKERS}"
   "--experiments"
 )
 cmd+=("${EXPERIMENTS[@]}")
