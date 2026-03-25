@@ -12,4 +12,10 @@ data/
 *.pt
 src.zip
 results/
+!results/runs/ablation_matrix_p3_20260323_235540*/**
+!results/runs/baselines_only_p3_20260313_212023*/**
+!results/checkpoints/ablation_matrix_p3_20260323_235540*/**
+!results/checkpoints/baselines_only_p3_20260313_212023*/**
+!results/logs_md/*ablation_matrix_p3_20260323_235540*.md
+!results/logs_md/*baselines_only_p3_20260313_212023*.md
 AAL-SD-Doc/
