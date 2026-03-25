@@ -1,0 +1,69 @@
+{
+  "run_id": "baselines_only_p3_20260313_212023_seed46",
+  "experiment_name": "baseline_entropy",
+  "updated_at": "2026-03-24T05:25:52.875367",
+  "pid": 62730,
+  "ppid": 16326,
+  "pool_integrity": {
+    "counts": {
+      "labeled": 189,
+      "unlabeled": 3610,
+      "union": 3799,
+      "dataset": 3799
+    },
+    "overlaps": {
+      "labeled_unlabeled": 0
+    }
+  },
+  "pool_integrity_ok": true,
+  "errors": [],
+  "status": "completed",
+  "pools_dir": "/Users/anykong/AD-KUCS/AAL_SD/results/pools/baselines_only_p3_20260313_212023_seed46/baseline_entropy",
+  "checkpoint_path": "/Users/anykong/AD-KUCS/AAL_SD/results/checkpoints/baselines_only_p3_20260313_212023_seed46/baseline_entropy_state.json",
+  "initial": {
+    "labeled": 189,
+    "unlabeled": 3610
+  },
+  "dataset_fingerprint": {
+    "count": 3799,
+    "sha256": "ab1c6ed6ffcd25606a577ecf266996d10127065c72db2f5cc8c43cb90fd7c95a"
+  },
+  "resume": {
+    "start_round": 0
+  },
+  "progress": {
+    "round": 16,
+    "epoch": "finished",
+    "labeled_size": 1509
+  },
+  "result": {
+    "alc": 0.6019968134086349,
+    "final_mIoU": 0.7234925024781884,
+    "final_f1": 0.8122145543683859,
+    "final_selected_mIoU": 0.7229135836589856,
+    "final_selected_f1": 0.8111931287246408,
+    "final_report_mIoU": 0.7234925024781884,
+    "final_report_f1": 0.8122145543683859,
+    "final_miou_source": "final_report",
+    "final_f1_source": "final_report",
+    "test_split": "test",
+    "budget_history": [
+      189,
+      277,
+      365,
+      453,
+      541,
+      629,
+      717,
+      805,
+      893,
+      981,
+      1069,
+      1157,
+      1245,
+      1333,
+      1421,
+      1509
+    ]
+  }
+}

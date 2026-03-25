@@ -1,0 +1,80 @@
+{
+  "run_id": "ablation_matrix_p3_20260323_235540_seed42",
+  "experiment_name": "fixed_lambda",
+  "updated_at": "2026-03-24T11:46:14.369136",
+  "pid": 32874,
+  "ppid": 32859,
+  "pool_integrity": {
+    "counts": {
+      "labeled": 1069,
+      "unlabeled": 2730,
+      "union": 3799,
+      "dataset": 3799
+    },
+    "overlaps": {
+      "labeled_unlabeled": 0
+    }
+  },
+  "pool_integrity_ok": true,
+  "errors": [
+    {
+      "ts": "2026-03-24T11:18:22.618885",
+      "status": "failed",
+      "error": {
+        "round": 16,
+        "message": "Missing previous round best checkpoint for final test-only round: results/runs/ablation_matrix_p3_20260323_235540_seed42/fixed_lambda_round_models/round_15_best_val.pt",
+        "type": "unknown",
+        "exception": "RuntimeError"
+      }
+    }
+  ],
+  "status": "completed",
+  "pools_dir": "/Users/anykong/AD-KUCS/AAL_SD/results/pools/ablation_matrix_p3_20260323_235540_seed42/fixed_lambda",
+  "checkpoint_path": "results/checkpoints/ablation_matrix_p3_20260323_235540_seed42/fixed_lambda_state.json",
+  "initial": {
+    "labeled": 1069,
+    "unlabeled": 2730
+  },
+  "dataset_fingerprint": {
+    "count": 3799,
+    "sha256": "ab1c6ed6ffcd25606a577ecf266996d10127065c72db2f5cc8c43cb90fd7c95a"
+  },
+  "resume": {
+    "start_round": 10
+  },
+  "progress": {
+    "round": 16,
+    "epoch": "finished",
+    "labeled_size": 1509
+  },
+  "result": {
+    "alc": 0.5995814998824733,
+    "final_mIoU": 0.7046264871955433,
+    "final_f1": 0.7940974748508756,
+    "final_selected_mIoU": 0.7029571224586069,
+    "final_selected_f1": 0.7920276925550707,
+    "final_report_mIoU": 0.7046264871955433,
+    "final_report_f1": 0.7940974748508756,
+    "final_miou_source": "final_report",
+    "final_f1_source": "final_report",
+    "test_split": "test",
+    "budget_history": [
+      189,
+      277,
+      365,
+      453,
+      541,
+      629,
+      717,
+      805,
+      893,
+      981,
+      1069,
+      1157,
+      1245,
+      1333,
+      1421,
+      1509
+    ]
+  }
+}

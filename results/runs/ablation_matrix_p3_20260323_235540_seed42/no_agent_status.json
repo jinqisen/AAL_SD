@@ -1,0 +1,55 @@
+{
+  "run_id": "ablation_matrix_p3_20260323_235540_seed42",
+  "experiment_name": "no_agent",
+  "updated_at": "2026-03-24T09:39:45.618891",
+  "pid": 32874,
+  "ppid": 32859,
+  "status": "completed",
+  "errors": [
+    {
+      "ts": "2026-03-24T08:19:32.807680",
+      "status": "failed",
+      "error": {
+        "round": 11,
+        "message": "[Errno 2] No such file or directory: 'results/runs/ablation_matrix_p3_20260323_235540_seed42/no_agent_status.json.tmp' -> 'results/runs/ablation_matrix_p3_20260323_235540_seed42/no_agent_status.json'",
+        "type": "unknown",
+        "exception": "FileNotFoundError"
+      }
+    }
+  ],
+  "progress": {
+    "round": 16,
+    "epoch": "finished",
+    "labeled_size": 1509
+  },
+  "result": {
+    "alc": 0.6001857312464686,
+    "final_mIoU": 0.6833718704386803,
+    "final_f1": 0.7730270350379242,
+    "final_selected_mIoU": 0.683587134660879,
+    "final_selected_f1": 0.7726084860157473,
+    "final_report_mIoU": 0.6833718704386803,
+    "final_report_f1": 0.7730270350379242,
+    "final_miou_source": "final_report",
+    "final_f1_source": "final_report",
+    "test_split": "test",
+    "budget_history": [
+      189,
+      277,
+      365,
+      453,
+      541,
+      629,
+      717,
+      805,
+      893,
+      981,
+      1069,
+      1157,
+      1245,
+      1333,
+      1421,
+      1509
+    ]
+  }
+}

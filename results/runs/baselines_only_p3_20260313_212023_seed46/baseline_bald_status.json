@@ -1,0 +1,69 @@
+{
+  "run_id": "baselines_only_p3_20260313_212023_seed46",
+  "experiment_name": "baseline_bald",
+  "updated_at": "2026-03-24T14:16:11.310327",
+  "pid": 47073,
+  "ppid": 16326,
+  "pool_integrity": {
+    "counts": {
+      "labeled": 189,
+      "unlabeled": 3610,
+      "union": 3799,
+      "dataset": 3799
+    },
+    "overlaps": {
+      "labeled_unlabeled": 0
+    }
+  },
+  "pool_integrity_ok": true,
+  "errors": [],
+  "status": "completed",
+  "pools_dir": "/Users/anykong/AD-KUCS/AAL_SD/results/pools/baselines_only_p3_20260313_212023_seed46/baseline_bald",
+  "checkpoint_path": "/Users/anykong/AD-KUCS/AAL_SD/results/checkpoints/baselines_only_p3_20260313_212023_seed46/baseline_bald_state.json",
+  "initial": {
+    "labeled": 189,
+    "unlabeled": 3610
+  },
+  "dataset_fingerprint": {
+    "count": 3799,
+    "sha256": "ab1c6ed6ffcd25606a577ecf266996d10127065c72db2f5cc8c43cb90fd7c95a"
+  },
+  "resume": {
+    "start_round": 0
+  },
+  "progress": {
+    "round": 16,
+    "epoch": "finished",
+    "labeled_size": 1509
+  },
+  "result": {
+    "alc": 0.5976562048648817,
+    "final_mIoU": 0.7067601185990608,
+    "final_f1": 0.7969194157298913,
+    "final_selected_mIoU": 0.7232668063926091,
+    "final_selected_f1": 0.8118759914307312,
+    "final_report_mIoU": 0.7067601185990608,
+    "final_report_f1": 0.7969194157298913,
+    "final_miou_source": "final_report",
+    "final_f1_source": "final_report",
+    "test_split": "test",
+    "budget_history": [
+      189,
+      277,
+      365,
+      453,
+      541,
+      629,
+      717,
+      805,
+      893,
+      981,
+      1069,
+      1157,
+      1245,
+      1333,
+      1421,
+      1509
+    ]
+  }
+}

@@ -1,0 +1,44 @@
+{
+  "run_id": "ablation_matrix_p3_20260323_235540_seed46",
+  "experiment_name": "fixed_lambda",
+  "updated_at": "2026-03-26T02:44:06.700481",
+  "pid": 53635,
+  "ppid": 32859,
+  "pool_integrity": {
+    "counts": {
+      "labeled": 189,
+      "unlabeled": 3610,
+      "union": 3799,
+      "dataset": 3799
+    },
+    "overlaps": {
+      "labeled_unlabeled": 0
+    }
+  },
+  "pool_integrity_ok": true,
+  "errors": [],
+  "status": "running",
+  "pools_dir": "/Users/anykong/AD-KUCS/AAL_SD/results/pools/ablation_matrix_p3_20260323_235540_seed46/fixed_lambda",
+  "checkpoint_path": "results/checkpoints/ablation_matrix_p3_20260323_235540_seed46/fixed_lambda_state.json",
+  "initial": {
+    "labeled": 189,
+    "unlabeled": 3610
+  },
+  "dataset_fingerprint": {
+    "count": 3799,
+    "sha256": "ab1c6ed6ffcd25606a577ecf266996d10127065c72db2f5cc8c43cb90fd7c95a"
+  },
+  "resume": {
+    "start_round": 0
+  },
+  "progress": {
+    "round": 1,
+    "epoch": 10,
+    "labeled_size": 189,
+    "loss": 0.06038360856473446,
+    "mIoU": 0.513579787981656,
+    "f1": 0.5376727721886435,
+    "best_mIoU_round": 0.5423488769780848,
+    "warnings": []
+  }
+}

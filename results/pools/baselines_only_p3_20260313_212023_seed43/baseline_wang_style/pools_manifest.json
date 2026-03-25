@@ -1,0 +1,56 @@
+{
+  "schema_version": 1,
+  "created_at": "2026-03-14T21:04:48.032566",
+  "data_root": "/Users/anykong/AAL_SD/data/Landslide4Sense",
+  "splits": {
+    "train": {
+      "images": {
+        "count": 3799,
+        "sha256": "ab1c6ed6ffcd25606a577ecf266996d10127065c72db2f5cc8c43cb90fd7c95a"
+      },
+      "masks": {
+        "count": 3799,
+        "sha256": "0a01cefd2ee021b089672d823cfe04cd50049ce616cadf336dee51059a2337ea"
+      }
+    },
+    "val": {
+      "images": {
+        "count": 245,
+        "sha256": "7b9c650057c095f0c2228308c7e051b7370eb6ccba954259b9065f6c7d0b28ca"
+      },
+      "masks": {
+        "count": 245,
+        "sha256": "11ef64a04569efb9763aa4065880f272c21b14373942d0d8e611d02fb67884f1"
+      }
+    },
+    "test": {
+      "images": {
+        "count": 800,
+        "sha256": "f56405eab97104d2e4a506e92166697a3c9346661a19b258709c1a3902ba5608"
+      },
+      "masks": {
+        "count": 800,
+        "sha256": "e6de1e15d3b3a5dc022494192a141690c8bdff508bd063533600f0fff4dc07d3"
+      }
+    }
+  },
+  "split_policy": {
+    "name": "initial_labeled_stratified_by_has_positive",
+    "initial_labeled_size": 0.05,
+    "random_seed": 43,
+    "stratify_key": "has_positive",
+    "train_counts": {
+      "pos": 2231,
+      "neg": 1568,
+      "total": 3799
+    }
+  },
+  "pools": {
+    "labeled": 189,
+    "unlabeled": 3610,
+    "files": {
+      "labeled_pool": "labeled_pool.csv",
+      "unlabeled_pool": "unlabeled_pool.csv"
+    }
+  }
+}

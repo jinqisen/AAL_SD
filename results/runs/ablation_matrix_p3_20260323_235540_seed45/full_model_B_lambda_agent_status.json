@@ -1,0 +1,67 @@
+{
+  "run_id": "ablation_matrix_p3_20260323_235540_seed45",
+  "experiment_name": "full_model_B_lambda_agent",
+  "updated_at": "2026-03-25T22:47:37.157511",
+  "pid": 53232,
+  "ppid": 53222,
+  "pool_integrity": {
+    "counts": {
+      "labeled": 189,
+      "unlabeled": 3610,
+      "union": 3799,
+      "dataset": 3799
+    },
+    "overlaps": {
+      "labeled_unlabeled": 0
+    }
+  },
+  "pool_integrity_ok": true,
+  "errors": [
+    {
+      "ts": "2026-03-25T22:47:37.157518",
+      "status": "failed",
+      "error": {
+        "round": 1,
+        "message": "LLM Agent failed at Round 1: LLMAPIError: Error calling API: HTTPSConnectionPool(host='api.siliconflow.cn', port=443): Max retries exceeded with url: /v1/chat/completions (Caused by SSLError(SSLEOFError(8, '[SSL: UNEXPECTED_EOF_WHILE_READING] EOF occurred in violation of protocol (_ssl.c:1032)')))",
+        "type": "unknown",
+        "exception": "RuntimeError"
+      }
+    }
+  ],
+  "status": "failed",
+  "pools_dir": "/Users/anykong/AD-KUCS/AAL_SD/results/pools/ablation_matrix_p3_20260323_235540_seed45/full_model_B_lambda_agent",
+  "checkpoint_path": "results/checkpoints/ablation_matrix_p3_20260323_235540_seed45/full_model_B_lambda_agent_state.json",
+  "initial": {
+    "labeled": 189,
+    "unlabeled": 3610
+  },
+  "dataset_fingerprint": {
+    "count": 3799,
+    "sha256": "ab1c6ed6ffcd25606a577ecf266996d10127065c72db2f5cc8c43cb90fd7c95a"
+  },
+  "resume": {
+    "start_round": 0
+  },
+  "progress": {
+    "round": 1,
+    "epoch": 10,
+    "labeled_size": 189,
+    "loss": 0.053059893349806465,
+    "mIoU": 0.5620908472831037,
+    "f1": 0.6188096991923625,
+    "best_mIoU_round": 0.6086459645172497,
+    "warnings": []
+  },
+  "current_error": {
+    "round": 1,
+    "message": "LLM Agent failed at Round 1: LLMAPIError: Error calling API: HTTPSConnectionPool(host='api.siliconflow.cn', port=443): Max retries exceeded with url: /v1/chat/completions (Caused by SSLError(SSLEOFError(8, '[SSL: UNEXPECTED_EOF_WHILE_READING] EOF occurred in violation of protocol (_ssl.c:1032)')))",
+    "type": "unknown",
+    "exception": "RuntimeError"
+  },
+  "error": {
+    "round": 1,
+    "message": "LLM Agent failed at Round 1: LLMAPIError: Error calling API: HTTPSConnectionPool(host='api.siliconflow.cn', port=443): Max retries exceeded with url: /v1/chat/completions (Caused by SSLError(SSLEOFError(8, '[SSL: UNEXPECTED_EOF_WHILE_READING] EOF occurred in violation of protocol (_ssl.c:1032)')))",
+    "type": "unknown",
+    "exception": "RuntimeError"
+  }
+}

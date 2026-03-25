@@ -1,0 +1,59 @@
+{
+  "run_id": "baselines_only_p3_20260313_212023_seed45",
+  "experiment_name": "baseline_random",
+  "updated_at": "2026-03-15T11:40:39.595195",
+  "pool_integrity": {
+    "counts": {
+      "labeled": 1509,
+      "unlabeled": 2290,
+      "union": 3799,
+      "dataset": 3799
+    },
+    "overlaps": {
+      "labeled_unlabeled": 0
+    }
+  },
+  "pool_integrity_ok": true,
+  "status": "completed",
+  "pools_dir": "/Users/anykong/AD-KUCS/AAL_SD/results/pools/baselines_only_p3_20260313_212023_seed45/baseline_random",
+  "checkpoint_path": "results/checkpoints/baselines_only_p3_20260313_212023_seed45/baseline_random_state.json",
+  "initial": {
+    "labeled": 1509,
+    "unlabeled": 2290
+  },
+  "dataset_fingerprint": {
+    "count": 3799,
+    "sha256": "ab1c6ed6ffcd25606a577ecf266996d10127065c72db2f5cc8c43cb90fd7c95a"
+  },
+  "resume": {
+    "start_round": 16
+  },
+  "progress": {
+    "round": 16,
+    "epoch": "finished",
+    "labeled_size": 1509
+  },
+  "result": {
+    "alc": 0.5919091663359284,
+    "final_mIoU": 0.730417319078734,
+    "final_f1": 0.817968507183422,
+    "budget_history": [
+      189,
+      277,
+      365,
+      453,
+      541,
+      629,
+      717,
+      805,
+      893,
+      981,
+      1069,
+      1157,
+      1245,
+      1333,
+      1421,
+      1509
+    ]
+  }
+}

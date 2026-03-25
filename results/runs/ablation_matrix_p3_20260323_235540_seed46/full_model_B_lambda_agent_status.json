@@ -1,0 +1,44 @@
+{
+  "run_id": "ablation_matrix_p3_20260323_235540_seed46",
+  "experiment_name": "full_model_B_lambda_agent",
+  "updated_at": "2026-03-26T05:20:16.026621",
+  "pid": 97881,
+  "ppid": 97873,
+  "pool_integrity": {
+    "counts": {
+      "labeled": 189,
+      "unlabeled": 3610,
+      "union": 3799,
+      "dataset": 3799
+    },
+    "overlaps": {
+      "labeled_unlabeled": 0
+    }
+  },
+  "pool_integrity_ok": true,
+  "errors": [],
+  "status": "running",
+  "pools_dir": "/Users/anykong/AD-KUCS/AAL_SD/results/pools/ablation_matrix_p3_20260323_235540_seed46/full_model_B_lambda_agent",
+  "checkpoint_path": "results/checkpoints/ablation_matrix_p3_20260323_235540_seed46/full_model_B_lambda_agent_state.json",
+  "initial": {
+    "labeled": 189,
+    "unlabeled": 3610
+  },
+  "dataset_fingerprint": {
+    "count": 3799,
+    "sha256": "ab1c6ed6ffcd25606a577ecf266996d10127065c72db2f5cc8c43cb90fd7c95a"
+  },
+  "resume": {
+    "start_round": 0
+  },
+  "progress": {
+    "round": 8,
+    "epoch": 10,
+    "labeled_size": 805,
+    "loss": 0.09004874438953005,
+    "mIoU": 0.705256261443233,
+    "f1": 0.7942623949070827,
+    "best_mIoU_round": 0.721245697494416,
+    "warnings": []
+  }
+}
