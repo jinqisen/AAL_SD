@@ -21,7 +21,11 @@ from agent.prompt_template import PromptBuilder
 from agent.agent_manager import SiliconFlowClient
 from agent.config import AgentThresholds
 from baselines.bald_sampler import BALDSampler
-from experiments.ablation_config import ABLATION_SETTINGS, EXPERIMENT_NAME_ALIASES, build_spec_from_legacy_dict
+from experiments.ablation_config import (
+    ABLATION_SETTINGS,
+    EXPERIMENT_NAME_ALIASES,
+    build_spec_from_legacy_dict,
+)
 from experiments.components import (
     build_sampler,
     build_selection_postprocessor,
@@ -46,6 +50,11 @@ class ActiveLearningPipeline:
         self.exp_config = ABLATION_SETTINGS.get(canonical)
         if not self.exp_config:
             raise ValueError(f"Unknown experiment: {experiment_name}")
+        self._apply_agent_threshold_overrides(
+            self.exp_config.get("agent_threshold_overrides")
+            if isinstance(self.exp_config, dict)
+            else None
+        )
         self.experiment_spec = build_spec_from_legacy_dict(requested, self.exp_config)
         self.experiment_runtime = self.experiment_spec.build(config)
 
@@ -55,7 +64,7 @@ class ActiveLearningPipeline:
         set_global_seed(self.seed, deterministic=self.deterministic)
 
         logger.info(f"Initializing Experiment: {experiment_name}")
-        logger.info(f"Description: {self.exp_config['description']}")
+        logger.info(f"Description: {self.exp_config.get('description') or ''}")
         logger.info(
             f"Isolation: run_id={self.run_id} experiment={self.experiment_name} pools_dir={getattr(self.config, 'POOLS_DIR', None)} "
             f"results_dir={getattr(self.config, 'RESULTS_DIR', None)} checkpoint_dir={getattr(self.config, 'CHECKPOINT_DIR', None)}"
@@ -154,8 +163,14 @@ class ActiveLearningPipeline:
         # NOTE: Landslide4SenseDataset loads all files in a dir.
         # We need to construct indices based on file names.
 
-        train_split = str(getattr(config, "TRAIN_SPLIT", "train") or "train").strip().lower()
-        self.full_dataset = Landslide4SenseDataset(config.DATA_DIR, split=train_split)
+        train_split = (
+            str(getattr(config, "TRAIN_SPLIT", "train") or "train").strip().lower()
+        )
+        self.full_dataset = Landslide4SenseDataset(
+            config.DATA_DIR, 
+            split=train_split,
+            bg_undersample_ratio=getattr(config, "BG_UNDERSAMPLE_RATIO", 1.0)
+        )
         self.query_dataset = Landslide4SenseDataset(
             config.DATA_DIR, split=train_split, with_mask=False
         )
@@ -186,7 +201,6 @@ class ActiveLearningPipeline:
         sampler_result = build_sampler(config, self.exp_config)
         self.sampler = sampler_result.sampler
         self.sampler_type = sampler_result.sampler_type
-        self.k_definition = sampler_result.k_definition
         self.score_normalization = sampler_result.score_normalization
         self.rollback_config = sampler_result.rollback_config
 
@@ -286,14 +300,25 @@ class ActiveLearningPipeline:
         self._last_training_state = None
         self._last_lambda_controller = None
         self._last_selection_summary = None
+        self.training_state: dict = {
+            "train_u_median_history": [],
+            "train_k_median_history": [],
+            "max_history_length": 5,
+        }
         self.default_query_size = int(getattr(self.config, "QUERY_SIZE", 0) or 0)
         self.default_epochs_per_round = int(
             getattr(self.config, "EPOCHS_PER_ROUND", 0) or 0
         )
         self._pending_round_controls = {}
-        self.train_split = str(getattr(self.config, "TRAIN_SPLIT", "train") or "train").strip().lower()
-        self.val_split = str(getattr(self.config, "VAL_SPLIT", "val") or "val").strip().lower()
-        self.test_split = str(getattr(self.config, "TEST_SPLIT", "test") or "test").strip().lower()
+        self.train_split = (
+            str(getattr(self.config, "TRAIN_SPLIT", "train") or "train").strip().lower()
+        )
+        self.val_split = (
+            str(getattr(self.config, "VAL_SPLIT", "val") or "val").strip().lower()
+        )
+        self.test_split = (
+            str(getattr(self.config, "TEST_SPLIT", "test") or "test").strip().lower()
+        )
 
         self._write_status(
             {
@@ -313,18 +338,24 @@ class ActiveLearningPipeline:
                 "pools_dir": self.pools_dir,
                 "checkpoint_path": self.checkpoint_manager.checkpoint_path,
                 "trace_schema_version": int(
-                    getattr(getattr(self, "experiment_runtime", None), "trace_options", None).schema_version
+                    getattr(
+                        getattr(self, "experiment_runtime", None), "trace_options", None
+                    ).schema_version
                 )
-                if getattr(getattr(self, "experiment_runtime", None), "trace_options", None) is not None
+                if getattr(
+                    getattr(self, "experiment_runtime", None), "trace_options", None
+                )
+                is not None
                 else 1,
                 "experiment_runtime": {
                     "mode": "legacy_adapter",
-                    "spec": getattr(getattr(self, "experiment_spec", None), "name", None),
+                    "spec": getattr(
+                        getattr(self, "experiment_spec", None), "name", None
+                    ),
                 },
                 "ablation": {
                     "use_agent": bool(self.use_agent),
                     "sampler_type": getattr(self, "sampler_type", None),
-                    "k_definition": getattr(self, "k_definition", None),
                     "score_normalization": getattr(self, "score_normalization", None),
                     "lambda_override": self.exp_config.get("lambda_override")
                     if isinstance(self.exp_config, dict)
@@ -395,8 +426,23 @@ class ActiveLearningPipeline:
                 f"Runtime: device={getattr(self.config, 'DEVICE', None)} num_workers={getattr(self.config, 'NUM_WORKERS', None)}"
             )
 
+    def _apply_agent_threshold_overrides(self, overrides):
+        if not isinstance(overrides, dict):
+            return
+        for key, value in overrides.items():
+            if not isinstance(key, str):
+                continue
+            name = key.strip()
+            if not name or not hasattr(AgentThresholds, name):
+                continue
+            applied = value
+            if isinstance(value, (int, float)):
+                applied = float(value)
+            setattr(AgentThresholds, name, applied)
+
     def _write_status(self, patch):
         import json
+        from utils import atomic_write_json
 
         payload = {}
         try:
@@ -412,18 +458,50 @@ class ActiveLearningPipeline:
             "run_id": self.run_id,
             "experiment_name": self.experiment_name,
             "updated_at": datetime.now().isoformat(),
+            "pid": int(os.getpid()),
+            "ppid": int(os.getppid()),
         }
         payload.update(base)
+        existing_errors = payload.get("errors")
+        errors: list = list(existing_errors) if isinstance(existing_errors, list) else []
         if isinstance(patch, dict):
-            payload.update(patch)
+            patch_dict = dict(patch)
+            incoming_error = None
+            if "current_error" in patch_dict:
+                incoming_error = patch_dict.pop("current_error")
+            if "error" in patch_dict:
+                incoming_error = patch_dict.pop("error")
 
-        tmp = self.status_path + ".tmp"
-        with open(tmp, "w", encoding="utf-8") as f:
-            json.dump(payload, f, ensure_ascii=False, indent=2)
-        os.replace(tmp, self.status_path)
+            status_next = patch_dict.get("status")
+            should_clear_current_error = (
+                incoming_error is None
+                and isinstance(status_next, str)
+                and status_next.strip().lower() in ("running", "completed", "finished")
+            )
+
+            payload.update(patch_dict)
+            payload["errors"] = errors
+
+            if incoming_error is not None:
+                cur = payload.get("current_error")
+                if incoming_error != cur:
+                    errors.append(
+                        {
+                            "ts": datetime.now().isoformat(),
+                            "status": str(payload.get("status") or ""),
+                            "error": incoming_error,
+                        }
+                    )
+                payload["current_error"] = incoming_error
+                payload["error"] = incoming_error
+            elif should_clear_current_error:
+                payload.pop("current_error", None)
+                payload.pop("error", None)
+
+        atomic_write_json(self.status_path, payload, indent=2)
 
     def _append_trace(self, event):
-        import json
+        from utils import append_jsonl
 
         payload = {
             "run_id": self.run_id,
@@ -443,9 +521,7 @@ class ActiveLearningPipeline:
                 self._last_control_events[str(et)] = dict(payload)
         except Exception:
             pass
-        line = json.dumps(payload, ensure_ascii=False)
-        with open(self.trace_path, "a", encoding="utf-8") as f:
-            f.write(line + "\n")
+        append_jsonl(self.trace_path, payload)
 
     def _resolve_pools_dir(self):
         return os.path.join(self.config.POOLS_DIR, self.run_id, self.experiment_name)
@@ -521,14 +597,21 @@ class ActiveLearningPipeline:
             with open(manifest_path, "r", encoding="utf-8") as f:
                 manifest = json.load(f)
         except Exception as e:
-            raise RuntimeError(f"Failed to read pool manifest: {manifest_path} ({e})") from e
+            raise RuntimeError(
+                f"Failed to read pool manifest: {manifest_path} ({e})"
+            ) from e
 
-        if not isinstance(manifest, dict) or int(manifest.get("schema_version") or 0) != 1:
+        if (
+            not isinstance(manifest, dict)
+            or int(manifest.get("schema_version") or 0) != 1
+        ):
             raise RuntimeError(f"Unsupported pool manifest schema: {manifest_path}")
 
         def _fingerprint_dir(img_dir: str, mask_dir: str | None) -> dict:
             h = hashlib.sha256()
-            img_names = sorted([f for f in os.listdir(img_dir) if str(f).lower().endswith(".h5")])
+            img_names = sorted(
+                [f for f in os.listdir(img_dir) if str(f).lower().endswith(".h5")]
+            )
             for name in img_names:
                 h.update(str(name).encode("utf-8", errors="ignore"))
                 h.update(b"\n")
@@ -536,7 +619,9 @@ class ActiveLearningPipeline:
             if mask_dir is None:
                 return {"images": img_fp, "masks": None}
             mh = hashlib.sha256()
-            mask_names = sorted([f for f in os.listdir(mask_dir) if str(f).lower().endswith(".h5")])
+            mask_names = sorted(
+                [f for f in os.listdir(mask_dir) if str(f).lower().endswith(".h5")]
+            )
             for name in mask_names:
                 mh.update(str(name).encode("utf-8", errors="ignore"))
                 mh.update(b"\n")
@@ -564,11 +649,15 @@ class ActiveLearningPipeline:
                 )
             raise RuntimeError(f"Unknown split for manifest validation: {split}")
 
-        splits = manifest.get("splits") if isinstance(manifest.get("splits"), dict) else {}
+        splits = (
+            manifest.get("splits") if isinstance(manifest.get("splits"), dict) else {}
+        )
         for s in ("train", "val"):
             img_dir, mask_dir = _split_paths(s)
             if not os.path.isdir(img_dir) or not os.path.isdir(mask_dir or ""):
-                raise RuntimeError(f"Missing required split directories for {s}: {img_dir} {mask_dir}")
+                raise RuntimeError(
+                    f"Missing required split directories for {s}: {img_dir} {mask_dir}"
+                )
             actual = _fingerprint_dir(img_dir, mask_dir)
             expected = splits.get(s)
             if expected != actual:
@@ -580,7 +669,9 @@ class ActiveLearningPipeline:
         if expected_test is not None:
             img_dir, mask_dir = _split_paths("test")
             if not os.path.isdir(img_dir) or not os.path.isdir(mask_dir or ""):
-                raise RuntimeError(f"Pool manifest expects test split but directories missing: {img_dir} {mask_dir}")
+                raise RuntimeError(
+                    f"Pool manifest expects test split but directories missing: {img_dir} {mask_dir}"
+                )
             actual_test = _fingerprint_dir(img_dir, mask_dir)
             if expected_test != actual_test:
                 raise RuntimeError(
@@ -605,11 +696,76 @@ class ActiveLearningPipeline:
             rollback_cfg = {}
         ranking_meta = getattr(self, "_last_ranking_metadata", None)
         ranking_lambda_eff = (
-            ranking_meta.get("lambda_effective") if isinstance(ranking_meta, dict) else None
+            ranking_meta.get("lambda_effective")
+            if isinstance(ranking_meta, dict)
+            else None
         )
         ranking_lambda_source = (
-            ranking_meta.get("lambda_source") if isinstance(ranking_meta, dict) else None
+            ranking_meta.get("lambda_source")
+            if isinstance(ranking_meta, dict)
+            else None
         )
+        if ranking_lambda_eff is None:
+            round_idx = getattr(self, "current_round", None)
+            try:
+                round_idx = int(round_idx) if round_idx is not None else None
+            except Exception:
+                round_idx = None
+
+            def _match_round(ev) -> bool:
+                if round_idx is None:
+                    return True
+                if not isinstance(ev, dict):
+                    return False
+                try:
+                    return int(ev.get("round") or -1) == int(round_idx)
+                except Exception:
+                    return False
+
+            inferred = None
+            inferred_source = None
+            try:
+                for key, src in (
+                    ("lambda_guard", "lambda_guard"),
+                    ("selection_guardrail", "selection_guardrail"),
+                    ("lambda_override", "lambda_override"),
+                    ("lambda_policy_apply", "lambda_policy"),
+                ):
+                    ev = self._last_control_events.get(key)
+                    if not (isinstance(ev, dict) and _match_round(ev)):
+                        continue
+                    cand = None
+                    if key in ("lambda_guard",):
+                        cand = ev.get("lambda_after")
+                    elif key in ("selection_guardrail",):
+                        cand = ev.get("lambda_after")
+                    elif key in ("lambda_override", "lambda_policy_apply"):
+                        cand = ev.get("applied")
+                    if cand is None:
+                        continue
+                    inferred = float(cand)
+                    inferred_source = str(src)
+                    break
+            except Exception:
+                inferred = None
+                inferred_source = None
+
+            if inferred is None and hasattr(self, "toolbox"):
+                try:
+                    state = getattr(self.toolbox, "control_state", None)
+                    if (
+                        isinstance(state, dict)
+                        and state.get("lambda_override_round") is not None
+                    ):
+                        inferred = float(state.get("lambda_override_round"))
+                        inferred_source = "agent_control_state"
+                except Exception:
+                    inferred = None
+                    inferred_source = None
+
+            if inferred is not None:
+                ranking_lambda_eff = inferred
+                ranking_lambda_source = inferred_source
         lambda_ctrl = (
             self.exp_config.get("lambda_controller")
             if isinstance(getattr(self, "exp_config", None), dict)
@@ -632,7 +788,6 @@ class ActiveLearningPipeline:
             "sampler_class": self.sampler.__class__.__name__
             if hasattr(self, "sampler") and self.sampler is not None
             else None,
-            "k_definition": getattr(self, "k_definition", None),
             "score_normalization": getattr(self, "score_normalization", None),
             "lambda_effective": ranking_lambda_eff,
             "lambda_source": ranking_lambda_source,
@@ -676,7 +831,11 @@ class ActiveLearningPipeline:
             base = cfg.get("lambda_init")
             prev = getattr(self, "_last_rule_lambda", None)
             if prev is None:
-                prev = float(base) if isinstance(base, (int, float)) else float((lmin + lmax) * 0.5)
+                prev = (
+                    float(base)
+                    if isinstance(base, (int, float))
+                    else float((lmin + lmax) * 0.5)
+                )
 
             state = self._last_training_state or {}
             rollback_flag = bool(state.get("rollback_flag"))
@@ -684,7 +843,9 @@ class ActiveLearningPipeline:
             step_up = float(cfg.get("step_up", 0.05))
             step_down = float(cfg.get("step_down", 0.1))
             threshold = float(cfg.get("miou_delta_threshold", 0.0))
-            schedule = cfg.get("schedule") if isinstance(cfg.get("schedule"), list) else None
+            schedule = (
+                cfg.get("schedule") if isinstance(cfg.get("schedule"), list) else None
+            )
 
             def _rule_r1():
                 return self._adjust_lambda_by_performance(
@@ -731,7 +892,9 @@ class ActiveLearningPipeline:
             )
         return value
 
-    def _resolve_lambda_override(self, round_idx: int | None) -> tuple[float | None, str | None]:
+    def _resolve_lambda_override(
+        self, round_idx: int | None
+    ) -> tuple[float | None, str | None]:
         exp_config = getattr(self, "exp_config", None)
         if not isinstance(exp_config, dict):
             return None, None
@@ -741,7 +904,9 @@ class ActiveLearningPipeline:
             return float(exp_override), "exp_override"
 
         if bool(getattr(self, "use_agent", False)) and hasattr(self, "toolbox"):
-            override = getattr(self.toolbox, "control_state", {}).get("lambda_override_round")
+            override = getattr(self.toolbox, "control_state", {}).get(
+                "lambda_override_round"
+            )
             if override is not None:
                 return float(override), "agent_override"
 
@@ -804,7 +969,9 @@ class ActiveLearningPipeline:
                 return
             topk = int(getattr(opts, "l3_topk", 256) or 256)
             max_selected_opt = getattr(opts, "l3_max_selected", None)
-            max_selected = int(max_selected_opt) if max_selected_opt is not None else int(topk)
+            max_selected = (
+                int(max_selected_opt) if max_selected_opt is not None else int(topk)
+            )
         else:
             if not isinstance(self.exp_config, dict):
                 return
@@ -844,6 +1011,72 @@ class ActiveLearningPipeline:
                     "lambda_t": item.get("lambda_t"),
                 }
             )
+        selected_u = []
+        selected_k = []
+        for row in selected_rows:
+            if not isinstance(row, dict):
+                continue
+            if row.get("uncertainty") is not None:
+                try:
+                    selected_u.append(float(row.get("uncertainty")))
+                except Exception:
+                    pass
+            if row.get("knowledge_gain") is not None:
+                try:
+                    selected_k.append(float(row.get("knowledge_gain")))
+                except Exception:
+                    pass
+        top_u = []
+        top_k = []
+        for row in top_rows:
+            if not isinstance(row, dict):
+                continue
+            if row.get("uncertainty") is not None:
+                try:
+                    top_u.append(float(row.get("uncertainty")))
+                except Exception:
+                    pass
+            if row.get("knowledge_gain") is not None:
+                try:
+                    top_k.append(float(row.get("knowledge_gain")))
+                except Exception:
+                    pass
+        u_median_selected = (
+            float(np.median(np.asarray(selected_u, dtype=float)))
+            if selected_u
+            else None
+        )
+        k_median_selected = (
+            float(np.median(np.asarray(selected_k, dtype=float)))
+            if selected_k
+            else None
+        )
+        u_median_top = (
+            float(np.median(np.asarray(top_u, dtype=float))) if top_u else None
+        )
+        k_median_top = (
+            float(np.median(np.asarray(top_k, dtype=float))) if top_k else None
+        )
+        selected_ids_list = [
+            str(sid) for sid in list(selected_ids or [])[: max(0, max_selected)]
+        ]
+        top_ids_set = set(
+            str(item.get("sample_id"))
+            for item in top_rows
+            if isinstance(item, dict) and item.get("sample_id") is not None
+        )
+        hit_count = int(sum(1 for sid in selected_ids_list if sid in top_ids_set))
+        coverage_selected_in_top = (
+            float(hit_count) / float(len(selected_ids_list))
+            if int(len(selected_ids_list)) > 0
+            else None
+        )
+        topk_stats_warning = None
+        if (
+            coverage_selected_in_top is not None
+            and float(coverage_selected_in_top) < 0.5
+        ):
+            topk_stats_warning = "topk_stats_low_coverage_diagnostics_only"
         self._append_trace(
             {
                 "type": "l3_selection",
@@ -857,6 +1090,29 @@ class ActiveLearningPipeline:
                 "selected_items": selected_rows,
             }
         )
+        self._append_trace(
+            {
+                "type": "l3_selection_stats",
+                "round": int(self.current_round)
+                if self.current_round is not None
+                else None,
+                "source": source,
+                "topk": int(topk),
+                "selected_limit": int(max_selected),
+                "u_median_selected": u_median_selected,
+                "k_median_selected": k_median_selected,
+                "u_median_top": u_median_top,
+                "k_median_top": k_median_top,
+                "coverage_selected_in_top": coverage_selected_in_top,
+                "topk_stats_for_closed_loop": False,
+                "topk_stats_warning": topk_stats_warning,
+            }
+        )
+        # P0: 保存到实例变量，供 training_state 使用
+        self._last_u_median_selected = u_median_selected
+        self._last_k_median_selected = k_median_selected
+        self._last_u_median_top = u_median_top
+        self._last_k_median_top = k_median_top
 
     def _append_round_summary(
         self, round_idx: int, best_miou: float, best_f1: float, labeled_size: int
@@ -890,7 +1146,9 @@ class ActiveLearningPipeline:
         try:
             for k in list(controls.keys()):
                 ev = self._last_control_events.get(k)
-                if isinstance(ev, dict) and int(ev.get("round") or -1) == int(round_idx):
+                if isinstance(ev, dict) and int(ev.get("round") or -1) == int(
+                    round_idx
+                ):
                     controls[k] = dict(ev)
         except Exception:
             pass
@@ -944,7 +1202,9 @@ class ActiveLearningPipeline:
                 return None
             arr = np.asarray(xs, dtype=float)
             q = np.quantile(arr, np.asarray(list(qts), dtype=float)).tolist()
-            q_map = {f"p{int(round(float(p) * 100)):02d}": float(v) for p, v in zip(qts, q)}
+            q_map = {
+                f"p{int(round(float(p) * 100)):02d}": float(v) for p, v in zip(qts, q)
+            }
             return {
                 "n": int(arr.size),
                 "mean": float(arr.mean()),
@@ -1005,9 +1265,13 @@ class ActiveLearningPipeline:
             f.write(content)
 
     def _round_checkpoint_path(self, round_idx: int):
-        return os.path.join(self.round_model_dir, f"round_{int(round_idx):02d}_best_val.pt")
+        return os.path.join(
+            self.round_model_dir, f"round_{int(round_idx):02d}_best_val.pt"
+        )
 
-    def _save_round_best_val_model(self, round_idx: int, state_dict: dict, metadata: dict):
+    def _save_round_best_val_model(
+        self, round_idx: int, state_dict: dict, metadata: dict
+    ):
         os.makedirs(self.round_model_dir, exist_ok=True)
         path = self._round_checkpoint_path(round_idx)
         tmp_path = f"{path}.tmp"
@@ -1042,7 +1306,9 @@ class ActiveLearningPipeline:
             mode = "all"
         if keep_last_n is None:
             try:
-                keep_last_n = int(getattr(self.config, "ROUND_MODEL_KEEP_LAST_N", 0) or 0)
+                keep_last_n = int(
+                    getattr(self.config, "ROUND_MODEL_KEEP_LAST_N", 0) or 0
+                )
             except Exception:
                 keep_last_n = 0
 
@@ -1181,7 +1447,8 @@ class ActiveLearningPipeline:
                         try:
                             if (
                                 isinstance(getattr(self, "exp_config", None), dict)
-                                and self.exp_config.get("epochs_per_round_override") is not None
+                                and self.exp_config.get("epochs_per_round_override")
+                                is not None
                             ):
                                 manifest_exempt_keys.add("EPOCHS_PER_ROUND")
                         except Exception:
@@ -1424,7 +1691,9 @@ class ActiveLearningPipeline:
                 model = LandslideDeepLabV3(
                     in_channels=self.config.IN_CHANNELS, classes=self.config.NUM_CLASSES
                 )
-                trainer = Trainer(model, self.config, self.config.DEVICE)
+                trainer = Trainer(
+                    model, self.config, self.config.DEVICE, training_state=self.training_state
+                )
 
                 grad_probe_source = "official_val"
                 grad_probe_holdout_frac = 0.1
@@ -1445,11 +1714,16 @@ class ActiveLearningPipeline:
                             grad_probe_holdout_min = int(v)
                         except Exception:
                             pass
-                grad_probe_source = str(grad_probe_source or "official_val").strip().lower()
+                grad_probe_source = (
+                    str(grad_probe_source or "official_val").strip().lower()
+                )
 
                 labeled_ids_train = list(self.labeled_indices)
                 labeled_ids_probe = []
-                if bool(getattr(self.config, "GRAD_LOG_VAL_ALIGNMENT", False)) and grad_probe_source == "train_holdout":
+                if (
+                    bool(getattr(self.config, "GRAD_LOG_VAL_ALIGNMENT", False))
+                    and grad_probe_source == "train_holdout"
+                ):
                     train_ids, probe_ids = self._split_labeled_indices_for_grad_probe(
                         list(self.labeled_indices),
                         frac=float(grad_probe_holdout_frac),
@@ -1471,8 +1745,12 @@ class ActiveLearningPipeline:
                     worker_init_fn=worker_init_fn,
                     drop_last=True,
                     pin_memory=bool(getattr(self.config, "PIN_MEMORY", False)),
-                    persistent_workers=bool(getattr(self.config, "PERSISTENT_WORKERS", False)),
-                    prefetch_factor=int(getattr(self.config, "PREFETCH_FACTOR", 2) or 2),
+                    persistent_workers=bool(
+                        getattr(self.config, "PERSISTENT_WORKERS", False)
+                    ),
+                    prefetch_factor=int(
+                        getattr(self.config, "PREFETCH_FACTOR", 2) or 2
+                    ),
                 )
                 labeled_loader = DataLoader(labeled_subset, **train_loader_kwargs)
 
@@ -1487,12 +1765,18 @@ class ActiveLearningPipeline:
                         worker_init_fn=worker_init_fn,
                         drop_last=False,
                         pin_memory=bool(getattr(self.config, "PIN_MEMORY", False)),
-                        persistent_workers=bool(getattr(self.config, "PERSISTENT_WORKERS", False)),
-                        prefetch_factor=int(getattr(self.config, "PREFETCH_FACTOR", 2) or 2),
+                        persistent_workers=bool(
+                            getattr(self.config, "PERSISTENT_WORKERS", False)
+                        ),
+                        prefetch_factor=int(
+                            getattr(self.config, "PREFETCH_FACTOR", 2) or 2
+                        ),
                     )
                     probe_loader = DataLoader(probe_subset, **probe_loader_kwargs)
 
-                val_dataset = Landslide4SenseDataset(self.config.DATA_DIR, split=self.val_split)
+                val_dataset = Landslide4SenseDataset(
+                    self.config.DATA_DIR, split=self.val_split
+                )
                 val_loader_kwargs = self._build_loader_kwargs(
                     batch_size=self.config.BATCH_SIZE,
                     shuffle=False,
@@ -1501,15 +1785,26 @@ class ActiveLearningPipeline:
                     worker_init_fn=worker_init_fn,
                     drop_last=False,
                     pin_memory=bool(getattr(self.config, "PIN_MEMORY", False)),
-                    persistent_workers=bool(getattr(self.config, "PERSISTENT_WORKERS", False)),
-                    prefetch_factor=int(getattr(self.config, "PREFETCH_FACTOR", 2) or 2),
+                    persistent_workers=bool(
+                        getattr(self.config, "PERSISTENT_WORKERS", False)
+                    ),
+                    prefetch_factor=int(
+                        getattr(self.config, "PREFETCH_FACTOR", 2) or 2
+                    ),
                 )
                 val_loader = DataLoader(val_dataset, **val_loader_kwargs)
-                val_eval_source = "official_val" if str(self.val_split) == "val" else "val"
+                val_eval_source = (
+                    "official_val" if str(self.val_split) == "val" else "val"
+                )
 
-                model_selection = str(
-                    getattr(self.config, "MODEL_SELECTION", "last_epoch") or "last_epoch"
-                ).strip().lower()
+                model_selection = (
+                    str(
+                        getattr(self.config, "MODEL_SELECTION", "last_epoch")
+                        or "last_epoch"
+                    )
+                    .strip()
+                    .lower()
+                )
                 if model_selection not in ("last_epoch", "best_val"):
                     raise ValueError(
                         f"Unsupported MODEL_SELECTION={model_selection}. Expected 'last_epoch' or 'best_val'."
@@ -1544,7 +1839,10 @@ class ActiveLearningPipeline:
                         else:
                             loss = out
 
-                        if isinstance(grad, dict) and grad.get("train_val_cos") is not None:
+                        if (
+                            isinstance(grad, dict)
+                            and grad.get("train_val_cos") is not None
+                        ):
                             grad_tvc_values.append(float(grad.get("train_val_cos")))
                         metrics = trainer.evaluate(val_loader)
                         last_miou_epoch = float(metrics.get("mIoU", 0.0))
@@ -1575,7 +1873,9 @@ class ActiveLearningPipeline:
                             warnings.append("miou_not_finite")
                         if not math.isfinite(float(metrics.get("f1_score", 0.0))):
                             warnings.append("f1_not_finite")
-                        if warnings and bool(getattr(self.config, "FAIL_ON_NONFINITE", True)):
+                        if warnings and bool(
+                            getattr(self.config, "FAIL_ON_NONFINITE", True)
+                        ):
                             raise RuntimeError(
                                 f"Non-finite metrics detected at round={int(round_idx + 1)} epoch={int(epoch + 1)} warnings={warnings}"
                             )
@@ -1617,7 +1917,9 @@ class ActiveLearningPipeline:
                     selected_miou = float(last_miou_epoch)
                     selected_f1 = float(last_f1_epoch)
                     if best_state_dict is None or best_epoch is None:
-                        raise RuntimeError("No best validation checkpoint was captured in this round")
+                        raise RuntimeError(
+                            "No best validation checkpoint was captured in this round"
+                        )
                     if model_selection == "best_val":
                         trainer.model.load_state_dict(best_state_dict, strict=True)
                         selected_epoch = int(best_epoch)
@@ -1657,7 +1959,9 @@ class ActiveLearningPipeline:
                 else:
                     previous_round = int(round_idx)
                     if previous_round <= 0:
-                        raise RuntimeError("Final test-only round requires previous training round")
+                        raise RuntimeError(
+                            "Final test-only round requires previous training round"
+                        )
                     previous_round_path = self._round_checkpoint_path(previous_round)
                     if not os.path.exists(previous_round_path):
                         raise RuntimeError(
@@ -1755,6 +2059,7 @@ class ActiveLearningPipeline:
                 tvc_last = None
                 tvc_p10 = None
                 tvc_neg_rate = None
+                tvc_sign_flip_rate = None
                 overfit_risk = None
                 if grad_tvc_values:
                     try:
@@ -1767,6 +2072,21 @@ class ActiveLearningPipeline:
                             tvc_last = float(arr[-1])
                             tvc_p10 = float(np.quantile(arr, 0.1))
                             tvc_neg_rate = float(np.mean(arr < 0))
+                            if int(arr.size) >= 2:
+                                signs = np.sign(arr)
+                                signs = signs[np.isfinite(signs)]
+                                sign_den = int(max(int(signs.size) - 1, 0))
+                                if sign_den > 0:
+                                    sign_flips = int(
+                                        np.sum((signs[1:] * signs[:-1]) < 0)
+                                    )
+                                    tvc_sign_flip_rate = float(sign_flips) / float(
+                                        sign_den
+                                    )
+                                else:
+                                    tvc_sign_flip_rate = 0.0
+                            else:
+                                tvc_sign_flip_rate = 0.0
                             overfit_risk = float(
                                 (tvc_neg_rate or 0.0)
                                 + max(0.0, -tvc_min) * 0.5
@@ -1779,7 +2099,18 @@ class ActiveLearningPipeline:
                         tvc_last = None
                         tvc_p10 = None
                         tvc_neg_rate = None
+                        tvc_sign_flip_rate = None
                         overfit_risk = None
+                epoch_miou_volatility = None
+                try:
+                    if isinstance(epoch_mious, list) and len(epoch_mious) >= 2:
+                        epoch_miou_volatility = float(
+                            np.std(np.asarray(epoch_mious, dtype=float), ddof=1)
+                        )
+                    elif isinstance(epoch_mious, list) and len(epoch_mious) == 1:
+                        epoch_miou_volatility = 0.0
+                except Exception:
+                    epoch_miou_volatility = None
 
                 self._append_trace(
                     {
@@ -1791,7 +2122,11 @@ class ActiveLearningPipeline:
                         "grad_train_val_cos_last": tvc_last,
                         "grad_train_val_cos_p10": tvc_p10,
                         "grad_train_val_cos_neg_rate": tvc_neg_rate,
+                        "tvc_sign_flip_rate": tvc_sign_flip_rate,
+                        "epoch_miou_volatility": epoch_miou_volatility,
                         "overfit_risk": overfit_risk,
+                        # P0: 标记梯度探针数据来源（学术审计）
+                        "grad_probe_source": grad_probe_source,
                     }
                 )
                 # ------------------------------------------------------------------
@@ -1809,9 +2144,13 @@ class ActiveLearningPipeline:
                 last_k = int(miou_policy.get("last_k", 3)) if miou_policy else 0
                 last_k = max(int(last_k), 0)
                 miou_last_k_mean = float(
-                    np.mean(epoch_mious[-last_k:]) if (epoch_mious and last_k > 0) else miou_last_epoch
+                    np.mean(epoch_mious[-last_k:])
+                    if (epoch_mious and last_k > 0)
+                    else miou_last_epoch
                 )
-                ema_alpha = float(miou_policy.get("ema_alpha", 0.6)) if miou_policy else 0.0
+                ema_alpha = (
+                    float(miou_policy.get("ema_alpha", 0.6)) if miou_policy else 0.0
+                )
                 ema_alpha = float(min(max(ema_alpha, 0.0), 1.0))
                 miou_ema = None
                 if epoch_mious:
@@ -1819,7 +2158,8 @@ class ActiveLearningPipeline:
                         miou_ema = (
                             float(val)
                             if miou_ema is None
-                            else ema_alpha * float(val) + (1.0 - ema_alpha) * float(miou_ema)
+                            else ema_alpha * float(val)
+                            + (1.0 - ema_alpha) * float(miou_ema)
                         )
 
                 raw_signal_key = (
@@ -1841,15 +2181,21 @@ class ActiveLearningPipeline:
                     "last_epoch": "last",
                     "epoch_last": "last",
                 }
-                miou_signal_type = signal_alias.get(raw_signal_key, raw_signal_key) or "peak"
+                miou_signal_type = (
+                    signal_alias.get(raw_signal_key, raw_signal_key) or "peak"
+                )
 
                 signal_getters = {
                     "peak": lambda: float(best_miou),
-                    "ema": lambda: float(miou_ema) if miou_ema is not None else float(best_miou),
+                    "ema": lambda: float(miou_ema)
+                    if miou_ema is not None
+                    else float(best_miou),
                     "last_k_mean": lambda: float(miou_last_k_mean),
                     "last": lambda: float(miou_last_epoch),
                 }
-                miou_signal = float(signal_getters.get(miou_signal_type, signal_getters["peak"])())
+                miou_signal = float(
+                    signal_getters.get(miou_signal_type, signal_getters["peak"])()
+                )
 
                 prev_miou = None
                 delta_source = (
@@ -1859,11 +2205,19 @@ class ActiveLearningPipeline:
                 )
 
                 def _prev_from_state():
-                    state = self._last_training_state if isinstance(self._last_training_state, dict) else {}
+                    state = (
+                        self._last_training_state
+                        if isinstance(self._last_training_state, dict)
+                        else {}
+                    )
                     return state.get("miou_signal")
 
                 def _prev_from_history():
-                    return performance_history[-2]["mIoU"] if len(performance_history) > 1 else None
+                    return (
+                        performance_history[-2]["mIoU"]
+                        if len(performance_history) > 1
+                        else None
+                    )
 
                 prev_getters = {
                     "miou_signal": _prev_from_state,
@@ -1876,9 +2230,13 @@ class ActiveLearningPipeline:
                 )
 
                 if miou_delta is not None:
-                    low_gain_thresh = float(getattr(AgentThresholds, "MIOU_LOW_GAIN_THRESH", 0.001))
+                    low_gain_thresh = float(
+                        getattr(AgentThresholds, "MIOU_LOW_GAIN_THRESH", 0.001)
+                    )
                     if float(miou_delta) < low_gain_thresh:
-                        self._main_miou_low_gain_streak = getattr(self, "_main_miou_low_gain_streak", 0) + 1
+                        self._main_miou_low_gain_streak = (
+                            getattr(self, "_main_miou_low_gain_streak", 0) + 1
+                        )
                     else:
                         self._main_miou_low_gain_streak = 0
                 else:
@@ -1922,9 +2280,13 @@ class ActiveLearningPipeline:
                     )
                 except Exception:
                     remaining_budget = None
-                training_state = {
+                _u_med = getattr(self, "_last_u_median_selected", None)
+                _k_med = getattr(self, "_last_k_median_selected", None)
+                training_state_update = {
                     "round_idx": int(round_idx + 1),
-                    "last_miou": float(miou_signal) if miou_policy else float(best_miou),
+                    "last_miou": float(miou_signal)
+                    if miou_policy
+                    else float(best_miou),
                     "prev_miou": prev_miou if prev_miou is not None else 0.0,
                     "best_miou_so_far": best_miou_so_far,
                     "miou_delta": miou_delta,
@@ -1943,7 +2305,6 @@ class ActiveLearningPipeline:
                     "rollback_threshold": float(rollback_threshold_used)
                     if rollback_threshold_used is not None
                     else None,
-                    "k_definition": getattr(self, "k_definition", None),
                     "current_labeled_count": int(len(self.labeled_indices)),
                     "total_budget": int(self.config.TOTAL_BUDGET),
                     "remaining_budget": remaining_budget,
@@ -1954,8 +2315,29 @@ class ActiveLearningPipeline:
                     "grad_train_val_cos_last": tvc_last,
                     "grad_train_val_cos_p10": tvc_p10,
                     "grad_train_val_cos_neg_rate": tvc_neg_rate,
+                    "tvc_sign_flip_rate": tvc_sign_flip_rate,
+                    "epoch_miou_volatility": epoch_miou_volatility,
                     "overfit_risk": overfit_risk,
+                    "u_median_selected": _u_med,
+                    "k_median_selected": _k_med,
+                    "u_median_top": getattr(self, "_last_u_median_top", None),
+                    "k_median_top": getattr(self, "_last_k_median_top", None),
+                    "grad_probe_source": grad_probe_source,
+                    "train_u_median_selected": _u_med,
+                    "train_k_median_selected": _k_med,
                 }
+                if not isinstance(getattr(self, "training_state", None), dict):
+                    self.training_state = {
+                        "train_u_median_history": [],
+                        "train_k_median_history": [],
+                        "max_history_length": 5,
+                    }
+                self.training_state.update(training_state_update)
+                try:
+                    trainer._update_uncertainty_history(int(round_idx + 1))
+                except Exception:
+                    pass
+                training_state = dict(self.training_state)
                 self._last_training_state = dict(training_state)
                 if self.use_agent and self.agent_manager:
                     self.toolbox.set_training_state(training_state)
@@ -1965,7 +2347,9 @@ class ActiveLearningPipeline:
                 report_f1 = None
                 is_final_round = round_idx == self.config.N_ROUNDS - 1
                 if is_final_round:
-                    report_dataset = Landslide4SenseDataset(self.config.DATA_DIR, split=self.test_split)
+                    report_dataset = Landslide4SenseDataset(
+                        self.config.DATA_DIR, split=self.test_split
+                    )
                     mask_dir = getattr(report_dataset, "mask_dir", None)
                     mask_map = getattr(report_dataset, "_mask_by_id", None)
                     if (
@@ -1998,13 +2382,23 @@ class ActiveLearningPipeline:
                             report_f1 = float(report_metrics.get("f1_score", 0.0))
                         except Exception:
                             report_f1 = None
-                    final_report = dict(report_metrics) if isinstance(report_metrics, dict) else report_metrics
+                    final_report = (
+                        dict(report_metrics)
+                        if isinstance(report_metrics, dict)
+                        else report_metrics
+                    )
                     test_split = str(self.test_split)
-                    if isinstance(self._last_training_state, dict) and report_miou is not None and report_f1 is not None:
+                    if (
+                        isinstance(self._last_training_state, dict)
+                        and report_miou is not None
+                        and report_f1 is not None
+                    ):
                         training_state_with_report = dict(self._last_training_state)
                         training_state_with_report["report_split"] = "test"
                         training_state_with_report["report_eval_source"] = (
-                            "official_test" if str(self.test_split) == "test" else "test"
+                            "official_test"
+                            if str(self.test_split) == "test"
+                            else "test"
                         )
                         training_state_with_report["report_miou"] = float(report_miou)
                         training_state_with_report["report_f1"] = float(report_f1)
@@ -2014,14 +2408,18 @@ class ActiveLearningPipeline:
                             "type": "report_eval",
                             "round": int(round_idx + 1),
                             "report_split": "test",
-                            "eval_source": "official_test" if str(self.test_split) == "test" else "test",
+                            "eval_source": "official_test"
+                            if str(self.test_split) == "test"
+                            else "test",
                             "eval_split": str(self.test_split),
                             "eval_img_dir": getattr(report_dataset, "img_dir", None),
                             "eval_mask_dir": getattr(report_dataset, "mask_dir", None),
                             "model_selection": str(model_selection),
                             "selected_epoch": int(selected_epoch),
                             "selected_from_round": int(selected_from_round),
-                            "metrics": dict(report_metrics) if isinstance(report_metrics, dict) else report_metrics,
+                            "metrics": dict(report_metrics)
+                            if isinstance(report_metrics, dict)
+                            else report_metrics,
                         }
                     )
 
@@ -2065,12 +2463,19 @@ class ActiveLearningPipeline:
                         ):
                             early_stop = True
                             early_stop_reason = "selection_short"
-                            
+
                     # 2. mIoU Low Gain (Disabled, used for lambda adjustment instead)
                     low_gain_streak = getattr(self, "_main_miou_low_gain_streak", 0)
-                    low_gain_thresh_streak = getattr(AgentThresholds, "MIOU_LOW_GAIN_STREAK", 3)
-                    if low_gain_streak >= low_gain_thresh_streak and round_idx >= self.config.N_ROUNDS // 2:
-                        logger.warning(f"Low gain warning: mIoU low gain for {low_gain_streak} consecutive rounds (threshold={low_gain_thresh_streak}). NOT stopping early, letting agent/policy adjust.")
+                    low_gain_thresh_streak = getattr(
+                        AgentThresholds, "MIOU_LOW_GAIN_STREAK", 3
+                    )
+                    if (
+                        low_gain_streak >= low_gain_thresh_streak
+                        and round_idx >= self.config.N_ROUNDS // 2
+                    ):
+                        logger.warning(
+                            f"Low gain warning: mIoU low gain for {low_gain_streak} consecutive rounds (threshold={low_gain_thresh_streak}). NOT stopping early, letting agent/policy adjust."
+                        )
                         # early_stop = True # Disabled to allow policy adjustment
                         # if not early_stop_reason: early_stop_reason = "miou_low_gain"
 
@@ -2083,8 +2488,12 @@ class ActiveLearningPipeline:
                 else:
                     self._append_round_summary(
                         int(round_idx + 1),
-                        float(report_miou) if report_miou is not None else float(selected_miou),
-                        float(report_f1) if report_f1 is not None else float(selected_f1),
+                        float(report_miou)
+                        if report_miou is not None
+                        else float(selected_miou),
+                        float(report_f1)
+                        if report_f1 is not None
+                        else float(selected_f1),
                         int(len(self.labeled_indices)),
                     )
 
@@ -2130,11 +2539,23 @@ class ActiveLearningPipeline:
                         {
                             "type": "early_stop",
                             "round": int(round_idx + 1),
-                            "reason": early_stop_reason if "early_stop_reason" in locals() else "unknown",
+                            "reason": early_stop_reason
+                            if "early_stop_reason" in locals()
+                            else "unknown",
                             "details": {
-                                "low_gain_streak": getattr(self, "_main_miou_low_gain_streak", 0),
-                                "selection_short": (int(self._last_query_selected_count) < expected) if (self.use_agent and self._last_query_selected_count is not None and expected > 0) else False
-                            }
+                                "low_gain_streak": getattr(
+                                    self, "_main_miou_low_gain_streak", 0
+                                ),
+                                "selection_short": (
+                                    int(self._last_query_selected_count) < expected
+                                )
+                                if (
+                                    self.use_agent
+                                    and self._last_query_selected_count is not None
+                                    and expected > 0
+                                )
+                                else False,
+                            },
                         }
                     )
                     break
@@ -2176,7 +2597,9 @@ class ActiveLearningPipeline:
                     else None,
                     val_loader=val_loader if "val_loader" in locals() else None,
                     probe_loader=probe_loader if "probe_loader" in locals() else None,
-                    report_loader=report_loader if "report_loader" in locals() else None,
+                    report_loader=report_loader
+                    if "report_loader" in locals()
+                    else None,
                     trainer=trainer if "trainer" in locals() else None,
                     model=model if "model" in locals() else None,
                 )
@@ -2198,22 +2621,53 @@ class ActiveLearningPipeline:
                 final_report_f1 = float(final_report.get("f1_score", 0.0))
             except Exception:
                 final_report_f1 = None
+        selected_final_miou = None
+        selected_final_f1 = None
+        if performance_history:
+            try:
+                selected_final_miou = float(performance_history[-1].get("mIoU", 0.0))
+            except Exception:
+                selected_final_miou = None
+            try:
+                selected_final_f1 = float(performance_history[-1].get("f1_score", 0.0))
+            except Exception:
+                selected_final_f1 = None
+        final_miou_source = "final_report"
+        if final_report_miou is None:
+            final_miou_source = "selected_val_fallback"
+        final_f1_source = "final_report"
+        if final_report_f1 is None:
+            final_f1_source = "selected_val_fallback"
         result = {
             "performance_history": performance_history,
             "budget_history": budget_history,
             "alc": float(alc),
             "final_miou": float(final_report_miou)
             if final_report_miou is not None
-            else float(performance_history[-1]["mIoU"]),
+            else float(selected_final_miou or 0.0),
             "final_f1": float(final_report_f1)
             if final_report_f1 is not None
-            else float(performance_history[-1]["f1_score"]),
+            else float(selected_final_f1 or 0.0),
+            "final_miou_source": str(final_miou_source),
+            "final_f1_source": str(final_f1_source),
+            "final_selected_miou": float(selected_final_miou)
+            if selected_final_miou is not None
+            else None,
+            "final_selected_f1": float(selected_final_f1)
+            if selected_final_f1 is not None
+            else None,
+            "final_report_miou": float(final_report_miou)
+            if final_report_miou is not None
+            else None,
+            "final_report_f1": float(final_report_f1)
+            if final_report_f1 is not None
+            else None,
             "test_split": test_split,
             "final_report": final_report,
         }
         self._append_md(
             log_path,
-            f"\n## 实验汇总\n\n预算历史: {budget_history}\nALC: {result['alc']:.4f}\n最终 mIoU: {result['final_miou']:.4f}\n最终 F1: {result['final_f1']:.4f}\n最终 Test Split: {result['test_split']}\n最终 Report: {result['final_report']}\n",
+            f"\n## 实验汇总\n\n预算历史: {budget_history}\nALC(基于每轮选模val mIoU): {result['alc']:.4f}\n最后一轮选模 mIoU(val): {result['final_selected_miou']}\n最后一轮选模 F1(val): {result['final_selected_f1']}\n最终报告 mIoU({result['test_split']}): {result['final_report_miou']}\n最终报告 F1({result['test_split']}): {result['final_report_f1']}\n最终输出 mIoU: {result['final_miou']:.4f} (source={result['final_miou_source']})\n最终输出 F1: {result['final_f1']:.4f} (source={result['final_f1_source']})\n最终 Test Split: {result['test_split']}\n最终 Report: {result['final_report']}\n",
         )
         self._write_status(
             {
@@ -2222,6 +2676,21 @@ class ActiveLearningPipeline:
                     "alc": float(result["alc"]),
                     "final_mIoU": float(result["final_miou"]),
                     "final_f1": float(result["final_f1"]),
+                    "final_selected_mIoU": float(result["final_selected_miou"])
+                    if result.get("final_selected_miou") is not None
+                    else None,
+                    "final_selected_f1": float(result["final_selected_f1"])
+                    if result.get("final_selected_f1") is not None
+                    else None,
+                    "final_report_mIoU": float(result["final_report_miou"])
+                    if result.get("final_report_miou") is not None
+                    else None,
+                    "final_report_f1": float(result["final_report_f1"])
+                    if result.get("final_report_f1") is not None
+                    else None,
+                    "final_miou_source": str(result.get("final_miou_source") or ""),
+                    "final_f1_source": str(result.get("final_f1_source") or ""),
+                    "test_split": str(result.get("test_split") or ""),
                     "budget_history": list(result["budget_history"]),
                 },
             }
@@ -2245,7 +2714,9 @@ class ActiveLearningPipeline:
             "batch_size": batch_size,
             "shuffle": bool(shuffle),
             "num_workers": int(num_workers),
-            "persistent_workers": bool(int(num_workers) > 0 and bool(persistent_workers)),
+            "persistent_workers": bool(
+                int(num_workers) > 0 and bool(persistent_workers)
+            ),
             "drop_last": bool(drop_last),
             "generator": generator,
             "worker_init_fn": worker_init_fn,
@@ -2279,7 +2750,9 @@ class ActiveLearningPipeline:
         scored = []
         salt = str(int(seed))
         for sid in ids:
-            h = hashlib.sha256(f"grad_probe|{salt}|{int(sid)}".encode("utf-8", errors="ignore")).digest()
+            h = hashlib.sha256(
+                f"grad_probe|{salt}|{int(sid)}".encode("utf-8", errors="ignore")
+            ).digest()
             u = int.from_bytes(h[:8], "big") / float(2**64 - 1)
             scored.append((u, int(sid)))
         scored.sort(key=lambda x: (float(x[0]), int(x[1])))
@@ -2305,7 +2778,13 @@ class ActiveLearningPipeline:
             del loader
 
     def _cleanup_resources(
-        self, labeled_loader=None, val_loader=None, probe_loader=None, report_loader=None, trainer=None, model=None
+        self,
+        labeled_loader=None,
+        val_loader=None,
+        probe_loader=None,
+        report_loader=None,
+        trainer=None,
+        model=None,
     ):
         """统一资源清理入口"""
         # 1. Cleanup Loaders
@@ -2469,19 +2948,33 @@ class ActiveLearningPipeline:
             if isinstance(getattr(self, "exp_config", None), dict):
                 protocol = self.exp_config.get("acquisition_protocol")
             protocol = protocol if isinstance(protocol, dict) else {}
-            u_agg = str(protocol.get("uncertainty_aggregation", "mean") or "mean").strip().lower()
-            needs_post = bool(
-                hasattr(self, "selection_postprocessor") and self.selection_postprocessor is not None
+            u_agg = (
+                str(protocol.get("uncertainty_aggregation", "mean") or "mean")
+                .strip()
+                .lower()
             )
-            use_pipeline_bald = needs_post or (u_agg not in ("mean", "full_mean", "none", ""))
+            needs_post = bool(
+                hasattr(self, "selection_postprocessor")
+                and self.selection_postprocessor is not None
+            )
+            use_pipeline_bald = needs_post or (
+                u_agg not in ("mean", "full_mean", "none", "")
+            )
 
             if use_pipeline_bald:
                 unlabeled_info, _ = self._prepare_unlabeled_info(model, mc_dropout=True)
                 ranked = [
-                    {"sample_id": sid, "final_score": float((info or {}).get("uncertainty_score") or 0.0)}
+                    {
+                        "sample_id": sid,
+                        "final_score": float(
+                            (info or {}).get("uncertainty_score") or 0.0
+                        ),
+                    }
                     for sid, info in unlabeled_info.items()
                 ]
-                ranked.sort(key=lambda x: float(x.get("final_score") or 0.0), reverse=True)
+                ranked.sort(
+                    key=lambda x: float(x.get("final_score") or 0.0), reverse=True
+                )
                 self._last_ranked_items = list(ranked or [])
                 self._last_ranking_metadata = (
                     self._compute_ranking_metadata(ranked, int(self.config.QUERY_SIZE))
@@ -2514,7 +3007,9 @@ class ActiveLearningPipeline:
                 persistent_workers=bool(
                     getattr(self.config, "FEATURE_PERSISTENT_WORKERS", False)
                 ),
-                prefetch_factor=int(getattr(self.config, "FEATURE_PREFETCH_FACTOR", 2) or 2),
+                prefetch_factor=int(
+                    getattr(self.config, "FEATURE_PREFETCH_FACTOR", 2) or 2
+                ),
             )
             loader_u = DataLoader(subset_u, **loader_kwargs)
             sample_indices = list(self.unlabeled_indices)
@@ -2540,7 +3035,9 @@ class ActiveLearningPipeline:
             or self.sampler.__class__.__name__ == "ADKUCSSampler"
         ):
             unlabeled_info, labeled_features = self._prepare_unlabeled_info(model)
-            lambda_override, lambda_source = self._resolve_lambda_override(self.current_round)
+            lambda_override, lambda_source = self._resolve_lambda_override(
+                self.current_round
+            )
 
             # Explicitly log lambda usage for debugging
             logger.info(
@@ -2582,10 +3079,16 @@ class ActiveLearningPipeline:
                 if isinstance(getattr(self, "exp_config", None), dict):
                     protocol = self.exp_config.get("acquisition_protocol")
                 protocol = protocol if isinstance(protocol, dict) else {}
-                u_agg = str(protocol.get("uncertainty_aggregation", "mean") or "mean").strip().lower()
+                u_agg = (
+                    str(protocol.get("uncertainty_aggregation", "mean") or "mean")
+                    .strip()
+                    .lower()
+                )
                 if u_agg in ("mean", "full_mean", "none", ""):
                     u_type = "pixel_mean_entropy_log2"
-                    u_def = "U(I)=mean_i H(p_i), H(p_i)=-sum_c p_{i,c} log2(p_{i,c}+1e-10)"
+                    u_def = (
+                        "U(I)=mean_i H(p_i), H(p_i)=-sum_c p_{i,c} log2(p_{i,c}+1e-10)"
+                    )
                 else:
                     tau = float(protocol.get("entropy_threshold", 0.5) or 0.5)
                     u_type = "pixel_high_entropy_mean_log2"
@@ -2602,7 +3105,10 @@ class ActiveLearningPipeline:
                     "uncertainty_type": str(u_type),
                     "uncertainty_definition": str(u_def),
                 }
-                base_meta = self._compute_ranking_metadata(ranked, int(self.config.QUERY_SIZE)) or {}
+                base_meta = (
+                    self._compute_ranking_metadata(ranked, int(self.config.QUERY_SIZE))
+                    or {}
+                )
                 if isinstance(base_meta, dict):
                     base_meta.update(self._last_ranking_metadata)
                     self._last_ranking_metadata = base_meta
@@ -2740,7 +3246,9 @@ class ActiveLearningPipeline:
         ctx = None
         if isinstance(getattr(self, "_selection_context", None), dict):
             ctx = dict(self._selection_context)
-        if isinstance(ctx, dict) and isinstance(getattr(self, "_last_ranked_items", None), list):
+        if isinstance(ctx, dict) and isinstance(
+            getattr(self, "_last_ranked_items", None), list
+        ):
             ranked_items = list(getattr(self, "_last_ranked_items", []) or [])
             if ranked_items:
                 qts = (0.1, 0.25, 0.5, 0.75, 0.9, 0.99)
@@ -2751,7 +3259,10 @@ class ActiveLearningPipeline:
                         return None
                     arr = np.asarray(xs, dtype=float)
                     q = np.quantile(arr, np.asarray(list(qts), dtype=float)).tolist()
-                    q_map = {f"p{int(round(float(p) * 100)):02d}": float(v) for p, v in zip(qts, q)}
+                    q_map = {
+                        f"p{int(round(float(p) * 100)):02d}": float(v)
+                        for p, v in zip(qts, q)
+                    }
                     return {
                         "n": int(arr.size),
                         "mean": float(arr.mean()),
@@ -2964,9 +3475,10 @@ class ActiveLearningPipeline:
         # 1. Truncate Labeled Pool
         # Keep first N rows
         valid_labeled_df = labeled_df.iloc[:target_labeled_size]
-        valid_labeled_df.to_csv(
-            os.path.join(self.pools_dir, "labeled_pool.csv"), index=False
-        )
+        labeled_path = os.path.join(self.pools_dir, "labeled_pool.csv")
+        labeled_tmp = labeled_path + ".tmp"
+        valid_labeled_df.to_csv(labeled_tmp, index=False)
+        os.replace(labeled_tmp, labeled_path)
         self.labeled_df = valid_labeled_df
 
         # 2. Reconstruct Unlabeled Pool
@@ -2979,18 +3491,17 @@ class ActiveLearningPipeline:
         ]
         labeled_ids = set(valid_labeled_df["sample_id"].tolist())
 
-        unlabeled_ids = [
-            s for s in all_samples if s not in labeled_ids
-        ]
+        unlabeled_ids = [s for s in all_samples if s not in labeled_ids]
 
         # Create unlabeled DataFrame
         # Assuming original unlabeled pool has 'sample_id' column.
         # If it had other columns (like scores), they are lost for the rolled-back samples,
         # but that's fine as they need to be re-scored anyway.
         unlabeled_df = pd.DataFrame({"sample_id": unlabeled_ids})
-        unlabeled_df.to_csv(
-            os.path.join(self.pools_dir, "unlabeled_pool.csv"), index=False
-        )
+        unlabeled_path = os.path.join(self.pools_dir, "unlabeled_pool.csv")
+        unlabeled_tmp = unlabeled_path + ".tmp"
+        unlabeled_df.to_csv(unlabeled_tmp, index=False)
+        os.replace(unlabeled_tmp, unlabeled_path)
         self.unlabeled_df = unlabeled_df
 
         # Update indices in memory
@@ -3042,8 +3553,10 @@ class ActiveLearningPipeline:
         )
         valid_lines.append(resume_marker + "\n")
 
-        with open(self.trace_path, "w", encoding="utf-8") as f:
+        tmp_path = str(self.trace_path) + ".tmp"
+        with open(tmp_path, "w", encoding="utf-8") as f:
             f.writelines(valid_lines)
+        os.replace(tmp_path, self.trace_path)
 
     def _save_pool_states(self):
         import pandas as pd
@@ -3093,7 +3606,11 @@ class ActiveLearningPipeline:
         layer = None
         if hasattr(model, "backbone"):
             layer = getattr(model.backbone, "layer4", None)
-        if layer is None and hasattr(model, "model") and hasattr(model.model, "encoder"):
+        if (
+            layer is None
+            and hasattr(model, "model")
+            and hasattr(model.model, "encoder")
+        ):
             layer = getattr(model.model, "encoder", None)
             if layer is not None:
                 layer = getattr(layer, "layer4", None)
@@ -3147,7 +3664,11 @@ class ActiveLearningPipeline:
         if isinstance(getattr(self, "exp_config", None), dict):
             protocol = self.exp_config.get("acquisition_protocol")
         protocol = protocol if isinstance(protocol, dict) else {}
-        u_agg = str(protocol.get("uncertainty_aggregation", "mean") or "mean").strip().lower()
+        u_agg = (
+            str(protocol.get("uncertainty_aggregation", "mean") or "mean")
+            .strip()
+            .lower()
+        )
         tau = float(protocol.get("entropy_threshold", 0.5) or 0.5)
         min_frac = float(protocol.get("entropy_min_frac", 0.01) or 0.01)
 
@@ -3157,7 +3678,9 @@ class ActiveLearningPipeline:
             if u_agg in ("mean", "full_mean", "none", ""):
                 return ent_map.mean(dim=(1, 2))
             mask = ent_map > float(tau)
-            min_keep = max(1, int(float(min_frac) * float(ent_map.shape[1] * ent_map.shape[2])))
+            min_keep = max(
+                1, int(float(min_frac) * float(ent_map.shape[1] * ent_map.shape[2]))
+            )
             keep = mask.view(mask.shape[0], -1).sum(dim=1)
             fallback = ent_map.mean(dim=(1, 2))
             masked_sum = (ent_map * mask).view(ent_map.shape[0], -1).sum(dim=1)
@@ -3185,23 +3708,37 @@ class ActiveLearningPipeline:
                         for _ in range(int(n_mc_samples or 10)):
                             logits = model(images)
                             probs = torch.softmax(logits, dim=1)
-                            sum_probs = probs if sum_probs is None else (sum_probs + probs)
+                            sum_probs = (
+                                probs if sum_probs is None else (sum_probs + probs)
+                            )
                             ent = -torch.sum(probs * torch.log2(probs + eps), dim=1)
                             sum_ent = sum_ent + _aggregate_uncertainty(ent)
                         mean_probs = sum_probs / float(int(n_mc_samples or 10))
-                        pred_ent = -torch.sum(mean_probs * torch.log2(mean_probs + eps), dim=1)
-                        mi = _aggregate_uncertainty(pred_ent) - (sum_ent / float(int(n_mc_samples or 10)))
+                        pred_ent = -torch.sum(
+                            mean_probs * torch.log2(mean_probs + eps), dim=1
+                        )
+                        mi = _aggregate_uncertainty(pred_ent) - (
+                            sum_ent / float(int(n_mc_samples or 10))
+                        )
                         uncertainties.extend(mi.detach().cpu().tolist())
                         if pos_areas is not None:
                             channel = mean_probs[:, int(pos_class), :, :]
-                            area = (channel > float(pos_threshold)).float().mean(dim=(1, 2))
+                            area = (
+                                (channel > float(pos_threshold))
+                                .float()
+                                .mean(dim=(1, 2))
+                            )
                             pos_areas.extend(area.detach().cpu().tolist())
             finally:
                 model.eval()
 
             features_tensor = self._extract_features_only(model, data_loader)
             unc_arr = np.asarray(uncertainties, dtype=np.float32)
-            pos_arr = np.asarray(pos_areas, dtype=np.float32) if pos_areas is not None else None
+            pos_arr = (
+                np.asarray(pos_areas, dtype=np.float32)
+                if pos_areas is not None
+                else None
+            )
             return unc_arr, features_tensor, pos_arr
 
         model.eval()
@@ -3237,7 +3774,9 @@ class ActiveLearningPipeline:
 
         features_tensor = torch.cat(features_list) if features_list else None
         unc_arr = np.asarray(uncertainties, dtype=np.float32)
-        pos_arr = np.asarray(pos_areas, dtype=np.float32) if pos_areas is not None else None
+        pos_arr = (
+            np.asarray(pos_areas, dtype=np.float32) if pos_areas is not None else None
+        )
         return unc_arr, features_tensor, pos_arr
 
     def _prepare_unlabeled_info(self, model, mc_dropout=False, n_mc_samples=10):
@@ -3257,7 +3796,9 @@ class ActiveLearningPipeline:
             persistent_workers=bool(
                 getattr(self.config, "FEATURE_PERSISTENT_WORKERS", False)
             ),
-            prefetch_factor=int(getattr(self.config, "FEATURE_PREFETCH_FACTOR", 2) or 2),
+            prefetch_factor=int(
+                getattr(self.config, "FEATURE_PREFETCH_FACTOR", 2) or 2
+            ),
         )
         loader_u = DataLoader(subset_u, **feature_loader_kwargs)
         constraints = (
@@ -3280,7 +3821,9 @@ class ActiveLearningPipeline:
             method_from_sampler = getattr(self.sampler, "uncertainty_method", None)
             if isinstance(method_from_sampler, str) and method_from_sampler.strip():
                 uncertainty_method = method_from_sampler.strip().lower()
-        effective_mc = int(getattr(self.sampler, "n_mc_samples", n_mc_samples) or n_mc_samples)
+        effective_mc = int(
+            getattr(self.sampler, "n_mc_samples", n_mc_samples) or n_mc_samples
+        )
 
         unc_arr, features_tensor, pos_arr = self._extract_uncertainty_and_features(
             model,
@@ -3294,7 +3837,9 @@ class ActiveLearningPipeline:
         if features_tensor is None:
             raise RuntimeError("_prepare_unlabeled_info failed: features=None")
         if unc_arr is None or int(len(unc_arr)) != int(len(self.unlabeled_indices)):
-            raise RuntimeError("_prepare_unlabeled_info failed: uncertainty size mismatch")
+            raise RuntimeError(
+                "_prepare_unlabeled_info failed: uncertainty size mismatch"
+            )
 
         for i, idx in enumerate(self.unlabeled_indices):
             info = {
@@ -3306,11 +3851,8 @@ class ActiveLearningPipeline:
             unlabeled_info[idx] = info
 
         labeled_features = None
-        labeled_source = self.labeled_indices
-        if str(getattr(self, "k_definition", "") or "") == "coreset_to_labeled_fixed":
-            labeled_source = getattr(self, "_initial_labeled_indices", []) or []
-        if labeled_source:
-            subset_l = Subset(self.query_dataset, labeled_source)
+        if self.labeled_indices:
+            subset_l = Subset(self.query_dataset, self.labeled_indices)
             loader_l = DataLoader(subset_l, **feature_loader_kwargs)
             l_feats = self._extract_features_only(model, loader_l)
             if l_feats is None:
@@ -3368,7 +3910,10 @@ def main():
     except Exception:
         pass
     try:
-        if str(getattr(config, "DEVICE", "")).lower() == "cuda" and torch.cuda.is_available():
+        if (
+            str(getattr(config, "DEVICE", "")).lower() == "cuda"
+            and torch.cuda.is_available()
+        ):
             if bool(getattr(config, "TF32", False)):
                 torch.backends.cuda.matmul.allow_tf32 = True
                 torch.backends.cudnn.allow_tf32 = True
@@ -3376,7 +3921,9 @@ def main():
                     torch.set_float32_matmul_precision("high")
                 except Exception:
                     pass
-            torch.backends.cudnn.benchmark = bool(getattr(config, "CUDNN_BENCHMARK", False))
+            torch.backends.cudnn.benchmark = bool(
+                getattr(config, "CUDNN_BENCHMARK", False)
+            )
     except Exception:
         pass
     config.START_MODE = args.start

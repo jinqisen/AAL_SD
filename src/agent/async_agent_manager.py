@@ -129,7 +129,6 @@ class AsyncAgentManager:
         last_miou = None
         rollback_threshold = None
         rollback_mode = None
-        k_definition = None
         
         if isinstance(status_payload, dict):
             result = status_payload.get("result", {})
@@ -139,8 +138,6 @@ class AsyncAgentManager:
                 lambda_t = result.get("lambda_t")
                 last_miou = result.get("last_miou")
                 rollback_threshold = result.get("rollback_threshold")
-                rollback_mode = result.get("rollback_mode")
-                k_definition = result.get("k_definition")
 
         self.history = [
             {
@@ -152,7 +149,6 @@ class AsyncAgentManager:
                     lambda_t=lambda_t,
                     rollback_threshold=rollback_threshold,
                     rollback_mode=rollback_mode,
-                    k_definition=k_definition,
                     control_permissions=getattr(self.tools, "control_permissions", None)
                 )
             },
@@ -231,6 +227,30 @@ class AsyncAgentManager:
         text = str(os.getenv("AAL_SD_TRACE_AGENT_THOUGHT", "") or "").strip().lower()
         return text in ("1", "true", "yes", "y", "on")
 
+    def _trace_prompt_enabled(self) -> bool:
+        controller = getattr(self.tools, "controller", None)
+        cfg = getattr(controller, "config", None) if controller is not None else None
+        if cfg is not None:
+            try:
+                return bool(getattr(cfg, "TRACE_AGENT_PROMPT", False))
+            except Exception:
+                pass
+        try:
+            exp_cfg = getattr(controller, "exp_config", None) if controller is not None else None
+            if isinstance(exp_cfg, dict) and bool(exp_cfg.get("enable_agent_prompt_logging")):
+                return True
+        except Exception:
+            pass
+        try:
+            runtime = getattr(controller, "experiment_runtime", None) if controller is not None else None
+            opts = getattr(runtime, "trace_options", None) if runtime is not None else None
+            if opts is not None and bool(getattr(opts, "enable_agent_prompt_logging", False)):
+                return True
+        except Exception:
+            pass
+        text = str(os.getenv("AAL_SD_TRACE_AGENT_PROMPT", "") or "").strip().lower()
+        return text in ("1", "true", "yes", "y", "on")
+
     def _redact_text(self, text: Optional[str]) -> Optional[str]:
         if text is None:
             return None
@@ -247,13 +267,77 @@ class AsyncAgentManager:
         except Exception:
             return None
 
+    def _safe_messages(self, messages: List[Dict[str, str]]) -> List[Dict[str, str]]:
+        safe = []
+        for msg in messages or []:
+            if not isinstance(msg, dict):
+                continue
+            safe.append(
+                {
+                    "role": msg.get("role"),
+                    "content": self._redact_text(msg.get("content")),
+                }
+            )
+        return safe
+
     async def _call_llm_with_retries_async(self, messages: List[Dict[str, str]], validator: Optional[Callable[[str], bool]] = None) -> str:
         attempts = max(1, 1 + self.llm_max_retries)
         last_text = None
         
         for attempt in range(attempts):
+            if (
+                self._trace_prompt_enabled()
+                and hasattr(self.tools, "controller")
+                and hasattr(self.tools.controller, "_append_trace")
+            ):
+                try:
+                    controller = self.tools.controller
+                    round_num = int(getattr(controller, "current_round", 0) or 0)
+                    step_num = int(getattr(self, "_current_step", 0) or 0)
+                    safe_messages = self._safe_messages(messages or [])
+                    self.tools.controller._append_trace(
+                        {
+                            "type": "agent_llm_request",
+                            "session_id": self.session_id,
+                            "round": round_num,
+                            "step": step_num,
+                            "attempt": int(attempt + 1),
+                            "messages": safe_messages,
+                            "messages_sha1": self._sha1(
+                                json.dumps(safe_messages, ensure_ascii=False)
+                            ),
+                        }
+                    )
+                except Exception:
+                    pass
             text = await self.client.chat_async(messages)
             last_text = text
+            if (
+                self._trace_prompt_enabled()
+                and hasattr(self.tools, "controller")
+                and hasattr(self.tools.controller, "_append_trace")
+            ):
+                try:
+                    controller = self.tools.controller
+                    round_num = int(getattr(controller, "current_round", 0) or 0)
+                    step_num = int(getattr(self, "_current_step", 0) or 0)
+                    safe_text = self._redact_text(text)
+                    extracted = self._redact_text(extract_thought(text or ""))
+                    self.tools.controller._append_trace(
+                        {
+                            "type": "agent_llm_response",
+                            "session_id": self.session_id,
+                            "round": round_num,
+                            "step": step_num,
+                            "attempt": int(attempt + 1),
+                            "response": safe_text,
+                            "response_sha1": self._sha1(safe_text),
+                            "thought": extracted,
+                            "thought_sha1": self._sha1(extracted),
+                        }
+                    )
+                except Exception:
+                    pass
             
             # 1. Transport Error Check
             if is_llm_transport_error(text):

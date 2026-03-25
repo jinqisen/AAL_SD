@@ -2,7 +2,7 @@ import json
 from .config import AgentThresholds, AgentConstraints
 
 class PromptBuilder:
-    def build_system_prompt(self, total_iterations=0, current_iteration=0, last_miou=0.0, lambda_t=0.0, rollback_threshold=None, rollback_mode=None, k_definition=None, control_permissions=None, require_explicit_lambda: bool = False, miou_low_gain_streak=0):
+    def build_system_prompt(self, total_iterations=0, current_iteration=0, last_miou=0.0, lambda_t=0.0, rollback_threshold=None, rollback_mode=None, control_permissions=None, require_explicit_lambda: bool = False, miou_low_gain_streak=0):
         allowed_actions = []
         control_permissions_json = "null"
         alpha_allowed = None
@@ -83,13 +83,11 @@ class PromptBuilder:
             rollback_threshold_val = float(AgentThresholds.ROLLBACK_THRESHOLD)
         rollback_mode_str = str(rollback_mode) if rollback_mode is not None else "adaptive_threshold"
 
-        kd = str(k_definition or "unlabeled_kmeans_representativeness").strip()
-        k_definition_desc = (
-            f"1. {kd or 'default'}（当前代码实现；k_definition 仅用于标识展示，不影响公式）：K(x)为“未标注池聚类代表性”得分（越大越代表性/越靠近簇中心）。"
+        knowledge_gain_desc = (
+            "K(x)为“未标注池聚类代表性”得分（越大越代表性/越靠近簇中心）。"
             "具体：对未标注样本特征做 KMeans 聚类（簇数 n_clusters=min(88, |U|)），"
             "令 x 归属簇中心为 c(x)，距离 d(x)=||f_x-c(x)||，并以未标注池内最大距离 d_max 归一化，"
             "K(x)=1-d(x)/max(d_max,1e-12)。"
-            "注意：当前 score 预计算阶段仍要求已标注池非空（否则会直接报错终止），这是实现层面的前置约束。"
         )
 
         prompt = """
@@ -107,10 +105,21 @@ class PromptBuilder:
             - 允许控制动作: {allowed_actions_str}
             - set_hyperparameter 可用: {alpha_allowed_str}
 
+            结构化输入（必须按块理解）:
+            - diagnostics:
+              - mIoU={last_miou:.4f}, miou_low_gain_streak={miou_low_gain_streak}, lambda_t={lambda_t:.4f}
+              - rollback_threshold={rollback_threshold}, rollback_mode={rollback_mode}
+            - issues:
+              - 重点排查回撤、过拟合、训练过载、预算越界、无效动作
+              - 若信息缺失，必须在Thought里声明降级策略
+            - recent_history:
+              - 以最近轮次的miou_delta/overfit_risk/TVC信号判断“是否需要保守或探索”
+              - 对晚期轮次优先控制稳定性风险，避免大幅振荡
+
             AD-KUCS 评分逻辑（必须遵守） ：
             - 不确定性 U(x) = 像素熵均值（log2）：U(I)=mean_i H(p_i)，H(p_i)=-sum_c p_{{i,c}} log2(p_{{i,c}}+1e-10)。
             - 知识增益 K(x) 定义：
-              {k_definition_desc}
+              {knowledge_gain_desc}
             - 融合得分 Score(x) = (1-λ)·U(x) + λ·K(x)，λ∈[0,1]。
             - 系统提供的 lambda_t 为本轮策略建议/已应用的λ；建议将单轮调整幅度控制在±{lambda_adjust_range}以内。系统对λ的硬约束为[{lambda_min},{lambda_max}]；实验策略额外约束为 λ∈[{lambda_policy_min},{lambda_policy_max}]。
 
@@ -153,12 +162,16 @@ class PromptBuilder:
             约束：建议每阶段最多调用{max_tool_calls_per_phase}次工具；系统同时限制总步数不超过{max_steps}步。
 
             ReAct格式（仅输出Thought与Action）：
-            Thought: <包含观测摘要、动作三元组与约束考虑、预期收益与风险>
+            Thought: <包含 diagnostics/issues/recent_history 摘要、主瓶颈一句话、3条有优先级的建议（每条含收益与风险）>
             Action: {{"tool_name": "...", "parameters": {{...}}}}
 
             严格约束：
             - 只能输出两行：Thought 与 Action（不要输出 Observation，不要使用代码块）。
             - Action 行必须以 "Action:" 开头，后面紧跟单个 JSON 对象，且 JSON 后不要追加任何文字。
+            - Action.tool_name 必须属于动作空间 {action_space_str}，禁止调用未授权动作。
+            - 参数必须满足范围：lambda∈[{lambda_min},{lambda_max}]，epochs∈[1,{epochs_cap}]，query_size∈[1,remaining_budget]。
+            - 若无 set_lambda 权限，禁止输出 set_lambda；必须通过允许的动作完成决策。
+            - 不得输出越权请求；若受权限限制，必须在Thought说明“权限内替代动作”。
             """
         formatted = prompt.format(
             total_iterations=int(total_iterations or 0),
@@ -174,7 +187,7 @@ class PromptBuilder:
             late_stage_ratio=AgentThresholds.LATE_STAGE_RATIO,
             rollback_threshold=float(rollback_threshold_val),
             rollback_mode=rollback_mode_str,
-            k_definition_desc=k_definition_desc,
+            knowledge_gain_desc=knowledge_gain_desc,
             training_overload_epochs=AgentThresholds.TRAINING_OVERLOAD_EPOCHS,
             epochs_cap=AgentThresholds.EPOCHS_CAP,
             lambda_min=AgentConstraints.LAMBDA_MIN,

@@ -35,6 +35,13 @@ class _Controller:
                     "lambda_step_down": 0.10,
                     "max_steps": 5,
                     "fallback_quota_u_frac": 0.70,
+                    "adaptive_thresholds": {
+                        "enabled": True,
+                        "window": 5,
+                        "min_samples": 2,
+                        "u_median_quantile": 0.3,
+                        "u_low_frac_quantile": 0.8,
+                    },
                 },
             }
         }
@@ -72,6 +79,17 @@ class TestSelectionGuardrail(unittest.TestCase):
         }
 
     def test_guardrail_applies_and_changes_selection(self):
+        self.tools.set_training_state({
+            "last_miou": 0.70,
+            "prev_miou": 0.70,
+            "miou_delta": 0.0,
+            "rollback_flag": False,
+            "current_labeled_count": 10,
+            "total_budget": 100,
+            "overfit_risk": 0.1,
+            "grad_train_val_cos_min": 0.0,
+            "grad_train_val_cos_neg_rate": 0.0,
+        })
         self.tools.reset_round_controls()
         v = float(self.tools.apply_round_lambda_policy())
         self.assertGreaterEqual(v, 0.40)
@@ -84,6 +102,9 @@ class TestSelectionGuardrail(unittest.TestCase):
         meta = self.tools.control_meta.get("lambda_guardrail")
         self.assertIsInstance(meta, dict)
         self.assertLess(float(meta.get("lambda_after")), float(meta.get("lambda_before")))
+        self.assertIn("stats_after_selected_all", meta)
+        self.assertIn("threshold_mode", meta)
+        self.assertEqual(int(meta["stats_after_selected_all"].get("u_n", 0)), 4)
 
     def test_guardrail_noop_when_selection_ok(self):
         self.tools.reset_round_controls()
@@ -95,7 +116,16 @@ class TestSelectionGuardrail(unittest.TestCase):
         self.assertEqual(self.controller.update_called_with, ["4", "5", "6", "7"])
         self.assertFalse("lambda_guardrail" in (self.tools.control_meta or {}))
 
+    def test_guardrail_adaptive_threshold_kicks_in_with_history(self):
+        self.tools._append_signal_history("guardrail_selected_u_median", 0.70)
+        self.tools._append_signal_history("guardrail_selected_u_median", 0.68)
+        self.tools._append_signal_history("guardrail_selected_frac_u_lt", 0.10)
+        self.tools._append_signal_history("guardrail_selected_frac_u_lt", 0.12)
+        result = self.tools._apply_selection_guardrail(["0", "1", "2", "3"])
+        self.assertTrue(bool(result.get("applied")))
+        meta = self.tools.control_meta.get("lambda_guardrail") or {}
+        self.assertEqual(meta.get("threshold_mode"), "adaptive_quantile")
+
 
 if __name__ == "__main__":
     unittest.main()
-

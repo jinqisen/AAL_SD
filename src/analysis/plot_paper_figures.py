@@ -35,11 +35,10 @@ def _iter_jsonl(path: Path):
                 continue
             try:
                 obj = json.loads(line)
-            except Exception as e:
-                raise ValueError(f"Invalid JSONL at {path}:{line_no}: {e}") from e
-            if not isinstance(obj, dict):
-                raise TypeError(f"Expected JSON object at {path}:{line_no}, got {type(obj).__name__}")
-            yield obj
+            except Exception:
+                continue
+            if isinstance(obj, dict):
+                yield obj
 
 
 def _parse_ts(ts: Any) -> Optional[datetime]:

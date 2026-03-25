@@ -19,6 +19,8 @@ Data sources:
 
 from __future__ import annotations
 
+import json
+import sys
 import shutil
 from pathlib import Path
 
@@ -36,7 +38,8 @@ FIG_DIR = DRAFT / "figures"
 PAPER = REPO / "paper"
 RUNS = REPO / "results" / "runs"
 SEEDS = [42, 43, 44, 45]
-SEED_DIRS = [RUNS / f"baseline_20260228_124857_seed{s}" for s in SEEDS]
+if str(REPO) not in sys.path:
+    sys.path.insert(0, str(REPO))
 
 # ── style ────────────────────────────────────────────────────────────────
 METHOD_ORDER = [
@@ -71,6 +74,7 @@ COLORS = {
 }
 ABLATION_ORDER = [
     "full_model_A_lambda_policy",
+    "no_risk_control",
     "no_agent",
     "fixed_lambda",
     "uncertainty_only",
@@ -78,6 +82,7 @@ ABLATION_ORDER = [
 ]
 ABLATION_LABELS = {
     "full_model_A_lambda_policy": "AAL-SD (full)",
+    "no_risk_control": "w/o Risk Control",
     "no_agent": "w/o Agent",
     "fixed_lambda": "Fixed λ=0.5",
     "uncertainty_only": "Uncertainty only (λ=0)",
@@ -85,6 +90,7 @@ ABLATION_LABELS = {
 }
 ABLATION_COLORS = {
     "full_model_A_lambda_policy": "#d62728",
+    "no_risk_control": "#17becf",
     "no_agent": "#1f77b4",
     "fixed_lambda": "#2ca02c",
     "uncertainty_only": "#ff7f0e",
@@ -107,22 +113,100 @@ def t_critical_95(n: int) -> float:
     return table.get(n - 1, 1.96)
 
 
+def _safe_float(x: object) -> float | None:
+    try:
+        v = float(x)
+        if np.isfinite(v):
+            return float(v)
+        return None
+    except Exception:
+        return None
+
+
+def _read_json(path: Path) -> dict:
+    with open(path, "r", encoding="utf-8") as f:
+        obj = json.load(f)
+    return obj if isinstance(obj, dict) else {}
+
+
+def _discover_latest_seed_run_dir(seed: int, prefix: str = "baseline_") -> Path | None:
+    candidates = []
+    for p in RUNS.iterdir():
+        if not p.is_dir():
+            continue
+        name = p.name
+        if not name.startswith(prefix) or not name.endswith(f"_seed{int(seed)}"):
+            continue
+        man = p / "manifest.json"
+        if not man.exists():
+            continue
+        created_at = None
+        try:
+            created_at = (_read_json(man).get("created_at") or "").strip()
+        except Exception:
+            created_at = None
+        candidates.append((created_at or "", name, p))
+    if not candidates:
+        return None
+    candidates.sort()
+    return candidates[-1][2]
+
+
+def _load_paper_round_curves() -> pd.DataFrame:
+    path = PAPER / "multiseed_round_curves.csv"
+    if not path.exists():
+        raise RuntimeError(f"Missing paper asset: {path}")
+    df = pd.read_csv(path)
+    for col in ["round", "labeled_size", "n", "miou_mean", "miou_std", "miou_ci95"]:
+        if col in df.columns:
+            df[col] = pd.to_numeric(df[col], errors="coerce")
+    return df
+
+
+def _load_controller_trajectories() -> pd.DataFrame:
+    path = PAPER / "controller_trajectories.csv"
+    if not path.exists():
+        raise RuntimeError(f"Missing paper asset: {path}")
+    df = pd.read_csv(path)
+    for col in [
+        "seed",
+        "round",
+        "labeled_size",
+        "final_miou",
+        "grad_train_val_cos_last",
+        "overfit_risk",
+        "lambda_eff",
+    ]:
+        if col in df.columns:
+            df[col] = pd.to_numeric(df[col], errors="coerce")
+    return df
+
+
 # ── data loaders ─────────────────────────────────────────────────────────
 def load_multiseed_curves() -> pd.DataFrame:
-    """Load per-round data from all seeds for the 8 shared methods."""
-    frames = []
-    for seed, sd in zip(SEEDS, SEED_DIRS):
-        df = pd.read_csv(sd / "run_all_experiments_per_round_with_grad.csv")
-        df["seed"] = seed
-        frames.append(df[df["experiment_name"].isin(METHOD_ORDER)])
-    return pd.concat(frames, ignore_index=True)
+    """Load pre-aggregated multi-seed per-round curves (paper assets)."""
+    df = _load_paper_round_curves()
+    return df[df["experiment"].isin(METHOD_ORDER)].copy()
 
 
 def load_seed42_ablation_curves() -> pd.DataFrame:
     """Load per-round data from seed-42 for ablation methods."""
-    sd = SEED_DIRS[0]
-    df = pd.read_csv(sd / "run_all_experiments_per_round_with_grad.csv")
-    return df[df["experiment_name"].isin(ABLATION_ORDER)]
+    for p in RUNS.iterdir():
+        if not p.is_dir() or not p.name.endswith("_seed42"):
+            continue
+        csv_path = p / "run_all_experiments_per_round_with_grad.csv"
+        if not csv_path.exists():
+            continue
+        try:
+            df = pd.read_csv(csv_path)
+        except Exception:
+            continue
+        if "experiment_name" not in df.columns:
+            continue
+        sub = df[df["experiment_name"].isin(ABLATION_ORDER)]
+        if not sub.empty:
+            return sub
+    return pd.DataFrame()
 
 
 def load_metrics_summary() -> pd.DataFrame:
@@ -135,13 +219,31 @@ def load_gradient_summary() -> pd.DataFrame:
 
 # ── Fig 1: architecture ─────────────────────────────────────────────────
 def fig1_architecture():
+    try:
+        import importlib.util
+
+        script_path = DRAFT / "generate_architecture_figure.py"
+        if script_path.exists():
+            spec = importlib.util.spec_from_file_location(
+                "paper_draft.generate_architecture_figure", script_path
+            )
+            if spec is not None and spec.loader is not None:
+                mod = importlib.util.module_from_spec(spec)
+                spec.loader.exec_module(mod)
+                if hasattr(mod, "main"):
+                    mod.main()
+                    print("  Fig1: generated by generate_architecture_figure.py")
+                    return
+    except Exception:
+        pass
+
     src = PAPER / "Figure1_AAL_SD_Architecture.png"
     dst = FIG_DIR / "Fig1_Architecture.png"
     if src.exists():
         shutil.copy2(src, dst)
         print(f"  Fig1: copied from {src}")
-    else:
-        print(f"  Fig1: WARNING – source not found at {src}")
+        return
+    print(f"  Fig1: SKIP – source not found at {src}")
 
 
 # ── Fig 2: multi-seed learning curves +末段 inset 放大 ─────────────────
@@ -153,27 +255,24 @@ def fig2_multiseed_learning_curves():
     all_means = {}
     all_cis = {}
     for method in METHOD_ORDER:
-        mdf = raw[raw["experiment_name"] == method]
-        grouped = mdf.groupby("round")["final_miou"]
-        mean = grouped.mean()
-        std = grouped.std()
-        n = grouped.count()
-        ci = std * t_critical_95(4) / np.sqrt(n)
-        rounds = mean.index.values
-        all_means[method] = (rounds, mean.values, ci.values)
+        mdf = raw[raw["experiment"] == method].sort_values("round")
+        rounds = mdf["round"].to_numpy()
+        mean_vals = mdf["miou_mean"].to_numpy()
+        ci_vals = mdf["miou_ci95"].to_numpy()
+        all_means[method] = (rounds, mean_vals, ci_vals)
         color = COLORS[method]
         lw = 2.8 if method.startswith("full_model") else 1.8
         ls = "-" if method.startswith("full_model") else "--"
         ax.plot(
             rounds,
-            mean.values,
+            mean_vals,
             label=LABELS[method],
             color=color,
             linewidth=lw,
             linestyle=ls,
         )
         ax.fill_between(
-            rounds, (mean - ci).values, (mean + ci).values, color=color, alpha=0.10
+            rounds, mean_vals - ci_vals, mean_vals + ci_vals, color=color, alpha=0.10
         )
     ax.set_xlabel("Active Learning Round")
     ax.set_ylabel("mIoU")
@@ -214,10 +313,9 @@ def fig2_multiseed_learning_curves():
 
 # ── Fig 3: seed-42 controller trajectory (A vs B) ────────────────────────
 def fig3_controller_trajectory():
-    sd = SEED_DIRS[0]
-    df = pd.read_csv(sd / "run_all_experiments_per_round_with_grad.csv")
+    df = _load_controller_trajectories()
     focus = df[
-        df["experiment_name"].isin(
+        df["experiment"].isin(
             ["full_model_A_lambda_policy", "full_model_B_lambda_agent"]
         )
     ]
@@ -229,7 +327,7 @@ def fig3_controller_trajectory():
         ("overfit_risk", "Overfit Risk"),
     ]
     for method in ["full_model_A_lambda_policy", "full_model_B_lambda_agent"]:
-        mdf = focus[focus["experiment_name"] == method].sort_values("round")
+        mdf = focus[focus["experiment"] == method].sort_values("round")
         color = COLORS[method]
         for ax, (col, ylabel) in zip(axes, panels):
             if col in mdf.columns:
@@ -318,21 +416,113 @@ def fig5_miou_bar():
 def fig6_ablation_curves():
     df = load_seed42_ablation_curves()
     fig, ax = plt.subplots(figsize=(10, 6))
-    for method in ABLATION_ORDER:
-        mdf = df[df["experiment_name"] == method].sort_values("round")
-        if mdf.empty:
-            continue
-        color = ABLATION_COLORS[method]
-        lw = 2.8 if method == "full_model_A_lambda_policy" else 1.8
-        ax.plot(
-            mdf["round"],
-            mdf["final_miou"],
-            label=ABLATION_LABELS[method],
-            color=color,
-            linewidth=lw,
-            marker="o",
-            markersize=4,
-        )
+    plotted = 0
+
+    if not df.empty:
+        for method in ABLATION_ORDER:
+            mdf = df[df["experiment_name"] == method].sort_values("round")
+            if mdf.empty:
+                continue
+            color = ABLATION_COLORS.get(method, "#333333")
+            lw = 2.8 if method == "full_model_A_lambda_policy" else 1.8
+            ax.plot(
+                mdf["round"],
+                mdf["final_miou"],
+                label=ABLATION_LABELS.get(method, method),
+                color=color,
+                linewidth=lw,
+                marker="o",
+                markersize=4,
+            )
+            plotted += 1
+    else:
+
+        def _parse_round_summaries(trace_path: Path) -> pd.DataFrame:
+            rows = []
+            if not trace_path.exists():
+                return pd.DataFrame()
+            with open(trace_path, "r", encoding="utf-8") as f:
+                for line in f:
+                    line = line.strip()
+                    if not line:
+                        continue
+                    try:
+                        ev = json.loads(line)
+                    except Exception:
+                        continue
+                    if not isinstance(ev, dict):
+                        continue
+                    if ev.get("type") != "round_summary":
+                        continue
+                    r = ev.get("round")
+                    try:
+                        rr = int(r)
+                    except Exception:
+                        continue
+                    rows.append(
+                        {
+                            "round": rr,
+                            "labeled_size": _safe_float(ev.get("labeled_size")),
+                            "miou": _safe_float(ev.get("mIoU")),
+                        }
+                    )
+            out = pd.DataFrame(rows)
+            if out.empty:
+                return out
+            out = out.dropna(subset=["round", "miou"]).sort_values("round")
+            return out
+
+        seed42_runs = [
+            p
+            for p in RUNS.iterdir()
+            if p.is_dir()
+            and p.name.startswith("baseline_")
+            and p.name.endswith("_seed42")
+        ]
+        best_dir = None
+        best_count = -1
+        for p in seed42_runs:
+            traces = list(p.glob("full_model_A_lambda_policy*trace.jsonl"))
+            if len(traces) > best_count:
+                best_dir = p
+                best_count = len(traces)
+
+        if best_dir is None or best_count <= 0:
+            plt.close(fig)
+            print("  Fig6: SKIP – ablation traces not found")
+            return
+
+        available = []
+        for tpath in sorted(best_dir.glob("*_trace.jsonl")):
+            name = tpath.name[: -len("_trace.jsonl")]
+            if name in ABLATION_ORDER or name.startswith("full_model_A_lambda_policy"):
+                available.append(name)
+        if "full_model_A_lambda_policy" in available:
+            available.remove("full_model_A_lambda_policy")
+            available = ["full_model_A_lambda_policy"] + available
+
+        palette = plt.get_cmap("tab10")
+        for idx, name in enumerate(available[:8]):
+            curve = _parse_round_summaries(best_dir / f"{name}_trace.jsonl")
+            if curve.empty:
+                continue
+            color = ABLATION_COLORS.get(name, palette(idx % 10))
+            lw = 2.8 if name == "full_model_A_lambda_policy" else 1.8
+            ax.plot(
+                curve["round"],
+                curve["miou"],
+                label=ABLATION_LABELS.get(name, name),
+                color=color,
+                linewidth=lw,
+                marker="o",
+                markersize=4,
+            )
+            plotted += 1
+
+    if plotted <= 0:
+        plt.close(fig)
+        print("  Fig6: SKIP – no ablation curves available")
+        return
     ax.set_xlabel("Active Learning Round")
     ax.set_ylabel("mIoU")
     ax.set_title("Seed-42 Component Ablation: Learning Curves")
@@ -401,13 +591,12 @@ def fig7_gradient_diagnostics():
 
 # ── Fig 8: lambda-gradient coupling scatter (seed-42) ────────────────────
 def fig8_lambda_gradient_coupling():
-    sd = SEED_DIRS[0]
-    df = pd.read_csv(sd / "run_all_experiments_per_round_with_grad.csv")
+    df = _load_controller_trajectories()
     fig, axes = plt.subplots(1, 2, figsize=(12, 5.5))
     for method, ax in zip(
         ["full_model_A_lambda_policy", "full_model_B_lambda_agent"], axes
     ):
-        mdf = df[df["experiment_name"] == method].sort_values("round").copy()
+        mdf = df[df["experiment"] == method].sort_values("round").copy()
         if mdf.empty or "lambda_eff" not in mdf.columns:
             continue
         mdf = mdf.dropna(subset=["lambda_eff", "grad_train_val_cos_last"])
@@ -450,32 +639,12 @@ def fig8_lambda_gradient_coupling():
 
 # ── Fig 9: four-seed box plots (ALC + final mIoU) ───────────────────────
 def fig9_multiseed_boxplots():
-    frames = []
-    for seed, sd in zip(SEEDS, SEED_DIRS):
-        summary = pd.read_csv(sd / "run_experiment_summary.csv")
-        summary["seed"] = seed
-        frames.append(summary[summary["experiment_name"].isin(METHOD_ORDER)])
-    all_seeds = pd.concat(frames, ignore_index=True)
-
-    # compute per-seed ALC from status.json for proposed methods, else use last_miou as proxy
-    # For simplicity, merge with the per-seed metrics from paper/metrics_summary if available
-    per_seed_path = REPO / "paper" / "metrics_summary.csv"
-    if per_seed_path.exists():
-        # This only has seed-42; use the full multiseed per-seed data instead
-        pass
-
-    # Build per-seed metrics from run_experiment_summary + status.json
-    import json
-
     rows = []
-    for seed, sd in zip(SEEDS, SEED_DIRS):
-        summary = pd.read_csv(sd / "run_experiment_summary.csv")
+    for seed in SEEDS:
+        sd = _discover_latest_seed_run_dir(seed, prefix="baseline_")
+        if sd is None:
+            continue
         for method in METHOD_ORDER:
-            srows = summary[summary["experiment_name"] == method]
-            if srows.empty:
-                continue
-            srow = srows.iloc[0]
-            # try to get ALC from status.json for proposed methods
             status_path = sd / f"{method}_status.json"
             if status_path.exists():
                 with open(status_path) as f:
@@ -484,8 +653,7 @@ def fig9_multiseed_boxplots():
                 alc = result.get("alc", float("nan"))
                 final_miou = result.get("final_mIoU", float("nan"))
             else:
-                alc = float(srow.get("last_miou", float("nan")))
-                final_miou = float(srow.get("last_miou", float("nan")))
+                continue
             rows.append(
                 {
                     "seed": seed,
@@ -566,39 +734,24 @@ def fig10_delta_miou_curves():
     ref_method = "full_model_A_lambda_policy"
     compare_methods = [m for m in METHOD_ORDER if m != ref_method]
 
-    # compute per-seed, per-round paired difference
     fig, ax = plt.subplots(figsize=(10, 5.5))
     for method in compare_methods:
-        deltas_by_round = {}
-        for seed in SEEDS:
-            ref = raw[
-                (raw["experiment_name"] == ref_method) & (raw["seed"] == seed)
-            ].sort_values("round")
-            comp = raw[
-                (raw["experiment_name"] == method) & (raw["seed"] == seed)
-            ].sort_values("round")
-            if ref.empty or comp.empty:
-                continue
-            merged = ref[["round", "final_miou"]].merge(
-                comp[["round", "final_miou"]], on="round", suffixes=("_ref", "_comp")
-            )
-            for _, row in merged.iterrows():
-                r = int(row["round"])
-                deltas_by_round.setdefault(r, []).append(
-                    row["final_miou_ref"] - row["final_miou_comp"]
-                )
-
-        rounds = sorted(deltas_by_round.keys())
-        means = [np.mean(deltas_by_round[r]) for r in rounds]
-        if len(SEEDS) > 1:
-            cis = [
-                t_critical_95(len(deltas_by_round[r]))
-                * np.std(deltas_by_round[r], ddof=1)
-                / np.sqrt(len(deltas_by_round[r]))
-                for r in rounds
-            ]
-        else:
-            cis = [0] * len(rounds)
+        ref = raw[raw["experiment"] == ref_method].sort_values("round")
+        comp = raw[raw["experiment"] == method].sort_values("round")
+        merged = ref[["round", "miou_mean", "miou_std", "n"]].merge(
+            comp[["round", "miou_mean", "miou_std", "n"]],
+            on="round",
+            suffixes=("_ref", "_comp"),
+        )
+        if merged.empty:
+            continue
+        rounds = merged["round"].to_numpy()
+        means = (merged["miou_mean_ref"] - merged["miou_mean_comp"]).to_numpy()
+        n = merged["n_ref"].fillna(merged["n_comp"]).fillna(4).astype(float).to_numpy()
+        std_ref = merged["miou_std_ref"].to_numpy()
+        std_comp = merged["miou_std_comp"].to_numpy()
+        std_delta = np.sqrt(np.square(std_ref) + np.square(std_comp))
+        cis = np.array([t_critical_95(int(nn)) for nn in n]) * (std_delta / np.sqrt(n))
 
         color = COLORS[method]
         label = LABELS[method]
@@ -643,8 +796,13 @@ def fig10_delta_miou_curves():
 def fig11_score_distribution():
     import json as _json
 
-    l3_path = SEED_DIRS[0] / "figures" / "l3_selection.csv"
-    if not l3_path.exists():
+    run_dir = _discover_latest_seed_run_dir(42, prefix="baseline_")
+    l3_path = None
+    if run_dir is not None:
+        cand = run_dir / "figures" / "l3_selection.csv"
+        if cand.exists():
+            l3_path = cand
+    if l3_path is None or (not l3_path.exists()):
         print("  Fig11: SKIP – l3_selection.csv not found")
         return
 
@@ -781,6 +939,478 @@ def fig11_score_distribution():
     print("  Fig11: U/K/Score distribution violins")
 
 
+def fig12_segmentation_visual_comparison():
+    try:
+        import torch
+    except Exception:
+        print("  Fig12: SKIP – torch not available")
+        return
+
+    from src.core.dataset import Landslide4SenseDataset
+    from src.core.model import LandslideDeepLabV3
+
+    run_dir = _discover_latest_seed_run_dir(42, prefix="baseline_")
+    if run_dir is None:
+        print("  Fig12: SKIP – baseline run dir not found for seed=42")
+        return
+
+    man_path = run_dir / "manifest.json"
+    data_root = None
+    if man_path.exists():
+        try:
+            data_root = (_read_json(man_path).get("data_dir") or "").strip()
+        except Exception:
+            data_root = None
+    if not data_root:
+        data_root = str(Path.home() / "AAL_SD" / "data" / "Landslide4Sense")
+
+    methods = ["full_model_A_lambda_policy", "baseline_entropy", "baseline_random"]
+
+    def _find_latest_round_model(exp_name: str) -> Path | None:
+        d = run_dir / f"{exp_name}_round_models"
+        if not d.exists():
+            return None
+        pts = sorted([p for p in d.glob("round_*_best_val.pt") if p.is_file()])
+        if not pts:
+            return None
+        best = None
+        best_r = -1
+        for p in pts:
+            try:
+                r = int(p.name.split("_", 2)[1])
+            except Exception:
+                continue
+            if r > best_r:
+                best_r = r
+                best = p
+        return best
+
+    ckpts = {m: _find_latest_round_model(m) for m in methods}
+    ckpts = {k: v for k, v in ckpts.items() if v is not None}
+    if not ckpts:
+        print("  Fig12: SKIP – round_models not found in baseline run dir")
+        return
+
+    ds = Landslide4SenseDataset(data_root, split="test", transform=None, with_mask=True)
+    want_pos = 2
+    want_neg = 2
+    chosen = []
+    for i in range(len(ds)):
+        sample = ds[i]
+        mask = sample["mask"]
+        if mask is None or (hasattr(mask, "numel") and int(mask.numel()) == 0):
+            continue
+        m = mask.detach().cpu().numpy()
+        pos = bool(np.any(m > 0))
+        if pos and want_pos > 0:
+            chosen.append(sample)
+            want_pos -= 1
+        elif (not pos) and want_neg > 0:
+            chosen.append(sample)
+            want_neg -= 1
+        if want_pos <= 0 and want_neg <= 0:
+            break
+    if not chosen:
+        print("  Fig12: SKIP – no test samples with masks found")
+        return
+
+    device = "cpu"
+
+    def _load_model(ckpt_path: Path):
+        payload = torch.load(ckpt_path, map_location="cpu")
+        state = (
+            payload["state_dict"]
+            if isinstance(payload, dict) and "state_dict" in payload
+            else payload
+        )
+        model = LandslideDeepLabV3(
+            in_channels=14, classes=2, encoder_weights=None, mc_dropout=0.0
+        )
+        model.load_state_dict(state, strict=False)
+        model.to(device)
+        model.eval()
+        return model
+
+    models = {m: _load_model(p) for m, p in ckpts.items()}
+
+    def _to_rgb(image_chw: np.ndarray) -> np.ndarray:
+        c = int(image_chw.shape[0])
+        idx = [0, 1, 2] if c >= 3 else list(range(c)) + [0] * (3 - c)
+        rgb = image_chw[idx, :, :].transpose(1, 2, 0).astype(np.float32, copy=False)
+        lo = np.quantile(rgb, 0.02)
+        hi = np.quantile(rgb, 0.98)
+        if not np.isfinite(lo) or not np.isfinite(hi) or hi <= lo:
+            lo = float(np.min(rgb))
+            hi = (
+                float(np.max(rgb))
+                if float(np.max(rgb)) > float(np.min(rgb))
+                else float(np.min(rgb) + 1.0)
+            )
+        rgb = (rgb - lo) / (hi - lo + 1e-6)
+        return np.clip(rgb, 0.0, 1.0)
+
+    n_rows = len(chosen)
+    n_cols = 2 + len(models)
+    fig, axes = plt.subplots(n_rows, n_cols, figsize=(3.2 * n_cols, 3.0 * n_rows))
+    if n_rows == 1:
+        axes = np.expand_dims(axes, axis=0)
+
+    headers = ["Image", "GT"] + [LABELS.get(m, m) for m in models.keys()]
+    for j, h in enumerate(headers):
+        axes[0, j].set_title(h, fontsize=12)
+
+    with torch.no_grad():
+        for i, sample in enumerate(chosen):
+            x = sample["image"].unsqueeze(0).to(device)
+            x_np = sample["image"].detach().cpu().numpy()
+            gt = sample["mask"].detach().cpu().numpy().astype(np.uint8)
+            rgb = _to_rgb(x_np)
+
+            axes[i, 0].imshow(rgb)
+            axes[i, 0].axis("off")
+
+            axes[i, 1].imshow(rgb)
+            axes[i, 1].imshow(gt > 0, cmap="Reds", alpha=0.45, vmin=0, vmax=1)
+            axes[i, 1].axis("off")
+
+            for j, (mname, model) in enumerate(models.items(), start=2):
+                logits = model(x)
+                pred = (
+                    torch.argmax(logits, dim=1)
+                    .squeeze(0)
+                    .detach()
+                    .cpu()
+                    .numpy()
+                    .astype(np.uint8)
+                )
+                axes[i, j].imshow(rgb)
+                axes[i, j].imshow(pred > 0, cmap="Reds", alpha=0.45, vmin=0, vmax=1)
+                axes[i, j].axis("off")
+
+            sid = str(
+                sample.get("sample_id") or sample.get("image_name") or f"sample_{i}"
+            )
+            axes[i, 0].text(
+                0.02,
+                0.02,
+                sid,
+                transform=axes[i, 0].transAxes,
+                fontsize=9,
+                color="white",
+                bbox=dict(facecolor="black", alpha=0.35, pad=2, edgecolor="none"),
+            )
+
+    fig.tight_layout()
+    fig.savefig(
+        FIG_DIR / "Fig12_Segmentation_Visual_Comparison.png", bbox_inches="tight"
+    )
+    plt.close(fig)
+    print("  Fig12: segmentation visual comparison")
+
+
+def fig13_hyperparam_sensitivity():
+    rows = []
+    for run_dir in sorted(
+        [
+            p
+            for p in RUNS.iterdir()
+            if p.is_dir() and p.name.startswith("autotune_opt_iter")
+        ]
+    ):
+        man_path = run_dir / "manifest.json"
+        if not man_path.exists():
+            continue
+        man = _read_json(man_path)
+        exps = man.get("experiments")
+        if not isinstance(exps, dict):
+            continue
+        for exp_name, exp_cfg in exps.items():
+            if not isinstance(exp_cfg, dict):
+                continue
+            status_path = run_dir / f"{exp_name}_status.json"
+            if not status_path.exists():
+                continue
+            st = _read_json(status_path)
+            res = st.get("result") if isinstance(st.get("result"), dict) else {}
+            final_miou = _safe_float(res.get("final_mIoU"))
+            alc = _safe_float(res.get("alc"))
+            lp = (
+                exp_cfg.get("lambda_policy")
+                if isinstance(exp_cfg.get("lambda_policy"), dict)
+                else {}
+            )
+            guard = (
+                lp.get("selection_guardrail")
+                if isinstance(lp.get("selection_guardrail"), dict)
+                else {}
+            )
+            thr = (
+                exp_cfg.get("agent_threshold_overrides")
+                if isinstance(exp_cfg.get("agent_threshold_overrides"), dict)
+                else {}
+            )
+
+            rows.append(
+                {
+                    "run_id": run_dir.name,
+                    "experiment": exp_name,
+                    "final_miou": final_miou,
+                    "alc": alc,
+                    "tau_risk": _safe_float(lp.get("risk_ci_quantile")),
+                    "beta_ema": _safe_float(lp.get("lambda_smoothing_alpha")),
+                    "lambda_max": _safe_float(thr.get("LAMBDA_CLAMP_MAX")),
+                    "lambda_max_step": _safe_float(lp.get("lambda_max_step")),
+                    "k_max": _safe_float(guard.get("max_steps")),
+                    "n_cool": _safe_float(thr.get("LAMBDA_DOWN_COOLING_ROUNDS")),
+                }
+            )
+
+    df = pd.DataFrame(rows)
+    df = df.dropna(subset=["final_miou"])
+    if df.empty:
+        print("  Fig13: SKIP – no autotune status results found")
+        return
+
+    fig = plt.figure(figsize=(15, 10))
+    gs = fig.add_gridspec(2, 3, height_ratios=[1.0, 1.1])
+
+    ax_hm = fig.add_subplot(gs[0, :2])
+    sub = df.dropna(subset=["tau_risk", "beta_ema"]).copy()
+    if sub.empty:
+        ax_hm.text(0.5, 0.5, "No (τ_risk, β) pairs found", ha="center", va="center")
+        ax_hm.set_axis_off()
+    else:
+        sub["tau_risk_r"] = sub["tau_risk"].round(3)
+        sub["beta_ema_r"] = sub["beta_ema"].round(3)
+        pivot = sub.pivot_table(
+            index="beta_ema_r",
+            columns="tau_risk_r",
+            values="final_miou",
+            aggfunc="mean",
+        ).sort_index()
+        im = ax_hm.imshow(pivot.values, aspect="auto", origin="lower", cmap="viridis")
+        ax_hm.set_xticks(np.arange(pivot.shape[1]))
+        ax_hm.set_xticklabels(
+            [str(x) for x in pivot.columns.tolist()], rotation=45, ha="right"
+        )
+        ax_hm.set_yticks(np.arange(pivot.shape[0]))
+        ax_hm.set_yticklabels([str(x) for x in pivot.index.tolist()])
+        ax_hm.set_xlabel("τ_risk (risk_ci_quantile)")
+        ax_hm.set_ylabel("β (EMA alpha)")
+        ax_hm.set_title("Hyperparameter Sensitivity Heatmap (mean final mIoU)")
+        cax = fig.add_subplot(gs[0, 2])
+        fig.colorbar(im, cax=cax, label="final mIoU")
+
+    axs = [
+        fig.add_subplot(gs[1, 0]),
+        fig.add_subplot(gs[1, 1]),
+        fig.add_subplot(gs[1, 2]),
+    ]
+    panels = [
+        ("lambda_max", "λ_max (LAMBDA_CLAMP_MAX)"),
+        ("lambda_max_step", "λ_max_step"),
+        ("n_cool", "n_cool (cooling rounds)"),
+    ]
+    for ax, (col, title) in zip(axs, panels):
+        s = df.dropna(subset=[col]).copy()
+        if s.empty:
+            ax.text(0.5, 0.5, f"No data for {col}", ha="center", va="center")
+            ax.set_axis_off()
+            continue
+        x = s[col].to_numpy()
+        y = s["final_miou"].to_numpy()
+        ax.scatter(x, y, s=32, alpha=0.55, edgecolors="white", linewidth=0.4)
+        order = np.argsort(x)
+        x_sorted = x[order]
+        y_sorted = y[order]
+        if len(x_sorted) >= 8:
+            bins = np.unique(
+                np.quantile(x_sorted, [0.0, 0.2, 0.4, 0.6, 0.8, 1.0]).round(6)
+            )
+            if len(bins) >= 3:
+                bx = []
+                by = []
+                for lo, hi in zip(bins[:-1], bins[1:]):
+                    mask = (x_sorted >= lo) & (x_sorted <= hi)
+                    if not np.any(mask):
+                        continue
+                    bx.append((lo + hi) / 2.0)
+                    by.append(float(np.mean(y_sorted[mask])))
+                if len(bx) >= 2:
+                    ax.plot(bx, by, "-o", linewidth=2.0, markersize=5, color="#d62728")
+        ax.set_title(title)
+        ax.set_xlabel(col)
+        ax.set_ylabel("final mIoU")
+        ax.grid(alpha=0.2)
+
+    fig.tight_layout()
+    fig.savefig(FIG_DIR / "Fig13_Hyperparam_Sensitivity.png", bbox_inches="tight")
+    plt.close(fig)
+    print("  Fig13: hyperparameter sensitivity (heatmap + trends)")
+
+
+def fig14_sensitivity_sweep_lines():
+    csv_candidates = sorted(RUNS.glob("sensitivity_*/sensitivity_summary.csv"))
+    if not csv_candidates:
+        csv_candidates = sorted(RUNS.glob("*/sensitivity_summary.csv"))
+    if not csv_candidates:
+        print("  Fig14: SKIP - no sensitivity_summary.csv found")
+        return
+
+    df = pd.read_csv(csv_candidates[-1])
+    df = df.dropna(subset=["final_miou"])
+    if df.empty:
+        print("  Fig14: SKIP - sensitivity_summary.csv is empty")
+        return
+
+    param_meta = {
+        "tau_risk": {
+            "label": r"$\tau_{risk}$ (OVERFIT_RISK_HI)",
+            "values": [0.6, 0.9, 1.2, 1.5, 1.8],
+        },
+        "beta_ema": {
+            "label": r"$\beta$ (EMA alpha)",
+            "values": [0.2, 0.4, 0.6, 0.8, 1.0],
+        },
+        "lambda_max": {
+            "label": r"$\lambda_{max}$",
+            "values": [0.4, 0.6, 0.8, 0.95, 1.0],
+        },
+        "k_max": {
+            "label": r"$k_{max}$ (max step)",
+            "values": [0.05, 0.10, 0.17, 0.25, 0.35],
+        },
+        "n_cool": {"label": r"$n_{cool}$ (cooling rounds)", "values": [0, 1, 2, 3, 4]},
+    }
+    default_vals = {
+        "tau_risk": 1.2,
+        "beta_ema": 0.6,
+        "lambda_max": 0.8,
+        "k_max": 0.17,
+        "n_cool": 2,
+    }
+
+    fig, axes = plt.subplots(2, 3, figsize=(15, 9))
+    axes_flat = axes.flatten()
+
+    for idx, (param, meta) in enumerate(param_meta.items()):
+        ax = axes_flat[idx]
+        sub = df[df["param_name"] == param].sort_values("param_value")
+        if sub.empty:
+            ax.text(
+                0.5,
+                0.5,
+                f"No data for {param}",
+                ha="center",
+                va="center",
+                transform=ax.transAxes,
+            )
+            ax.set_title(meta["label"])
+            continue
+
+        grouped = (
+            sub.groupby("param_value")
+            .agg(
+                miou_mean=("final_miou", "mean"),
+                miou_std=("final_miou", "std"),
+                alc_mean=("alc", "mean"),
+                n=("final_miou", "count"),
+            )
+            .reset_index()
+        )
+        grouped["miou_std"] = grouped["miou_std"].fillna(0)
+
+        x = grouped["param_value"].values
+        y_miou = grouped["miou_mean"].values
+        y_alc = grouped["alc_mean"].values
+        yerr = grouped["miou_std"].values
+
+        ax.errorbar(
+            x,
+            y_miou,
+            yerr=yerr,
+            fmt="-o",
+            color="#d62728",
+            linewidth=2,
+            markersize=7,
+            capsize=4,
+            label="final mIoU",
+            zorder=3,
+        )
+        ax2 = ax.twinx()
+        ax2.plot(
+            x,
+            y_alc,
+            "--s",
+            color="#1f77b4",
+            linewidth=1.5,
+            markersize=5,
+            alpha=0.7,
+            label="ALC",
+        )
+        ax2.set_ylabel("ALC", color="#1f77b4", fontsize=9)
+        ax2.tick_params(axis="y", labelcolor="#1f77b4")
+
+        if default_vals.get(param) is not None:
+            ax.axvline(
+                default_vals[param],
+                color="#999",
+                linestyle=":",
+                linewidth=1.2,
+                alpha=0.7,
+            )
+            ax.annotate(
+                "default",
+                xy=(default_vals[param], ax.get_ylim()[0]),
+                fontsize=7,
+                color="#999",
+                ha="center",
+                va="bottom",
+            )
+
+        ax.set_xlabel(meta["label"], fontsize=10)
+        ax.set_ylabel("final mIoU", color="#d62728", fontsize=9)
+        ax.tick_params(axis="y", labelcolor="#d62728")
+        ax.set_title(meta["label"], fontsize=11)
+        ax.grid(alpha=0.2)
+
+    axes_flat[-1].set_visible(False)
+
+    handles1 = [
+        plt.Line2D(
+            [0], [0], color="#d62728", marker="o", linewidth=2, label="final mIoU"
+        )
+    ]
+    handles2 = [
+        plt.Line2D(
+            [0],
+            [0],
+            color="#1f77b4",
+            marker="s",
+            linestyle="--",
+            linewidth=1.5,
+            label="ALC",
+        )
+    ]
+    fig.legend(
+        handles=handles1 + handles2,
+        loc="lower right",
+        fontsize=10,
+        bbox_to_anchor=(0.95, 0.08),
+        frameon=True,
+    )
+
+    fig.suptitle(
+        "Hyperparameter Sensitivity Analysis (One-at-a-Time Sweep, Seed-42)",
+        fontsize=14,
+        y=1.01,
+    )
+    fig.tight_layout()
+    fig.savefig(FIG_DIR / "Fig14_Sensitivity_Sweep_Lines.png", bbox_inches="tight")
+    plt.close(fig)
+    print("  Fig14: sensitivity sweep line plots")
+
+
 # ── main ─────────────────────────────────────────────────────────────────
 def main():
     FIG_DIR.mkdir(parents=True, exist_ok=True)
@@ -796,6 +1426,9 @@ def main():
     fig9_multiseed_boxplots()
     fig10_delta_miou_curves()
     fig11_score_distribution()
+    fig12_segmentation_visual_comparison()
+    fig13_hyperparam_sensitivity()
+    fig14_sensitivity_sweep_lines()
     print(f"Done. All figures saved to {FIG_DIR}")
 
 

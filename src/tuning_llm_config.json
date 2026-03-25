@@ -1,0 +1,16 @@
+{
+  "provider": "ppchat_anthropic",
+  "base_url": "https://code.ppchat.vip/v1",
+  "api_key": "${TUNING_LLM_API_KEY}",
+  "model": "claude-opus-4-6",
+  "temperature": 0.3,
+  "timeout": 120,
+  "max_retries": 3,
+  "retry_delay": 5.0,
+  "retry_backoff": 2.0,
+  "thinking_budget": 16000,
+  "max_tokens": 8192,
+  "fallback_on_failure": true,
+  "log_requests": true,
+  "log_dir": "results/tuning_llm_logs"
+}

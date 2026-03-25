@@ -1,0 +1,69 @@
+{
+  "run_id": "ablation_matrix_p3_20260323_235540_seed44",
+  "experiment_name": "knowledge_only",
+  "updated_at": "2026-03-25T21:52:09.641748",
+  "pid": 72239,
+  "ppid": 32859,
+  "pool_integrity": {
+    "counts": {
+      "labeled": 717,
+      "unlabeled": 3082,
+      "union": 3799,
+      "dataset": 3799
+    },
+    "overlaps": {
+      "labeled_unlabeled": 0
+    }
+  },
+  "pool_integrity_ok": true,
+  "errors": [],
+  "status": "completed",
+  "pools_dir": "/Users/anykong/AD-KUCS/AAL_SD/results/pools/ablation_matrix_p3_20260323_235540_seed44/knowledge_only",
+  "checkpoint_path": "results/checkpoints/ablation_matrix_p3_20260323_235540_seed44/knowledge_only_state.json",
+  "initial": {
+    "labeled": 717,
+    "unlabeled": 3082
+  },
+  "dataset_fingerprint": {
+    "count": 3799,
+    "sha256": "ab1c6ed6ffcd25606a577ecf266996d10127065c72db2f5cc8c43cb90fd7c95a"
+  },
+  "resume": {
+    "start_round": 6
+  },
+  "progress": {
+    "round": 16,
+    "epoch": "finished",
+    "labeled_size": 1509
+  },
+  "result": {
+    "alc": 0.5799418628975844,
+    "final_mIoU": 0.6545495984082698,
+    "final_f1": 0.7414728969340135,
+    "final_selected_mIoU": 0.6580234031278527,
+    "final_selected_f1": 0.7450123453574998,
+    "final_report_mIoU": 0.6545495984082698,
+    "final_report_f1": 0.7414728969340135,
+    "final_miou_source": "final_report",
+    "final_f1_source": "final_report",
+    "test_split": "test",
+    "budget_history": [
+      189,
+      277,
+      365,
+      453,
+      541,
+      629,
+      717,
+      805,
+      893,
+      981,
+      1069,
+      1157,
+      1245,
+      1333,
+      1421,
+      1509
+    ]
+  }
+}

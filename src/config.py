@@ -168,6 +168,9 @@ class Config:
     except ValueError:
         FEATURE_PREFETCH_FACTOR = 2
 
+    # A1 experiment: background undersampling ratio
+    BG_UNDERSAMPLE_RATIO = 1.0
+
     AMP_ENABLED = _coerce_bool(os.getenv("AAL_SD_AMP"), default=False)
     AMP_DTYPE = str(os.getenv("AAL_SD_AMP_DTYPE", "float16") or "float16").strip().lower()
     TORCH_COMPILE = _coerce_bool(os.getenv("AAL_SD_TORCH_COMPILE"), default=False)
@@ -186,7 +189,7 @@ class Config:
     GRAD_LOG_MAX_BATCHES = 8
     GRAD_LOG_PARAM_MAX_ELEMENTS = 200000
     GRAD_LOG_VAL_ALIGNMENT = True
-    ROUND_MODEL_RETENTION = str(os.getenv("AAL_SD_ROUND_MODEL_RETENTION", "all") or "all").strip().lower()
+    ROUND_MODEL_RETENTION = str(os.getenv("AAL_SD_ROUND_MODEL_RETENTION", "latest_only") or "latest_only").strip().lower()
     try:
         ROUND_MODEL_KEEP_LAST_N = int(os.getenv("AAL_SD_ROUND_MODEL_KEEP_LAST_N", "0"))
     except ValueError:

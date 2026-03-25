@@ -150,7 +150,6 @@ class AgentManager:
         last_miou = None
         rollback_threshold = None
         rollback_mode = None
-        k_definition = None
         if isinstance(status_payload, dict):
             result = status_payload.get("result", {})
             if isinstance(result, dict):
@@ -160,7 +159,6 @@ class AgentManager:
                 last_miou = result.get("last_miou")
                 rollback_threshold = result.get("rollback_threshold")
                 rollback_mode = result.get("rollback_mode")
-                k_definition = result.get("k_definition")
 
         require_explicit_lambda = False
         controller_cfg = getattr(getattr(self.tools, "controller", None), "exp_config", None)
@@ -177,7 +175,6 @@ class AgentManager:
                     lambda_t=lambda_t,
                     rollback_threshold=rollback_threshold,
                     rollback_mode=rollback_mode,
-                    k_definition=k_definition,
                     control_permissions=getattr(self.tools, "control_permissions", None),
                     require_explicit_lambda=bool(require_explicit_lambda),
                     miou_low_gain_streak=int(self.tools.training_state.get("miou_low_gain_streak", 0)),

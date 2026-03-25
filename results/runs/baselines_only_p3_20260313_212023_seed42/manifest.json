@@ -1,0 +1,60 @@
+{
+  "run_id": "baselines_only_p3_20260313_212023_seed42",
+  "created_at": "2026-03-23T16:48:34.086359",
+  "updated_at": "2026-03-15T11:31:25.510553",
+  "config": {
+    "INITIAL_LABELED_SIZE": 0.05,
+    "TRAIN_SPLIT": "train",
+    "VAL_SPLIT": "val",
+    "TEST_SPLIT": "test",
+    "MODEL_SELECTION": "best_val",
+    "FAIL_ON_NONFINITE": true,
+    "N_ROUNDS": 16,
+    "QUERY_SIZE": 88,
+    "TOTAL_BUDGET": 1519,
+    "BUDGET_RATIO": 0.4,
+    "ESTIMATED_TOTAL_SAMPLES": 3799,
+    "RANDOM_SEED": 42,
+    "DETERMINISTIC": true,
+    "EPOCHS_PER_ROUND": 10,
+    "BATCH_SIZE": 4,
+    "LR": 0.0001,
+    "ALPHA": 5.0
+  },
+  "experiments": [
+    "baseline_random",
+    "baseline_entropy",
+    "baseline_coreset",
+    "baseline_bald",
+    "baseline_dial_style",
+    "baseline_wang_style"
+  ],
+  "experiment_runtime": {
+    "mode": "legacy_adapter",
+    "trace_schema_version": 2
+  },
+  "code_fingerprint": {
+    "run_parallel_strict": "659f2b82ac2f6230cf02d77ccdd213a812f8b536a6eb394b5866354c74620217",
+    "config": "577c89b18ae42ae3ddd1025fbc4e5e4025fa99ee71930aff1d23d18de624a282",
+    "main": "2a8c4ec3c9fb02d160a022378485ef402b4501d0d76e0ef3a7ba0e4ae672a7dd",
+    "trainer": "4c587bb1c46eac18cdcadf2a349b99ae54d3e586b921665375055cd99c8fe5dc",
+    "ablation_config": "f5fb2f311e665fff92a1da6b82dfb176a3749b4e6177a416cafbb62f53ad0203",
+    "prompt_template": "4bb017c126fbb9864a5f00852d41a7ce7db0cdfdd93f9ae42605f7edd924235b",
+    "plot_paper_figures": "ab6cdfba7da52fe5827f15f11da51c2cfac2062e8b94089fca2a4150929a67d4"
+  },
+  "data_dir": "/Users/anykong/AAL_SD/data/Landslide4Sense",
+  "pools_dir": "/Users/anykong/AD-KUCS/AAL_SD/results/pools",
+  "checkpoint_dir": "results/checkpoints",
+  "dataset_fingerprint": {
+    "count": 3799,
+    "sha256": "ab1c6ed6ffcd25606a577ecf266996d10127065c72db2f5cc8c43cb90fd7c95a"
+  },
+  "environment": {
+    "python": "3.13.11 | packaged by Anaconda, Inc. | (main, Dec 10 2025, 21:21:08) [Clang 20.1.8 ]",
+    "platform": "macOS-26.3.1-arm64-arm-64bit-Mach-O",
+    "torch": "2.10.0",
+    "numpy": "2.4.1",
+    "sklearn": "1.8.0",
+    "segmentation_models_pytorch": "0.5.0"
+  }
+}

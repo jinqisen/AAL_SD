@@ -1,0 +1,22 @@
+{
+  "full_model_A_lambda_policy": {
+    "experiment_name": "full_model_A_lambda_policy",
+    "description": "对照A / AAL-SD (Full)：基于 auto_opt_iter15_cand2_02（warmup+risk闭环 + 后期ramp + U-guardrail；train_holdout grad_probe）",
+    "status": "failed",
+    "error": "LLM Agent failed at Round 1: LLMAPIError: Error calling API: HTTPSConnectionPool(host='api.siliconflow.cn', port=443): Max retries exceeded with url: /v1/chat/completions (Caused by SSLError(SSLEOFError(8, '[SSL: UNEXPECTED_EOF_WHILE_READING] EOF occurred in violation of protocol (_ssl.c:1032)')))",
+    "performance_history": [
+      {
+        "round": 1,
+        "mIoU": 0.55,
+        "f1_score": 0.5998,
+        "labeled_size": 189
+      }
+    ],
+    "budget_history": [
+      189
+    ],
+    "last_round": 1,
+    "timestamp": "2026-03-25T22:47:37.202697",
+    "log_file": "results/logs_md/full_model_A_lambda_policy_ablation_matrix_p3_20260323_235540_seed45.md"
+  }
+}

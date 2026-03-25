@@ -1,0 +1,22 @@
+{
+  "fixed_lambda": {
+    "experiment_name": "fixed_lambda",
+    "description": "消融：Fixed λ=0.5；保留Agent，隔离三阶段λ policy贡献",
+    "status": "failed",
+    "error": "LLM Agent failed at Round 1: LLMAPIError: Error calling API: HTTPSConnectionPool(host='api.siliconflow.cn', port=443): Max retries exceeded with url: /v1/chat/completions (Caused by SSLError(SSLEOFError(8, '[SSL: UNEXPECTED_EOF_WHILE_READING] EOF occurred in violation of protocol (_ssl.c:1032)')))",
+    "performance_history": [
+      {
+        "round": 1,
+        "mIoU": 0.5348,
+        "f1_score": 0.5751,
+        "labeled_size": 189
+      }
+    ],
+    "budget_history": [
+      189
+    ],
+    "last_round": 1,
+    "timestamp": "2026-03-25T23:46:53.040125",
+    "log_file": "results/logs_md/fixed_lambda_ablation_matrix_p3_20260323_235540_seed45.md"
+  }
+}

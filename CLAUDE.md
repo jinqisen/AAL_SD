@@ -56,6 +56,7 @@
   - reports/：监控脚本生成的阶段/异常报告（可选）
 - 每个 run_id 的 checkpoint：results/checkpoints/<run_id>/<exp>_state.json
 - 每个实验的数据池：data/pools/<run_id>/<exp>/labeled_pool.csv、unlabeled_pool.csv、test_pool.csv
+- 文件写入与一致性：原子写/容错读/锁更新统一用 utils.atomic_write_json / utils.read_json_dict / utils.locked_update_json / utils.append_jsonl
 
 ## 关键代码入口（快速定位）
 - 实验批跑与续跑：@src/run_parallel_strict.py
@@ -63,3 +64,14 @@
 - 全局配置与路径/LLM 读取：@src/config.py
 - 消融矩阵：@src/experiments/ablation_config.py
 - 恢复/一致性检查脚本：@inspect_integrity.py
+
+## 论文披露文件维护约定
+- 论文需要公开的实现/实验细节统一维护在：@AAL-SD-Doc/survey/PAPER_DISCLOSURE_DETAILS.md
+- 任何会影响论文结论解释的改动，都需要同步更新该文件，其中包括但不限于：
+  - 主动学习协议（pool 定义、预算口径、round 内训练与选模规则）
+  - 指标口径与 objective 映射（例如 ALC、val/test mIoU 的定义与解析逻辑）
+  - LLM/Agent 行为与失败处理策略（包含 selection_guardrail、selection_repair 等系统性机制）
+  - Auto-tuning 多保真/多 seed 复核的流程与 acceptance gate
+- 在实现/修改上述逻辑时，除代码变更和测试外，默认还需要：
+  - 检查 PAPER_DISCLOSURE_DETAILS.md 是否需要补充/修订
+  - 让披露内容保持与当前实现严格一致，避免论文描述与仓库行为不符

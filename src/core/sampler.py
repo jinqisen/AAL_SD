@@ -16,7 +16,6 @@ class ADKUCSSampler:
         device="cpu",
         alpha=5.0,
         score_normalization: bool = True,
-        k_definition: str | None = None,
         feature_num_workers: int = 0,
         feature_persistent_workers: bool = False,
         feature_prefetch_factor: int = 2,
@@ -25,7 +24,6 @@ class ADKUCSSampler:
         self.device = device
         self.alpha = alpha
         self.score_normalization = bool(score_normalization)
-        self.k_definition = str(k_definition or "coreset_to_labeled")
         self.current_round = None
         self.uncertainty_calibration = None
         self.uncertainty_method = "entropy"
@@ -48,11 +46,21 @@ class ADKUCSSampler:
                 self.uncertainty_method = str(um).strip().lower() or "entropy"
             protocol = exp_config.get("acquisition_protocol")
             protocol = protocol if isinstance(protocol, dict) else {}
-            self.uncertainty_aggregation = str(
-                protocol.get("uncertainty_aggregation", self.uncertainty_aggregation) or self.uncertainty_aggregation
-            ).strip().lower()
+            self.uncertainty_aggregation = (
+                str(
+                    protocol.get(
+                        "uncertainty_aggregation", self.uncertainty_aggregation
+                    )
+                    or self.uncertainty_aggregation
+                )
+                .strip()
+                .lower()
+            )
             try:
-                self.entropy_threshold = float(protocol.get("entropy_threshold", self.entropy_threshold) or self.entropy_threshold)
+                self.entropy_threshold = float(
+                    protocol.get("entropy_threshold", self.entropy_threshold)
+                    or self.entropy_threshold
+                )
             except Exception:
                 self.entropy_threshold = float(self.entropy_threshold or 0.5)
             try:
@@ -84,7 +92,9 @@ class ADKUCSSampler:
         if rounds is None:
             return True
         try:
-            current = int(self.current_round) if self.current_round is not None else None
+            current = (
+                int(self.current_round) if self.current_round is not None else None
+            )
             return current in set(int(x) for x in rounds)
         except Exception:
             return False
@@ -123,23 +133,30 @@ class ADKUCSSampler:
         x = np.asarray(features)
         if x.ndim != 2 or len(x) < 2:
             return 0.0
-        x = x.astype(np.float32, copy=False)
-        n = int(len(x))
-        norms2 = np.einsum("ij,ij->i", x, x)
-        max_dist2 = 0.0
-        chunk = int(min(256, n))
-        for start in range(0, n, chunk):
-            end = min(start + chunk, n)
-            gram_chunk = x[start:end] @ x.T
-            dist2_chunk = norms2[start:end, None] + norms2[None, :]
-            dist2_chunk = dist2_chunk - 2.0 * gram_chunk
-            dist2_chunk = np.maximum(dist2_chunk, 0.0)
-            cur = float(np.max(dist2_chunk))
-            if cur > max_dist2:
-                max_dist2 = cur
-        if not np.isfinite(max_dist2) or max_dist2 <= 0.0:
-            return 0.0
-        return float(np.sqrt(max_dist2))
+        x = x.astype(np.float64, copy=False)
+        try:
+            from scipy.spatial.distance import pdist
+
+            distances = pdist(x, metric="euclidean")
+            max_dist = float(np.max(distances)) if len(distances) > 0 else 0.0
+            return max_dist if np.isfinite(max_dist) and max_dist > 0.0 else 0.0
+        except (ImportError, Exception):
+            n = int(len(x))
+            norms2 = np.einsum("ij,ij->i", x, x)
+            max_dist2 = 0.0
+            chunk = int(min(256, n))
+            for start in range(0, n, chunk):
+                end = min(start + chunk, n)
+                gram_chunk = x[start:end] @ x.T
+                dist2_chunk = norms2[start:end, None] + norms2[None, :]
+                dist2_chunk = dist2_chunk - 2.0 * gram_chunk
+                dist2_chunk = np.maximum(dist2_chunk, 0.0)
+                cur = float(np.max(dist2_chunk))
+                if cur > max_dist2:
+                    max_dist2 = cur
+            if not np.isfinite(max_dist2) or max_dist2 <= 0.0:
+                return 0.0
+            return float(np.sqrt(max_dist2))
 
     def _coreset_to_labeled_scores(
         self, features: np.ndarray, labeled_features: np.ndarray
@@ -148,7 +165,7 @@ class ADKUCSSampler:
         lf = np.asarray(labeled_features)
 
         if x.ndim != 2 or len(x) == 0:
-            return np.zeros((0,), dtype=np.float32)
+            return np.zeros((0,), dtype=np.float64)
         if lf.ndim != 2 or len(lf) == 0:
             raise RuntimeError("coreset-to-labeled requires non-empty labeled_features")
         if x.shape[1] != lf.shape[1]:
@@ -156,16 +173,16 @@ class ADKUCSSampler:
                 f"coreset-to-labeled feature dim mismatch: unlabeled_dim={x.shape[1]} labeled_dim={lf.shape[1]}"
             )
 
-        x = x.astype(np.float32, copy=False)
-        lf = lf.astype(np.float32, copy=False)
+        x = x.astype(np.float64, copy=False)
+        lf = lf.astype(np.float64, copy=False)
 
         max_dist = self._max_pairwise_distance(lf)
         if max_dist < 1e-10:
-            return np.zeros((len(x),), dtype=np.float32)
+            return np.zeros((len(x),), dtype=np.float64)
 
         lf_norms2 = np.einsum("ij,ij->i", lf, lf)
         x_norms2 = np.einsum("ij,ij->i", x, x)
-        min_dist2 = np.full((len(x),), np.inf, dtype=np.float32)
+        min_dist2 = np.full((len(x),), np.inf, dtype=np.float64)
         lf_n = int(len(lf))
         chunk = int(min(256, lf_n))
         for start in range(0, lf_n, chunk):
@@ -178,7 +195,7 @@ class ADKUCSSampler:
         min_dist = np.sqrt(min_dist2)
         scores = min_dist / float(max_dist)
         scores = np.where(np.isfinite(scores), scores, 0.0)
-        return scores.astype(np.float32, copy=False)
+        return scores.astype(np.float64, copy=False)
 
     def _normalize_scores(self, scores: np.ndarray) -> np.ndarray:
         scores = np.asarray(scores)
@@ -193,7 +210,11 @@ class ADKUCSSampler:
         if arr.size == 0:
             return 0.0
         arr = np.where(np.isfinite(arr), arr, 0.0).astype(np.float32, copy=False)
-        mode = str(getattr(self, "uncertainty_aggregation", "mean") or "mean").strip().lower()
+        mode = (
+            str(getattr(self, "uncertainty_aggregation", "mean") or "mean")
+            .strip()
+            .lower()
+        )
         if mode in ("mean", "full_mean", "none", ""):
             return float(np.mean(arr))
         tau = float(getattr(self, "entropy_threshold", 0.5) or 0.5)
@@ -264,7 +285,9 @@ class ADKUCSSampler:
             "batch_size": 8,
             "shuffle": False,
             "num_workers": self.feature_num_workers,
-            "persistent_workers": bool(self.feature_num_workers > 0 and self.feature_persistent_workers),
+            "persistent_workers": bool(
+                self.feature_num_workers > 0 and self.feature_persistent_workers
+            ),
             "pin_memory": self.feature_pin_memory,
         }
         if self.feature_num_workers > 0:
@@ -291,7 +314,11 @@ class ADKUCSSampler:
                     probs = torch.softmax(logits, dim=1)
                     sum_probs = probs if sum_probs is None else (sum_probs + probs)
                     ent = -torch.sum(probs * torch.log2(probs + eps), dim=1)
-                    mode = str(getattr(self, "uncertainty_aggregation", "mean") or "mean").strip().lower()
+                    mode = (
+                        str(getattr(self, "uncertainty_aggregation", "mean") or "mean")
+                        .strip()
+                        .lower()
+                    )
                     if mode in ("mean", "full_mean", "none", ""):
                         sum_ent = sum_ent + ent.mean(dim=(1, 2))
                     else:
@@ -303,21 +330,29 @@ class ADKUCSSampler:
 
                 mean_probs = sum_probs / float(int(n_mc_samples or 10))
                 pred_ent = -torch.sum(mean_probs * torch.log2(mean_probs + eps), dim=1)
-                mode = str(getattr(self, "uncertainty_aggregation", "mean") or "mean").strip().lower()
+                mode = (
+                    str(getattr(self, "uncertainty_aggregation", "mean") or "mean")
+                    .strip()
+                    .lower()
+                )
                 if mode in ("mean", "full_mean", "none", ""):
                     pred_ent_scalar = pred_ent.mean(dim=(1, 2))
                 else:
                     tau = float(getattr(self, "entropy_threshold", 0.5) or 0.5)
                     pred_ent_mask = pred_ent > tau
-                    pred_ent_scalar = (pred_ent * pred_ent_mask).sum(dim=(1, 2)) / (pred_ent_mask.sum(dim=(1, 2)) + 1e-10)
+                    pred_ent_scalar = (pred_ent * pred_ent_mask).sum(dim=(1, 2)) / (
+                        pred_ent_mask.sum(dim=(1, 2)) + 1e-10
+                    )
                 mi = pred_ent_scalar - (sum_ent / float(int(n_mc_samples or 10)))
                 bald_scores.extend(mi.detach().cpu().tolist())
-                batch_ids = unlabeled_indices[cursor:cursor + batch_size]
+                batch_ids = unlabeled_indices[cursor : cursor + batch_size]
                 sample_ids.extend(batch_ids)
                 cursor += batch_size
 
         model.eval()
-        if int(len(bald_scores)) != int(len(sample_ids)) or int(len(sample_ids)) != int(len(unlabeled_indices)):
+        if int(len(bald_scores)) != int(len(sample_ids)) or int(len(sample_ids)) != int(
+            len(unlabeled_indices)
+        ):
             raise RuntimeError("BALD score extraction failed: output size mismatch")
         return bald_scores, sample_ids
 
@@ -436,7 +471,9 @@ class ADKUCSSampler:
         write_offset = 0
 
         if mc_dropout:
-            raise RuntimeError("get_predictions_and_features(mc_dropout=True) is disabled; use get_uncertainty_and_features(method='bald') instead.")
+            raise RuntimeError(
+                "get_predictions_and_features(mc_dropout=True) is disabled; use get_uncertainty_and_features(method='bald') instead."
+            )
 
         features_list: list[torch.Tensor] = []
 
@@ -462,9 +499,13 @@ class ADKUCSSampler:
                     probs_cpu = probs.detach().cpu()
                     batch_size = int(probs_cpu.shape[0])
                     if probs_tensor is None and total_len is not None:
-                        probs_tensor = torch.empty((total_len, *probs_cpu.shape[1:]), dtype=probs_cpu.dtype)
+                        probs_tensor = torch.empty(
+                            (total_len, *probs_cpu.shape[1:]), dtype=probs_cpu.dtype
+                        )
                     if probs_tensor is not None:
-                        probs_tensor[write_offset:write_offset + batch_size] = probs_cpu
+                        probs_tensor[write_offset : write_offset + batch_size] = (
+                            probs_cpu
+                        )
                     else:
                         probs_list.append(probs_cpu)
                     write_offset += batch_size
@@ -488,7 +529,11 @@ class ADKUCSSampler:
         pos_class: int | None = None,
         pos_threshold: float = 0.5,
     ):
-        method = str(getattr(self, "uncertainty_method", "entropy") or "entropy").strip().lower()
+        method = (
+            str(getattr(self, "uncertainty_method", "entropy") or "entropy")
+            .strip()
+            .lower()
+        )
         if method == "bald":
             eps = 1e-10
             uncertainties: list[float] = []
@@ -520,7 +565,9 @@ class ADKUCSSampler:
                         sum_probs = None
                         sum_ent = torch.zeros((batch_size,), device=self.device)
                         capture_first["on"] = True
-                        for mc_idx in range(int(getattr(self, "n_mc_samples", 10) or 10)):
+                        for mc_idx in range(
+                            int(getattr(self, "n_mc_samples", 10) or 10)
+                        ):
                             logits = model(images)
                             if mc_idx == 0:
                                 capture_first["on"] = False
@@ -530,32 +577,59 @@ class ADKUCSSampler:
                             else:
                                 sum_probs = sum_probs + probs
                             ent = -torch.sum(probs * torch.log2(probs + eps), dim=1)
-                            mode = str(getattr(self, "uncertainty_aggregation", "mean") or "mean").strip().lower()
+                            mode = (
+                                str(
+                                    getattr(self, "uncertainty_aggregation", "mean")
+                                    or "mean"
+                                )
+                                .strip()
+                                .lower()
+                            )
                             if mode in ("mean", "full_mean", "none", ""):
                                 sum_ent = sum_ent + ent.mean(dim=(1, 2))
                             else:
-                                tau = float(getattr(self, "entropy_threshold", 0.5) or 0.5)
+                                tau = float(
+                                    getattr(self, "entropy_threshold", 0.5) or 0.5
+                                )
                                 ent_mask = ent > tau
                                 ent_sum_masked = (ent * ent_mask).sum(dim=(1, 2))
                                 mask_count = ent_mask.sum(dim=(1, 2)) + 1e-10
                                 sum_ent = sum_ent + (ent_sum_masked / mask_count)
 
-                        mean_probs = sum_probs / float(int(getattr(self, "n_mc_samples", 10) or 10))
+                        mean_probs = sum_probs / float(
+                            int(getattr(self, "n_mc_samples", 10) or 10)
+                        )
                         pred_ent = -torch.sum(
                             mean_probs * torch.log2(mean_probs + eps), dim=1
                         )
-                        mode = str(getattr(self, "uncertainty_aggregation", "mean") or "mean").strip().lower()
+                        mode = (
+                            str(
+                                getattr(self, "uncertainty_aggregation", "mean")
+                                or "mean"
+                            )
+                            .strip()
+                            .lower()
+                        )
                         if mode in ("mean", "full_mean", "none", ""):
                             pred_ent_scalar = pred_ent.mean(dim=(1, 2))
                         else:
                             tau = float(getattr(self, "entropy_threshold", 0.5) or 0.5)
                             pred_ent_mask = pred_ent > tau
-                            pred_ent_scalar = (pred_ent * pred_ent_mask).sum(dim=(1, 2)) / (pred_ent_mask.sum(dim=(1, 2)) + 1e-10)
-                        mi = pred_ent_scalar - (sum_ent / float(int(getattr(self, "n_mc_samples", 10) or 10)))
+                            pred_ent_scalar = (pred_ent * pred_ent_mask).sum(
+                                dim=(1, 2)
+                            ) / (pred_ent_mask.sum(dim=(1, 2)) + 1e-10)
+                        mi = pred_ent_scalar - (
+                            sum_ent
+                            / float(int(getattr(self, "n_mc_samples", 10) or 10))
+                        )
                         uncertainties.extend(mi.detach().cpu().tolist())
                         if pos_areas is not None:
                             channel = mean_probs[:, int(pos_class), :, :]
-                            area = (channel > float(pos_threshold)).float().mean(dim=(1, 2))
+                            area = (
+                                (channel > float(pos_threshold))
+                                .float()
+                                .mean(dim=(1, 2))
+                            )
                             pos_areas.extend(area.detach().cpu().tolist())
             finally:
                 model.eval()
@@ -564,7 +638,9 @@ class ADKUCSSampler:
             features_tensor = torch.cat(features_list) if features_list else None
             unc_arr = np.asarray(uncertainties, dtype=np.float32)
             pos_arr = (
-                np.asarray(pos_areas, dtype=np.float32) if pos_areas is not None else None
+                np.asarray(pos_areas, dtype=np.float32)
+                if pos_areas is not None
+                else None
             )
             return unc_arr, features_tensor, pos_arr
 
@@ -596,13 +672,19 @@ class ADKUCSSampler:
                     probs = F.softmax(logits, dim=1)
 
                     ent = -torch.sum(probs * torch.log2(probs + eps), dim=1)
-                    mode = str(getattr(self, "uncertainty_aggregation", "mean") or "mean").strip().lower()
+                    mode = (
+                        str(getattr(self, "uncertainty_aggregation", "mean") or "mean")
+                        .strip()
+                        .lower()
+                    )
                     if mode in ("mean", "full_mean", "none", ""):
                         ent_mean = ent.mean(dim=(1, 2))
                     else:
                         tau = float(getattr(self, "entropy_threshold", 0.5) or 0.5)
                         ent_mask = ent > tau
-                        ent_mean = (ent * ent_mask).sum(dim=(1, 2)) / (ent_mask.sum(dim=(1, 2)) + 1e-10)
+                        ent_mean = (ent * ent_mask).sum(dim=(1, 2)) / (
+                            ent_mask.sum(dim=(1, 2)) + 1e-10
+                        )
                     uncertainties.extend(ent_mean.detach().cpu().tolist())
 
                     if pos_areas is not None:
@@ -656,7 +738,9 @@ class ADKUCSSampler:
             "batch_size": 8,
             "shuffle": False,
             "num_workers": self.feature_num_workers,
-            "persistent_workers": bool(self.feature_num_workers > 0 and self.feature_persistent_workers),
+            "persistent_workers": bool(
+                self.feature_num_workers > 0 and self.feature_persistent_workers
+            ),
             "pin_memory": self.feature_pin_memory,
         }
         if self.feature_num_workers > 0:
@@ -667,39 +751,31 @@ class ADKUCSSampler:
             raise RuntimeError("Feature extraction failed: missing features")
         features_u_np = features_u.numpy()
 
-        # FIX: Extract Labeled Features for K-term (Diversity/Novelty) consistency
-        labeled_features_np = None
-        if labeled_indices is not None and len(labeled_indices) > 0:
-            subset_l = Subset(dataset, labeled_indices)
-            loader_l = DataLoader(subset_l, **loader_kwargs)
-            features_l = self.get_features_only(model, loader_l)
-            if features_l is not None:
-                labeled_features_np = features_l.numpy()
-
-        if labeled_features_np is None or len(labeled_features_np) == 0:
-            raise RuntimeError("coreset-to-labeled requires non-empty labeled set; labeled pool is empty or feature extraction failed")
-
         # 1. Generate clustering on Unlabeled Features
-        n_clusters = min(88, len(features_u_np)) # Query size is 88 by default
-        cluster_labels, cluster_centers = self._cluster_features(features_u_np, n_clusters=n_clusters)
-        
+        n_clusters = min(88, len(features_u_np))  # Query size is 88 by default
+        cluster_labels, cluster_centers = self._cluster_features(
+            features_u_np, n_clusters=n_clusters
+        )
+
         # 2. Calculate Cluster-based Representativeness (K score)
-        # We compute the distance to the assigned cluster center. 
+        # We compute the distance to the assigned cluster center.
         # Smaller distance means MORE representative. We want higher K score for more representative samples.
-        k_scores_dist = []
-        for feat, label in zip(features_u_np, cluster_labels):
-            center = cluster_centers[label]
-            dist = np.linalg.norm(feat - center)
-            k_scores_dist.append(dist)
-            
-        k_scores_dist = np.array(k_scores_dist, dtype=np.float32)
-        max_dist = k_scores_dist.max() if len(k_scores_dist) > 0 and k_scores_dist.max() > 0 else 1.0
-        
+        # Vectorized: compute all distances at once instead of looping
+        diffs = features_u_np - cluster_centers[cluster_labels]
+        k_scores_dist = np.linalg.norm(diffs, axis=1).astype(np.float32)
+        max_dist = (
+            k_scores_dist.max()
+            if len(k_scores_dist) > 0 and k_scores_dist.max() > 0
+            else 1.0
+        )
+
         # Invert normalized distance so 1.0 is exactly at cluster center (most representative)
         # and 0.0 is the furthest outlier in any cluster
         k_scores = (1.0 - (k_scores_dist / max_dist)).tolist()
 
-        u_scores_arr = self._calibrate_uncertainty_scores(np.asarray(u_scores_arr, dtype=np.float32))
+        u_scores_arr = self._calibrate_uncertainty_scores(
+            np.asarray(u_scores_arr, dtype=np.float32)
+        )
         u_norm = self._normalize_scores(u_scores_arr)
         k_norm = self._normalize_scores(np.array(k_scores))
         return u_norm, k_norm
@@ -715,6 +791,7 @@ class ADKUCSSampler:
         if not isinstance(unlabeled_info, dict) or not unlabeled_info:
             return []
         sample_ids = list(unlabeled_info.keys())
+
         u_scores = []
         features_list = []
         for sample_id in sample_ids:
@@ -729,28 +806,72 @@ class ADKUCSSampler:
                     u_scores.append(self._calculate_uncertainty(prob_map))
             features_list.append(info["feature"])
 
-        features_array = np.array(features_list)
+        features_array = np.array(features_list, dtype=np.float32)
 
         # 1. Generate clustering on Unlabeled Features
-        n_clusters = min(88, len(features_array)) # Query size is 88 by default
-        cluster_labels, cluster_centers = self._cluster_features(features_array, n_clusters=n_clusters)
+        n_clusters = min(88, len(features_array))  # Query size is 88 by default
+        cluster_labels, cluster_centers = self._cluster_features(
+            features_array, n_clusters=n_clusters
+        )
+
+        # Calculate cluster saturation for Cluster-Balanced K'
+        unlabeled_counts = np.bincount(cluster_labels, minlength=n_clusters)
+        labeled_counts = np.zeros(n_clusters, dtype=int)
+        if labeled_features is not None and len(labeled_features) > 0:
+            from scipy.spatial.distance import cdist
+            # Assign labeled features to the nearest unlabeled cluster center
+            dists = cdist(labeled_features, cluster_centers)
+            labeled_cluster_assignments = np.argmin(dists, axis=1)
+            labeled_counts = np.bincount(labeled_cluster_assignments, minlength=n_clusters)
+
+        pool_counts = unlabeled_counts + labeled_counts
+        
+        # Laplace smoothing: (labeled + eps) / (pool + eps) to prevent numerical instability
+        eps = 1.0  # Changed to 1.0 as per AAL-SD-Doc methodology
+        sat = (labeled_counts + eps) / (pool_counts + eps)
+        
+        # Calculate cluster weights: w(c) = (1 - sat(c))^gamma
+        gamma = 1.0  # Linear penalty
+        
+        # Apply noise cluster filtering (min_cluster_size)
+        min_cluster_size = 5
+        w_c = np.zeros(n_clusters, dtype=np.float32)
+        for c in range(n_clusters):
+            if pool_counts[c] < min_cluster_size:
+                w_c[c] = 0.0  # Filter out noise clusters
+            else:
+                w_c[c] = np.power(max(1.0 - sat[c], 0.0), gamma)
+                
+        # Apply ratio floor to prevent winner-takes-all
+        ratio_floor = 0.1
+        w_max = np.max(w_c)
+        if w_max > 0:
+            for c in range(n_clusters):
+                if w_c[c] > 0:
+                    w_c[c] = max(w_c[c], w_max * ratio_floor)
+        
+        w_c = w_c / (np.sum(w_c) + 1e-10)  # Normalize weights
         
         # 2. Calculate Cluster-based Representativeness (K score)
-        # Smaller distance to assigned cluster center means MORE representative.
-        k_scores_dist = []
-        for feat, label in zip(features_array, cluster_labels):
-            center = cluster_centers[label]
-            dist = np.linalg.norm(feat - center)
-            k_scores_dist.append(dist)
-            
-        k_scores_dist = np.array(k_scores_dist, dtype=np.float32)
-        max_dist = k_scores_dist.max() if len(k_scores_dist) > 0 and k_scores_dist.max() > 0 else 1.0
-        
+        diffs = features_array - cluster_centers[cluster_labels]
+        k_scores_dist = np.linalg.norm(diffs, axis=1).astype(np.float32)
+        max_dist = (
+            k_scores_dist.max()
+            if len(k_scores_dist) > 0 and k_scores_dist.max() > 0
+            else 1.0
+        )
+
         # Invert normalized distance so 1.0 is exactly at cluster center (most representative)
         # and 0.0 is the furthest outlier.
-        k_scores = (1.0 - (k_scores_dist / max_dist)).tolist()
+        k_scores_raw = 1.0 - (k_scores_dist / max_dist)
+        
+        # Apply cluster weights to K score (Cluster-Balanced K')
+        sample_weights = w_c[cluster_labels]
+        k_scores = (k_scores_raw * sample_weights).tolist()
 
-        u_scores_arr = self._calibrate_uncertainty_scores(np.array(u_scores, dtype=np.float32))
+        u_scores_arr = self._calibrate_uncertainty_scores(
+            np.array(u_scores, dtype=np.float32)
+        )
         if self.score_normalization:
             u_scores_norm = self._normalize_scores(u_scores_arr)
             k_scores_norm = self._normalize_scores(np.array(k_scores))
@@ -772,7 +893,7 @@ class ADKUCSSampler:
                 "final_score": float(item[1]),
                 "uncertainty": float(item[2]),
                 "knowledge_gain": float(item[3]),
-                "lambda_t": float(lambda_t)
+                "lambda_t": float(lambda_t),
             }
             for item in ranked_list
         ]

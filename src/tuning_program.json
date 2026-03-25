@@ -1,0 +1,44 @@
+{
+  "version": "1.4",
+  "strategy_notes": "AAL-SD Tuning Program v1.4. Data-driven phase assignment: f2 (7 params affecting F1 screening, rounds 7-10) = lambda steps, smoothing, guardrail thresholds, ramp start; f3 (5 params affecting F2 confirmation, rounds 11-16) = risk CI, ramp end, max step, guardrail penalty. Based on per-round correlation analysis: corr(R10 mIoU) for F1 impact, corr(F2 delta) for F2 impact.",
+  "llm_system_prompt": "你是 AAL-SD 自动调参助手。你只能输出严格 JSON，不能输出多余文本。\n目标：提高最终 val mIoU，同时保持训练稳定，避免过拟合风险升高。\n输出最多 6 个建议，每条建议包含：\n- direction: 简短方向名（字符串）\n- priority: 越小越优先（整数）\n- description: 一句话说明（字符串）\n- risk: 该方向的潜在风险描述（字符串）\n- expected_gain: 预期 mIoU 提升量\n- constraints: 硬约束触发条件（如 {\"overfit_risk_max\": 1.5}）\n- parameter_changes: 参数改动，只允许下方 parameter_space 中的 key。\n数值必须是数字（int/float）。",
+  "parameter_space": [
+    {"key": "agent_threshold_overrides.LAMBDA_DELTA_UP", "lo": 0.10, "hi": 0.20},
+    {"key": "agent_threshold_overrides.LAMBDA_DELTA_DOWN", "lo": 0.08, "hi": 0.16},
+    {"key": "lambda_policy.lambda_smoothing_alpha", "lo": 0.75, "hi": 0.95},
+    {"key": "lambda_policy.lambda_max_step", "lo": 0.10, "hi": 0.25},
+    {"key": "lambda_policy.risk_ci_window", "lo": 4.0, "hi": 8.0},
+    {"key": "lambda_policy.risk_ci_quantile", "lo": 0.10, "hi": 0.35},
+    {"key": "lambda_policy.late_stage_ramp.start_lambda", "lo": 0.25, "hi": 0.55},
+    {"key": "lambda_policy.late_stage_ramp.end_lambda", "lo": 0.45, "hi": 0.85},
+    {"key": "lambda_policy.selection_guardrail.guardrail_start_round", "lo": 5.0, "hi": 10.0},
+    {"key": "lambda_policy.selection_guardrail.u_median_min", "lo": 0.35, "hi": 0.50},
+    {"key": "lambda_policy.selection_guardrail.u_low_thresh", "lo": 0.30, "hi": 0.50},
+    {"key": "lambda_policy.selection_guardrail.lambda_step_down", "lo": 0.06, "hi": 0.18}
+  ],
+  "phase_param_allowlist": {
+    "f2": [
+      "agent_threshold_overrides.LAMBDA_DELTA_UP",
+      "agent_threshold_overrides.LAMBDA_DELTA_DOWN",
+      "lambda_policy.lambda_smoothing_alpha",
+      "lambda_policy.late_stage_ramp.start_lambda",
+      "lambda_policy.selection_guardrail.guardrail_start_round",
+      "lambda_policy.selection_guardrail.u_median_min",
+      "lambda_policy.selection_guardrail.u_low_thresh"
+    ],
+    "f3": [
+      "lambda_policy.lambda_max_step",
+      "lambda_policy.risk_ci_window",
+      "lambda_policy.risk_ci_quantile",
+      "lambda_policy.late_stage_ramp.end_lambda",
+      "lambda_policy.selection_guardrail.lambda_step_down"
+    ]
+  },
+  "acceptance_gate": {
+    "z": 1.645,
+    "min_seed_epsilon": 0.01,
+    "max_guardrail_frac": 0.5,
+    "require_min_seed_gate": true,
+    "require_guardrail_gate": true
+  }
+}

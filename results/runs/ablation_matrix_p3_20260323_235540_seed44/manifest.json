@@ -1,0 +1,46 @@
+{
+  "run_id": "ablation_matrix_p3_20260323_235540_seed44",
+  "created_at": "2026-03-25T01:14:01.541835",
+  "data_dir": "/Users/anykong/AAL_SD/data/Landslide4Sense",
+  "pools_dir": "/Users/anykong/AD-KUCS/AAL_SD/results/pools",
+  "checkpoint_dir": "results/checkpoints",
+  "dataset_fingerprint": {
+    "count": 3799,
+    "sha256": "ab1c6ed6ffcd25606a577ecf266996d10127065c72db2f5cc8c43cb90fd7c95a"
+  },
+  "environment": {
+    "python": "3.13.11 | packaged by Anaconda, Inc. | (main, Dec 10 2025, 21:21:08) [Clang 20.1.8 ]",
+    "platform": "macOS-26.3.1-arm64-arm-64bit-Mach-O",
+    "torch": "2.10.0",
+    "numpy": "2.4.1",
+    "sklearn": "1.8.0",
+    "segmentation_models_pytorch": "0.5.0"
+  },
+  "experiments": [
+    "full_model_A_lambda_policy",
+    "full_model_B_lambda_agent",
+    "no_agent",
+    "fixed_lambda",
+    "uncertainty_only",
+    "knowledge_only"
+  ],
+  "config": {
+    "INITIAL_LABELED_SIZE": 0.05,
+    "TRAIN_SPLIT": "train",
+    "VAL_SPLIT": "val",
+    "TEST_SPLIT": "test",
+    "MODEL_SELECTION": "best_val",
+    "FAIL_ON_NONFINITE": true,
+    "N_ROUNDS": 16,
+    "QUERY_SIZE": 88,
+    "TOTAL_BUDGET": 1519,
+    "BUDGET_RATIO": 0.4,
+    "ESTIMATED_TOTAL_SAMPLES": 3799,
+    "RANDOM_SEED": 44,
+    "DETERMINISTIC": true,
+    "EPOCHS_PER_ROUND": 10,
+    "BATCH_SIZE": 4,
+    "LR": 0.0001,
+    "ALPHA": 5.0
+  }
+}

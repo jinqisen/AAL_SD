@@ -38,7 +38,6 @@ def _emit_prompts(
     last_miou: float,
     rollback_threshold: float,
     rollback_mode: str,
-    k_definition: str,
     control_permissions: Dict[str, bool],
     lambda_schedule: Dict[int, float],
     query_size: int,
@@ -67,8 +66,6 @@ def _emit_prompts(
         rc = exp_cfg.get("rollback_config")
         if isinstance(rc, dict) and rc.get("mode") is not None:
             rollback_mode = str(rc.get("mode"))
-        if exp_cfg.get("k_definition") is not None:
-            k_definition = str(exp_cfg.get("k_definition"))
         pol = exp_cfg.get("lambda_policy")
         if isinstance(pol, dict):
             lambda_schedule = _compute_lambda_schedule(
@@ -90,7 +87,6 @@ def _emit_prompts(
             lambda_t=float(lambda_schedule[int(r)]),
             rollback_threshold=float(rollback_threshold),
             rollback_mode=str(rollback_mode),
-            k_definition=str(k_definition),
             control_permissions=dict(control_permissions),
         )
         labeled_size = int(labeled_base) + (int(r) - 1) * int(query_size)
@@ -266,7 +262,6 @@ def main() -> int:
         "last_miou": float(args.last_miou),
         "rollback_threshold": float(args.rollback_threshold),
         "rollback_mode": str(args.rollback_mode),
-        "k_definition": str(args.k_definition),
         "query_size": int(args.query_size),
         "labeled_base": int(args.labeled_base),
         "unlabeled_base": int(args.unlabeled_base),
@@ -295,7 +290,6 @@ def main() -> int:
                     last_miou=float(payload["last_miou"]),
                     rollback_threshold=float(payload["rollback_threshold"]),
                     rollback_mode=str(payload["rollback_mode"]),
-                    k_definition=str(payload["k_definition"]),
                     control_permissions=dict(payload["control_permissions"]),
                     lambda_schedule={int(k): float(v) for k, v in payload["lambda_schedule"].items()},
                     query_size=int(payload["query_size"]),
@@ -314,7 +308,6 @@ def main() -> int:
                 last_miou=float(payload["last_miou"]),
                 rollback_threshold=float(payload["rollback_threshold"]),
                 rollback_mode=str(payload["rollback_mode"]),
-                k_definition=str(payload["k_definition"]),
                 control_permissions=dict(payload["control_permissions"]),
                 lambda_schedule={int(k): float(v) for k, v in payload["lambda_schedule"].items()},
                 query_size=int(payload["query_size"]),

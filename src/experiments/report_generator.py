@@ -104,14 +104,32 @@ class ReportGenerator:
         if successful_results:
             report += "## 2. 核心结果对比\n\n"
             report += "### 2.1 性能指标汇总\n\n"
-            report += "| 实验名称 | ALC | 最终 mIoU | 最终 F1-Score |\n"
-            report += "|---------|-----|----------|--------------|\n"
+            report += f"| 实验名称 | ALC(val选模) | 最后选模 mIoU(val) | 最后选模 F1(val) | 最终报告 mIoU({test_split}) | 最终报告 F1({test_split}) |\n"
+            report += "|---------|------------|------------------|---------------|----------------------|---------------------|\n"
             
             for exp_name, result in successful_results.items():
                 alc = result.get('alc', 0)
-                miou = result.get('final_miou', 0)
-                f1 = result.get('final_f1', 0)
-                report += f"| {exp_name} | {alc:.4f} | {miou:.4f} | {f1:.4f} |\n"
+                selected_miou = result.get("final_selected_miou")
+                selected_f1 = result.get("final_selected_f1")
+                report_miou = result.get("final_report_miou")
+                report_f1 = result.get("final_report_f1")
+                if selected_miou is None:
+                    try:
+                        perf = result.get("performance_history") or []
+                        selected_miou = float(perf[-1]["mIoU"]) if perf else None
+                    except Exception:
+                        selected_miou = None
+                if selected_f1 is None:
+                    try:
+                        perf = result.get("performance_history") or []
+                        selected_f1 = float(perf[-1]["f1_score"]) if perf else None
+                    except Exception:
+                        selected_f1 = None
+                if report_miou is None:
+                    report_miou = result.get('final_miou', 0)
+                if report_f1 is None:
+                    report_f1 = result.get('final_f1', 0)
+                report += f"| {exp_name} | {alc:.4f} | {selected_miou if selected_miou is not None else 'N/A'} | {selected_f1 if selected_f1 is not None else 'N/A'} | {float(report_miou):.4f} | {float(report_f1):.4f} |\n"
             
             report += "\n### 2.2 性能排名\n\n"
             
@@ -121,10 +139,17 @@ class ReportGenerator:
                 report += f"{i}. {exp_name}: {result.get('alc', 0):.4f}\n"
             
             report += "\n"
-            sorted_by_miou = sorted(successful_results.items(), key=lambda x: x[1].get('final_miou', 0), reverse=True)
-            report += "**按最终mIoU排名**:\n\n"
+            sorted_by_miou = sorted(
+                successful_results.items(),
+                key=lambda x: (x[1].get("final_report_miou") if x[1].get("final_report_miou") is not None else x[1].get("final_miou", 0)),
+                reverse=True,
+            )
+            report += f"**按最终报告mIoU({test_split})排名**:\n\n"
             for i, (exp_name, result) in enumerate(sorted_by_miou, 1):
-                report += f"{i}. {exp_name}: {result.get('final_miou', 0):.4f}\n"
+                miou = result.get("final_report_miou")
+                if miou is None:
+                    miou = result.get("final_miou", 0)
+                report += f"{i}. {exp_name}: {float(miou):.4f}\n"
 
             report += "\n### 2.3 topk回退统计\n\n"
             report += "| 实验名称 | 回退轮次数 | 回退补齐总数 | 回退比例 |\n"
@@ -164,8 +189,8 @@ class ReportGenerator:
 
 ### 2.1 性能-成本曲线对比
 
-| 实验名称 | ALC | 最终 mIoU | 最终 F1-Score |
-|---------|-----|----------|--------------|
+| 实验名称 | ALC(val选模) | 最终报告 mIoU({self._manifest_config().get('TEST_SPLIT', 'test')}) | 最终报告 F1({self._manifest_config().get('TEST_SPLIT', 'test')}) |
+|---------|------------|----------------------|---------------------|
 """
         baseline_experiments = ['baseline_random', 'baseline_entropy', 'baseline_coreset', 
                                'baseline_bald', 'baseline_llm_us', 'baseline_llm_rs']
@@ -173,7 +198,13 @@ class ReportGenerator:
         for exp_name in baseline_experiments:
             if exp_name in self.results and self.results[exp_name].get('status') == 'success':
                 result = self.results[exp_name]
-                report += f"| {exp_name} | {result.get('alc', 0):.4f} | {result.get('final_miou', 0):.4f} | {result.get('final_f1', 0):.4f} |\n"
+                miou = result.get("final_report_miou")
+                if miou is None:
+                    miou = result.get("final_miou", 0)
+                f1 = result.get("final_report_f1")
+                if f1 is None:
+                    f1 = result.get("final_f1", 0)
+                report += f"| {exp_name} | {result.get('alc', 0):.4f} | {float(miou):.4f} | {float(f1):.4f} |\n"
         
         report += "\n### 2.2 详细性能对比\n\n"
         
@@ -181,7 +212,7 @@ class ReportGenerator:
                                if k in baseline_experiments and v.get('status') == 'success'}
         
         if successful_baselines:
-            report += "#### 2.2.1 每轮mIoU变化\n\n"
+            report += "#### 2.2.1 每轮选模mIoU(val)变化\n\n"
             report += "| 轮次 | " + " | ".join(successful_baselines.keys()) + " |\n"
             report += "|------|" + "|".join(["--------"] * len(successful_baselines)) + "|\n"
             
@@ -196,7 +227,7 @@ class ReportGenerator:
                         row.append("N/A")
                 report += "| " + " | ".join(row) + " |\n"
             
-            report += "\n#### 2.2.2 标注效率分析\n\n"
+            report += "\n#### 2.2.2 标注效率分析（基于每轮选模mIoU@val）\n\n"
             report += "达到不同mIoU水平所需的标注样本数：\n\n"
             report += "| 目标 mIoU | " + " | ".join(successful_baselines.keys()) + " |\n"
             report += "|----------|" + "|".join(["--------"] * len(successful_baselines)) + "|\n"
@@ -247,8 +278,8 @@ class ReportGenerator:
 
 ### 2.1 性能对比
 
-| 实验名称 | ALC | 最终 mIoU | 最终 F1-Score |
-|---------|-----|----------|--------------|
+| 实验名称 | ALC(val选模) | 最终报告 mIoU({self._manifest_config().get('TEST_SPLIT', 'test')}) | 最终报告 F1({self._manifest_config().get('TEST_SPLIT', 'test')}) |
+|---------|------------|----------------------|---------------------|
 """
         ablation_experiments = [full_model_name, 'no_agent',
                                'uncertainty_only', 'knowledge_only', 'fixed_lambda']
@@ -256,7 +287,13 @@ class ReportGenerator:
         for exp_name in ablation_experiments:
             if exp_name in self.results and self.results[exp_name].get('status') == 'success':
                 result = self.results[exp_name]
-                report += f"| {exp_name} | {result.get('alc', 0):.4f} | {result.get('final_miou', 0):.4f} | {result.get('final_f1', 0):.4f} |\n"
+                miou = result.get("final_report_miou")
+                if miou is None:
+                    miou = result.get("final_miou", 0)
+                f1 = result.get("final_report_f1")
+                if f1 is None:
+                    f1 = result.get("final_f1", 0)
+                report += f"| {exp_name} | {result.get('alc', 0):.4f} | {float(miou):.4f} | {float(f1):.4f} |\n"
         
         report += "\n### 2.2 组件有效性分析\n\n"
         

@@ -1,0 +1,64 @@
+{
+  "run_id": "baselines_only_p3_20260313_212023_seed44",
+  "experiment_name": "baseline_wang_style",
+  "updated_at": "2026-03-15T12:49:10.000000",
+  "pool_integrity": {
+    "counts": {
+      "labeled": 189,
+      "unlabeled": 3610,
+      "union": 3799,
+      "dataset": 3799
+    },
+    "overlaps": {
+      "labeled_unlabeled": 0
+    }
+  },
+  "pool_integrity_ok": true,
+  "status": "completed",
+  "pools_dir": "/Users/anykong/AD-KUCS/AAL_SD/results/pools/baselines_only_p3_20260313_212023_seed44/baseline_wang_style",
+  "checkpoint_path": "results/checkpoints/baselines_only_p3_20260313_212023_seed44/baseline_wang_style_state.json",
+  "initial": {
+    "labeled": 189,
+    "unlabeled": 3610
+  },
+  "dataset_fingerprint": {
+    "count": 3799,
+    "sha256": "ab1c6ed6ffcd25606a577ecf266996d10127065c72db2f5cc8c43cb90fd7c95a"
+  },
+  "resume": {
+    "start_round": 0
+  },
+  "progress": {
+    "round": 13,
+    "epoch": 9,
+    "labeled_size": 1245,
+    "loss": 0.07686239525891385,
+    "mIoU": 0.6925799493050193,
+    "f1": 0.7823742411677097,
+    "best_mIoU_round": 0.7010635418484168,
+    "warnings": []
+  },
+  "result": {
+    "alc": 0.5949639251675275,
+    "final_mIoU": 0.7231676469535887,
+    "final_f1": 0.8115757333285377,
+    "budget_history": [
+      189,
+      277,
+      365,
+      453,
+      541,
+      629,
+      717,
+      805,
+      893,
+      981,
+      1069,
+      1157,
+      1245,
+      1333,
+      1421,
+      1509
+    ]
+  }
+}

@@ -3,12 +3,15 @@ from unittest.mock import MagicMock
 import json
 import sys
 import os
+import tempfile
+from pathlib import Path
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from agent.agent_manager import AgentManager
 from agent.toolbox import Toolbox
 from main import ActiveLearningPipeline
+from tuning_opt.evaluator import parse_objective_from_status
 
 class MockLLMClient:
     def chat(self, messages):
@@ -389,6 +392,29 @@ class TestLambdaPolicyWarmupRisk(unittest.TestCase):
         v = float(self.tools.apply_round_lambda_policy())
         self.assertAlmostEqual(v, float(warmup_v) + 0.05, places=12)
 
+    def test_round4_high_volatility_blocks_lambda_up(self):
+        self.controller.current_round = 2
+        self.tools.reset_round_controls()
+        warmup_v = float(self.tools.apply_round_lambda_policy())
+
+        self.controller.current_round = 4
+        self.tools.reset_round_controls()
+        for _ in range(3):
+            self.tools.set_training_state({
+                "last_miou": 0.75,
+                "prev_miou": 0.75,
+                "miou_delta": 0.0,
+                "rollback_flag": False,
+                "current_labeled_count": 10,
+                "total_budget": 100,
+                "overfit_risk": 0.1,
+                "grad_train_val_cos_min": 0.0,
+                "epoch_miou_volatility": 0.08,
+                "tvc_sign_flip_rate": 0.8,
+            })
+        v = float(self.tools.apply_round_lambda_policy())
+        self.assertAlmostEqual(v, float(warmup_v), places=12)
+
 
 class TestAgentObservationContract(unittest.TestCase):
     def test_get_system_status_exposes_observation_contract(self):
@@ -412,3 +438,89 @@ class TestAgentObservationContract(unittest.TestCase):
         result = payload.get("result")
         self.assertIsInstance(result, dict)
         self.assertEqual(result.get("raw_image_access"), False)
+
+
+class _RepairCfg:
+    QUERY_SIZE = 5
+
+
+class _RepairController:
+    def __init__(self):
+        self.config = _RepairCfg()
+        self.unlabeled_indices = [10, 11, 12, 13, 14, 15, 16]
+        self.labeled_indices = []
+        self.current_round = 3
+        self.sampler_type = "ad_kucs"
+        self.experiment_name = "unit_repair"
+        self._selection_context = {}
+        self._last_ranked_items = [
+            {"sample_id": 10, "final_score": 1.0},
+            {"sample_id": 11, "final_score": 0.9},
+            {"sample_id": 12, "final_score": 0.8},
+            {"sample_id": 13, "final_score": 0.7},
+            {"sample_id": 14, "final_score": 0.6},
+        ]
+        self._events = []
+
+    def _append_trace(self, event):
+        self._events.append(event)
+        return None
+
+    def update(self, new_indices):
+        expected = int(getattr(self.config, "QUERY_SIZE", 0) or 0)
+        ids = [int(x) for x in (new_indices or [])]
+        valid = [x for x in ids if x in self.unlabeled_indices]
+        if len(valid) < expected:
+            raise RuntimeError("selection_short")
+        selected = valid[:expected]
+        for idx in selected:
+            self.unlabeled_indices.remove(idx)
+            self.labeled_indices.append(idx)
+        return {
+            "status": "success",
+            "expected_count": expected,
+            "selected_count": len(selected),
+            "selected_ids": list(selected),
+        }
+
+
+class TestToolboxSelectionRepair(unittest.TestCase):
+    def test_finalize_selection_repairs_invalid_and_short_ids(self):
+        controller = _RepairController()
+        tools = Toolbox(controller, MagicMock(), model=None)
+        raw = tools.finalize_selection(
+            sample_ids=["999", "10", "10", "11"],
+            reason="unit_test",
+            thought=None,
+        )
+        payload = json.loads(raw)
+        self.assertEqual(payload.get("status"), "success")
+        self.assertEqual(int(payload.get("selected_count") or 0), 5)
+        self.assertEqual(len(payload.get("selected_ids") or []), 5)
+        self.assertTrue(
+            isinstance(controller._selection_context, dict)
+            and isinstance(controller._selection_context.get("selection_repair"), dict)
+            and bool(controller._selection_context["selection_repair"].get("applied"))
+        )
+
+
+class TestObjectiveParsing(unittest.TestCase):
+    def test_parse_objective_from_status_prefers_final_selected_for_val(self):
+        with tempfile.TemporaryDirectory() as td:
+            p = Path(td) / "x_status.json"
+            p.write_text(
+                json.dumps(
+                    {
+                        "status": "completed",
+                        "result": {
+                            "alc": 0.5,
+                            "final_mIoU": 0.70,
+                            "final_selected_mIoU": 0.73,
+                            "final_report_mIoU": 0.71,
+                        },
+                    }
+                ),
+                encoding="utf-8",
+            )
+            self.assertAlmostEqual(float(parse_objective_from_status(p, "val")), 0.73, places=12)
+            self.assertAlmostEqual(float(parse_objective_from_status(p, "test")), 0.71, places=12)

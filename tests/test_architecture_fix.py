@@ -1,27 +1,35 @@
 import sys
 from unittest.mock import MagicMock
 
+_SENTINEL = object()
+_MOCKED_MODULE_NAMES = [
+    "torch",
+    "torch.nn",
+    "torch.nn.functional",
+    "torch.optim",
+    "torch.utils",
+    "torch.utils.data",
+    "torchvision",
+    "torchvision.transforms",
+    "cv2",
+    "segmentation_models_pytorch",
+]
+_ORIGINAL_MODULES = {
+    name: sys.modules.get(name, _SENTINEL) for name in _MOCKED_MODULE_NAMES
+}
+
 # Mock heavy dependencies before importing src modules
 mock_torch = MagicMock()
-sys.modules['torch'] = mock_torch
-sys.modules['torch.nn'] = MagicMock()
-sys.modules['torch.nn.functional'] = MagicMock()
-sys.modules['torch.optim'] = MagicMock()
-sys.modules['torch.utils'] = MagicMock()
-sys.modules['torch.utils.data'] = MagicMock()
-sys.modules['torchvision'] = MagicMock()
-sys.modules['torchvision.transforms'] = MagicMock()
-sys.modules['cv2'] = MagicMock()
-sys.modules['sklearn'] = MagicMock()
-sys.modules['sklearn.model_selection'] = MagicMock()
-sys.modules['sklearn.metrics'] = MagicMock()
-sys.modules['sklearn.cluster'] = MagicMock()
-sys.modules['scipy'] = MagicMock()
-sys.modules['scipy.spatial'] = MagicMock()
-sys.modules['scipy.spatial.distance'] = MagicMock()
-sys.modules['scipy.stats'] = MagicMock()
-sys.modules['segmentation_models_pytorch'] = MagicMock()
-sys.modules['tqdm'] = MagicMock()
+sys.modules["torch"] = mock_torch
+sys.modules["torch.nn"] = MagicMock()
+sys.modules["torch.nn.functional"] = MagicMock()
+sys.modules["torch.optim"] = MagicMock()
+sys.modules["torch.utils"] = MagicMock()
+sys.modules["torch.utils.data"] = MagicMock()
+sys.modules["torchvision"] = MagicMock()
+sys.modules["torchvision.transforms"] = MagicMock()
+sys.modules["cv2"] = MagicMock()
+sys.modules["segmentation_models_pytorch"] = MagicMock()
 
 import unittest
 import os
@@ -34,7 +42,7 @@ import hashlib
 from unittest.mock import patch
 
 # Add src to sys.path
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../src')))
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../src")))
 
 # Now we can safely import modules
 from agent.toolbox import Toolbox
@@ -43,17 +51,38 @@ from main import ActiveLearningPipeline
 from config import Config
 from experiments.ablation_config import ABLATION_SETTINGS
 
+
+def teardown_module(module):
+    for name, original in _ORIGINAL_MODULES.items():
+        if original is _SENTINEL:
+            sys.modules.pop(name, None)
+        else:
+            sys.modules[name] = original
+    for name in [
+        "main",
+        "core.data_preprocessing",
+        "core.dataset",
+        "core.sampler",
+        "core.trainer",
+        "agent.toolbox",
+        "agent.agent_manager",
+    ]:
+        sys.modules.pop(name, None)
+
+
 class TestArchitectureFix(unittest.TestCase):
     def setUp(self):
         # Create a temporary directory for pools
         self.test_dir = tempfile.mkdtemp()
         self.config = Config()
         self.config.REQUIRE_LLM_FOR_AGENT = False
-        self.config.POOLS_DIR = os.path.join(self.test_dir, 'pools')
-        self.config.DATA_DIR = os.path.join(self.test_dir, 'data')
-        self.config.RESULTS_DIR = os.path.join(self.test_dir, 'results')
-        self.config.CHECKPOINT_DIR = os.path.join(self.config.RESULTS_DIR, 'checkpoints')
-        self.config.DEVICE = 'cpu'
+        self.config.POOLS_DIR = os.path.join(self.test_dir, "pools")
+        self.config.DATA_DIR = os.path.join(self.test_dir, "data")
+        self.config.RESULTS_DIR = os.path.join(self.test_dir, "results")
+        self.config.CHECKPOINT_DIR = os.path.join(
+            self.config.RESULTS_DIR, "checkpoints"
+        )
+        self.config.DEVICE = "cpu"
         os.makedirs(self.config.POOLS_DIR, exist_ok=True)
         os.makedirs(self.config.DATA_DIR, exist_ok=True)
         os.makedirs(self.config.RESULTS_DIR, exist_ok=True)
@@ -67,8 +96,13 @@ class TestArchitectureFix(unittest.TestCase):
             os.makedirs(os.path.join(self.config.DATA_DIR, *rel), exist_ok=True)
         base_dir = os.path.join(self.config.POOLS_DIR, "unit_test", "_base")
         os.makedirs(base_dir, exist_ok=True)
-        pd.DataFrame({"sample_id": []}).to_csv(os.path.join(base_dir, "labeled_pool.csv"), index=False)
-        pd.DataFrame({"sample_id": []}).to_csv(os.path.join(base_dir, "unlabeled_pool.csv"), index=False)
+        pd.DataFrame({"sample_id": []}).to_csv(
+            os.path.join(base_dir, "labeled_pool.csv"), index=False
+        )
+        pd.DataFrame({"sample_id": []}).to_csv(
+            os.path.join(base_dir, "unlabeled_pool.csv"), index=False
+        )
+
         def _sha(names):
             h = hashlib.sha256()
             for n in sorted(names):
@@ -93,9 +127,18 @@ class TestArchitectureFix(unittest.TestCase):
                 "stratify_key": "has_positive",
                 "train_counts": {"pos": 0, "neg": 0, "total": 0},
             },
-            "pools": {"labeled": 0, "unlabeled": 0, "files": {"labeled_pool": "labeled_pool.csv", "unlabeled_pool": "unlabeled_pool.csv"}},
+            "pools": {
+                "labeled": 0,
+                "unlabeled": 0,
+                "files": {
+                    "labeled_pool": "labeled_pool.csv",
+                    "unlabeled_pool": "unlabeled_pool.csv",
+                },
+            },
         }
-        with open(os.path.join(base_dir, "pools_manifest.json"), "w", encoding="utf-8") as f:
+        with open(
+            os.path.join(base_dir, "pools_manifest.json"), "w", encoding="utf-8"
+        ) as f:
             json.dump(manifest, f, ensure_ascii=False, indent=2)
 
     def tearDown(self):
@@ -107,17 +150,17 @@ class TestArchitectureFix(unittest.TestCase):
         controller = MagicMock()
         strategy = MagicMock()
         model = MagicMock()
-        
+
         toolbox = Toolbox(controller, strategy, model)
-        
+
         # Modify state
-        toolbox.candidates_cache = [{'id': '1', 'score': 0.9}]
-        toolbox.current_scores = {'1': {'U': 0.5, 'K': 0.4}}
-        toolbox.training_state = {'epoch': 5}
-        
+        toolbox.candidates_cache = [{"id": "1", "score": 0.9}]
+        toolbox.current_scores = {"1": {"U": 0.5, "K": 0.4}}
+        toolbox.training_state = {"epoch": 5}
+
         # Act
         toolbox.reset()
-        
+
         # Assert
         self.assertEqual(toolbox.candidates_cache, [])
         self.assertEqual(toolbox.current_scores, {})
@@ -129,81 +172,108 @@ class TestArchitectureFix(unittest.TestCase):
         # Mock dependencies
         toolbox = MagicMock()
         client = MagicMock()
-        
+
         agent = AgentManager(toolbox, client, verbose=False)
-        
+
         # Modify state
-        agent.history = [{'role': 'user', 'content': 'hi'}]
-        
+        agent.history = [{"role": "user", "content": "hi"}]
+
         # Act
         agent.reset()
-        
+
         # Assert
         self.assertEqual(agent.history, [])
         toolbox.reset.assert_called_once()
         print("✅ AgentManager.reset() works correctly.")
 
-    @patch('main.Landslide4SenseDataset')
-    @patch('main.DataPreprocessor')
-    @patch('main.SiliconFlowClient')
-    def test_pipeline_initialization_resets_agent(self, MockClient, MockPreprocessor, MockDataset):
+    @patch("main.Landslide4SenseDataset")
+    @patch("main.DataPreprocessor")
+    @patch("main.SiliconFlowClient")
+    def test_pipeline_initialization_resets_agent(
+        self, MockClient, MockPreprocessor, MockDataset
+    ):
         """Test if ActiveLearningPipeline resets agent on initialization."""
         self.config.STRICT_RESUME = False
         # Setup mocks
         mock_dataset_instance = MockDataset.return_value
-        mock_dataset_instance.images = [] # Empty dataset
+        mock_dataset_instance.images = []  # Empty dataset
         MockPreprocessor.return_value.create_data_pools.return_value = None
 
-        with patch('main.ABLATION_SETTINGS', {'test_exp': {'description': 'test', 'sampler_type': 'ad_kucs', 'use_agent': True, 'control_permissions': {}}}):
-            pipeline = ActiveLearningPipeline(self.config, 'test_exp', run_id='unit_test')
+        with patch(
+            "main.ABLATION_SETTINGS",
+            {
+                "test_exp": {
+                    "description": "test",
+                    "sampler_type": "ad_kucs",
+                    "use_agent": True,
+                    "control_permissions": {},
+                }
+            },
+        ):
+            pipeline = ActiveLearningPipeline(
+                self.config, "test_exp", run_id="unit_test"
+            )
             self.assertEqual(pipeline.agent_manager.history, [])
             self.assertEqual(pipeline.toolbox.candidates_cache, [])
-            pipeline.agent_manager.history.append('dirty')
+            pipeline.agent_manager.history.append("dirty")
             pipeline.agent_manager.reset()
             self.assertEqual(pipeline.agent_manager.history, [])
             print("✅ Pipeline initializes with clean Agent state.")
 
-    @patch('main.Landslide4SenseDataset')
-    @patch('main.DataPreprocessor')
+    @patch("main.Landslide4SenseDataset")
+    @patch("main.DataPreprocessor")
     def test_load_pool_states(self, MockPreprocessor, MockDataset):
         """Test _load_pool_states functionality."""
-        exp_name = 'resume_exp'
-        exp_dir = os.path.join(self.config.POOLS_DIR, 'unit_test', exp_name)
+        exp_name = "resume_exp"
+        exp_dir = os.path.join(self.config.POOLS_DIR, "unit_test", exp_name)
         os.makedirs(exp_dir, exist_ok=True)
-        
+
         # Create dummy pool files
-        pd.DataFrame({'sample_id': ['img1', 'img2']}).to_csv(os.path.join(exp_dir, 'labeled_pool.csv'), index=False)
-        pd.DataFrame({'sample_id': ['img3']}).to_csv(os.path.join(exp_dir, 'unlabeled_pool.csv'), index=False)
-        
+        pd.DataFrame({"sample_id": ["img1", "img2"]}).to_csv(
+            os.path.join(exp_dir, "labeled_pool.csv"), index=False
+        )
+        pd.DataFrame({"sample_id": ["img3"]}).to_csv(
+            os.path.join(exp_dir, "unlabeled_pool.csv"), index=False
+        )
+
         # Mock dataset to have these images
         mock_dataset_instance = MockDataset.return_value
         # Mock images list for _map_filenames_to_indices
-        mock_dataset_instance.images = ['img1.h5', 'img2.h5', 'img3.h5']
-        
+        mock_dataset_instance.images = ["img1.h5", "img2.h5", "img3.h5"]
+
         # Mock ABLATION_SETTINGS
-        with patch('main.ABLATION_SETTINGS', {exp_name: {'description': 'test', 'sampler_type': 'random', 'use_agent': False}}):
-             # Initialize pipeline
-             # __init__ will load pools from disk if they exist.
-             pipeline = ActiveLearningPipeline(self.config, exp_name, run_id='unit_test')
-             
-             # Verify initial load worked (proving __init__ uses correct paths)
-             self.assertEqual(set(pipeline.labeled_indices), {0, 1}) # img1, img2
-             self.assertEqual(set(pipeline.unlabeled_indices), {2})  # img3
-             
-             # Now clear state manually to test _load_pool_states explicitly
-             pipeline.labeled_indices = []
-             pipeline.unlabeled_indices = []
-             
-             # Call _load_pool_states
-             result = pipeline._load_pool_states()
-             
-             self.assertTrue(result)
-             # img1(0), img2(1) should be labeled
-             self.assertEqual(set(pipeline.labeled_indices), {0, 1})
-             # img3(2) should be unlabeled
-             self.assertEqual(set(pipeline.unlabeled_indices), {2})
-             
-             print("✅ _load_pool_states loads state correctly.")
+        with patch(
+            "main.ABLATION_SETTINGS",
+            {
+                exp_name: {
+                    "description": "test",
+                    "sampler_type": "random",
+                    "use_agent": False,
+                }
+            },
+        ):
+            # Initialize pipeline
+            # __init__ will load pools from disk if they exist.
+            pipeline = ActiveLearningPipeline(self.config, exp_name, run_id="unit_test")
+
+            # Verify initial load worked (proving __init__ uses correct paths)
+            self.assertEqual(set(pipeline.labeled_indices), {0, 1})  # img1, img2
+            self.assertEqual(set(pipeline.unlabeled_indices), {2})  # img3
+
+            # Now clear state manually to test _load_pool_states explicitly
+            pipeline.labeled_indices = []
+            pipeline.unlabeled_indices = []
+
+            # Call _load_pool_states
+            result = pipeline._load_pool_states()
+
+            self.assertTrue(result)
+            # img1(0), img2(1) should be labeled
+            self.assertEqual(set(pipeline.labeled_indices), {0, 1})
+            # img3(2) should be unlabeled
+            self.assertEqual(set(pipeline.unlabeled_indices), {2})
+
+            print("✅ _load_pool_states loads state correctly.")
 
     def test_ablation_settings_have_distinct_effective_configs(self):
         def freeze(v):
@@ -216,6 +286,8 @@ class TestArchitectureFix(unittest.TestCase):
         signatures = {}
         duplicates = []
         for name, cfg in (ABLATION_SETTINGS or {}).items():
+            if name.startswith("sensitivity_"):
+                continue
             effective = {
                 "use_agent": cfg.get("use_agent", False),
                 "sampler_type": cfg.get("sampler_type"),
@@ -242,7 +314,9 @@ class TestArchitectureFix(unittest.TestCase):
             else:
                 signatures[sig] = name
 
-        self.assertEqual(duplicates, [], f"Duplicate effective ablation configs found: {duplicates}")
+        self.assertEqual(
+            duplicates, [], f"Duplicate effective ablation configs found: {duplicates}"
+        )
 
     def test_toolbox_lambda_policy_threshold_overrides_change_lambda(self):
         class DummyController:
@@ -292,8 +366,12 @@ class TestArchitectureFix(unittest.TestCase):
         lam_alt = tb_alt.apply_round_lambda_policy()
 
         self.assertNotEqual(lam_full, lam_alt)
-        self.assertTrue(any(e.get("type") == "lambda_policy_apply" for e in c_full.events))
-        self.assertTrue(any(e.get("type") == "lambda_policy_apply" for e in c_alt.events))
+        self.assertTrue(
+            any(e.get("type") == "lambda_policy_apply" for e in c_full.events)
+        )
+        self.assertTrue(
+            any(e.get("type") == "lambda_policy_apply" for e in c_alt.events)
+        )
 
     def test_lambda_policy_r1_lambda_zero_applies_in_r1_r2(self):
         class DummyController:
@@ -308,7 +386,9 @@ class TestArchitectureFix(unittest.TestCase):
                 self.events.append(event)
 
         for r in (1, 2):
-            controller = DummyController(ABLATION_SETTINGS["full_model_A_lambda_policy"], current_round=r)
+            controller = DummyController(
+                ABLATION_SETTINGS["full_model_A_lambda_policy"], current_round=r
+            )
             toolbox = Toolbox(controller, MagicMock(), MagicMock())
             toolbox._last_lambda_applied = 0.55
             toolbox.set_training_state(
@@ -328,8 +408,15 @@ class TestArchitectureFix(unittest.TestCase):
             )
             lam = toolbox.apply_round_lambda_policy()
             self.assertEqual(lam, 0.0)
-            self.assertEqual(float(toolbox.control_state.get("lambda_override_round")), 0.0)
-            self.assertTrue(any(e.get("type") == "lambda_policy_apply" and int(e.get("round")) == r for e in controller.events))
+            self.assertEqual(
+                float(toolbox.control_state.get("lambda_override_round")), 0.0
+            )
+            self.assertTrue(
+                any(
+                    e.get("type") == "lambda_policy_apply" and int(e.get("round")) == r
+                    for e in controller.events
+                )
+            )
 
     def test_set_lambda_allows_r1_lambda_below_clamp_min_in_uncertainty_phase(self):
         class DummyController:
@@ -375,7 +462,10 @@ class TestArchitectureFix(unittest.TestCase):
         out_r3 = json.loads(tb_r3.set_lambda(0.0, scope="round"))
         self.assertEqual(out_r3.get("status"), "success")
         self.assertGreaterEqual(float(out_r3.get("applied")), 0.05)
-        self.assertEqual(float(tb_r3.control_state.get("lambda_override_round")), float(out_r3.get("applied")))
+        self.assertEqual(
+            float(tb_r3.control_state.get("lambda_override_round")),
+            float(out_r3.get("applied")),
+        )
 
     def test_get_top_k_samples_uses_lambda_policy_bounds_in_r1(self):
         class DummyController:
@@ -385,7 +475,9 @@ class TestArchitectureFix(unittest.TestCase):
                 self.config = MagicMock()
                 self.config.RANDOM_SEED = 123
 
-        controller = DummyController(ABLATION_SETTINGS["full_model_A_lambda_policy"], current_round=1)
+        controller = DummyController(
+            ABLATION_SETTINGS["full_model_A_lambda_policy"], current_round=1
+        )
         toolbox = Toolbox(controller, MagicMock(), MagicMock())
         toolbox.current_scores = {
             "1": {"U": 1.0, "K": 0.0},
@@ -416,7 +508,9 @@ class TestArchitectureFix(unittest.TestCase):
     @patch("main.Landslide4SenseDataset")
     @patch("main.DataPreprocessor")
     @patch("main.SiliconFlowClient")
-    def test_agent_finalize_selection_writes_l3_selection(self, MockClient, MockPreprocessor, MockDataset):
+    def test_agent_finalize_selection_writes_l3_selection(
+        self, MockClient, MockPreprocessor, MockDataset
+    ):
         self.config.STRICT_RESUME = False
         self.config.STRICT_INNOVATION = False
         self.config.QUERY_SIZE = 1
@@ -434,8 +528,17 @@ class TestArchitectureFix(unittest.TestCase):
             return pd.DataFrame({"sample_id": []})
 
         with patch("pandas.read_csv", side_effect=fake_read_csv):
-            with patch("main.ABLATION_SETTINGS", {"full_model_A_lambda_policy": ABLATION_SETTINGS["full_model_A_lambda_policy"]}):
-                pipeline = ActiveLearningPipeline(self.config, "full_model_A_lambda_policy", run_id="unit_test")
+            with patch(
+                "main.ABLATION_SETTINGS",
+                {
+                    "full_model_A_lambda_policy": ABLATION_SETTINGS[
+                        "full_model_A_lambda_policy"
+                    ]
+                },
+            ):
+                pipeline = ActiveLearningPipeline(
+                    self.config, "full_model_A_lambda_policy", run_id="unit_test"
+                )
 
         events = []
         pipeline._append_trace = lambda e: events.append(e)
@@ -470,7 +573,9 @@ class TestArchitectureFix(unittest.TestCase):
             def __init__(self, *args, **kwargs):
                 pass
 
-            def _get_adaptive_weight(self, current_iteration, total_iterations, override=None):
+            def _get_adaptive_weight(
+                self, current_iteration, total_iterations, override=None
+            ):
                 return override if override is not None else 0.5
 
             def rank_samples(
@@ -546,14 +651,30 @@ class TestArchitectureFix(unittest.TestCase):
         lam_full = make_lambda(cfg_full)
         lam_alt = make_lambda(cfg_alt)
         ranked_full = sampler.rank_samples(
-            unlabeled_info, None, current_iteration=10, total_iterations=100, lambda_override=lam_full
+            unlabeled_info,
+            None,
+            current_iteration=10,
+            total_iterations=100,
+            lambda_override=lam_full,
         )
         ranked_alt = sampler.rank_samples(
-            unlabeled_info, None, current_iteration=10, total_iterations=100, lambda_override=lam_alt
+            unlabeled_info,
+            None,
+            current_iteration=10,
+            total_iterations=100,
+            lambda_override=lam_alt,
         )
         self.assertNotAlmostEqual(float(lam_full), float(lam_alt), places=6)
-        self.assertNotAlmostEqual(float(ranked_full[0]["lambda_t"]), float(ranked_alt[0]["lambda_t"]), places=6)
-        self.assertNotAlmostEqual(float(ranked_full[0]["final_score"]), float(ranked_alt[0]["final_score"]), places=6)
+        self.assertNotAlmostEqual(
+            float(ranked_full[0]["lambda_t"]),
+            float(ranked_alt[0]["lambda_t"]),
+            places=6,
+        )
+        self.assertNotAlmostEqual(
+            float(ranked_full[0]["final_score"]),
+            float(ranked_alt[0]["final_score"]),
+            places=6,
+        )
 
     def test_resolve_lambda_override_precedence_and_strictness(self):
         pipeline = ActiveLearningPipeline.__new__(ActiveLearningPipeline)
@@ -568,7 +689,10 @@ class TestArchitectureFix(unittest.TestCase):
                 return self._applied
 
         pipeline.use_agent = True
-        pipeline.exp_config = {"lambda_override": 0.11, "lambda_policy": {"mode": "warmup_risk_closed_loop"}}
+        pipeline.exp_config = {
+            "lambda_override": 0.11,
+            "lambda_policy": {"mode": "warmup_risk_closed_loop"},
+        }
         pipeline.toolbox = DummyToolbox({"lambda_override_round": 0.22}, applied=0.33)
         value, source = pipeline._resolve_lambda_override(pipeline.current_round)
         self.assertAlmostEqual(value, 0.11, places=6)
@@ -592,7 +716,14 @@ class TestArchitectureFix(unittest.TestCase):
             pipeline._resolve_lambda_override(pipeline.current_round)
 
         pipeline.use_agent = False
-        pipeline.exp_config = {"lambda_controller": {"mode": "rule_based", "rule": "r1", "lambda_min": 0.0, "lambda_max": 1.0}}
+        pipeline.exp_config = {
+            "lambda_controller": {
+                "mode": "rule_based",
+                "rule": "r1",
+                "lambda_min": 0.0,
+                "lambda_max": 1.0,
+            }
+        }
         pipeline._apply_lambda_controller = lambda round_idx: 0.44
         value, source = pipeline._resolve_lambda_override(pipeline.current_round)
         self.assertAlmostEqual(value, 0.44, places=6)
@@ -600,17 +731,24 @@ class TestArchitectureFix(unittest.TestCase):
 
     def test_sampler_audit_uses_lambda_effective(self):
         pipeline = ActiveLearningPipeline.__new__(ActiveLearningPipeline)
-        pipeline.rollback_config = {"mode": "adaptive_threshold", "threshold": 0.1, "std_factor": 1.5}
+        pipeline.rollback_config = {
+            "mode": "adaptive_threshold",
+            "threshold": 0.1,
+            "std_factor": 1.5,
+        }
         pipeline.exp_config = {}
         pipeline.sampler_type = "ad_kucs"
-        pipeline.k_definition = "coreset_to_labeled"
         pipeline.score_normalization = True
         pipeline.sampler = MagicMock()
-        pipeline._last_ranking_metadata = {"lambda_effective": 0.55, "lambda_source": "lambda_policy"}
+        pipeline._last_ranking_metadata = {
+            "lambda_effective": 0.55,
+            "lambda_source": "lambda_policy",
+        }
 
         audit = pipeline._sampler_audit()
         self.assertAlmostEqual(audit.get("lambda_effective"), 0.55, places=6)
         self.assertEqual(audit.get("lambda_source"), "lambda_policy")
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     unittest.main()

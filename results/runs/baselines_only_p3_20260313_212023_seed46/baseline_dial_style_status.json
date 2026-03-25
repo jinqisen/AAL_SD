@@ -1,0 +1,69 @@
+{
+  "run_id": "baselines_only_p3_20260313_212023_seed46",
+  "experiment_name": "baseline_dial_style",
+  "updated_at": "2026-03-24T16:48:06.859144",
+  "pid": 71024,
+  "ppid": 16326,
+  "pool_integrity": {
+    "counts": {
+      "labeled": 189,
+      "unlabeled": 3610,
+      "union": 3799,
+      "dataset": 3799
+    },
+    "overlaps": {
+      "labeled_unlabeled": 0
+    }
+  },
+  "pool_integrity_ok": true,
+  "errors": [],
+  "status": "completed",
+  "pools_dir": "/Users/anykong/AD-KUCS/AAL_SD/results/pools/baselines_only_p3_20260313_212023_seed46/baseline_dial_style",
+  "checkpoint_path": "/Users/anykong/AD-KUCS/AAL_SD/results/checkpoints/baselines_only_p3_20260313_212023_seed46/baseline_dial_style_state.json",
+  "initial": {
+    "labeled": 189,
+    "unlabeled": 3610
+  },
+  "dataset_fingerprint": {
+    "count": 3799,
+    "sha256": "ab1c6ed6ffcd25606a577ecf266996d10127065c72db2f5cc8c43cb90fd7c95a"
+  },
+  "resume": {
+    "start_round": 0
+  },
+  "progress": {
+    "round": 16,
+    "epoch": "finished",
+    "labeled_size": 1509
+  },
+  "result": {
+    "alc": 0.6070111545965705,
+    "final_mIoU": 0.6936544110223934,
+    "final_f1": 0.7834347601448555,
+    "final_selected_mIoU": 0.7123623424682434,
+    "final_selected_f1": 0.8013243951154452,
+    "final_report_mIoU": 0.6936544110223934,
+    "final_report_f1": 0.7834347601448555,
+    "final_miou_source": "final_report",
+    "final_f1_source": "final_report",
+    "test_split": "test",
+    "budget_history": [
+      189,
+      277,
+      365,
+      453,
+      541,
+      629,
+      717,
+      805,
+      893,
+      981,
+      1069,
+      1157,
+      1245,
+      1333,
+      1421,
+      1509
+    ]
+  }
+}
