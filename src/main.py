@@ -1114,6 +1114,91 @@ class ActiveLearningPipeline:
         self._last_u_median_top = u_median_top
         self._last_k_median_top = k_median_top
 
+    def _append_score_snapshot(self, selected_ids, source: str | None = None):
+        opts = getattr(getattr(self, "experiment_runtime", None), "trace_options", None)
+        if opts is not None:
+            if not bool(getattr(opts, "enable_score_snapshot_logging", False)):
+                return
+            boundary_window = int(
+                getattr(opts, "score_snapshot_boundary_window", 64) or 64
+            )
+            max_pool_items_opt = getattr(opts, "score_snapshot_max_pool_items", None)
+            max_pool_items = (
+                None if max_pool_items_opt is None else int(max_pool_items_opt)
+            )
+        else:
+            if not isinstance(self.exp_config, dict):
+                return
+            if not bool(
+                self.exp_config.get(
+                    "enable_score_snapshot_logging",
+                    self.exp_config.get("enable_l3_selection_logging"),
+                )
+            ):
+                return
+            boundary_window = int(
+                self.exp_config.get("score_snapshot_boundary_window", 64) or 64
+            )
+            max_pool_items_cfg = self.exp_config.get("score_snapshot_max_pool_items")
+            max_pool_items = (
+                None if max_pool_items_cfg is None else int(max_pool_items_cfg)
+            )
+        ranked_items = list(getattr(self, "_last_ranked_items", []) or [])
+        if not ranked_items:
+            return
+        query_size = int(getattr(self.config, "QUERY_SIZE", 0) or 0)
+        selected_id_set = {str(sid) for sid in list(selected_ids or [])}
+
+        def _row(item, rank: int):
+            sample_id = item.get("sample_id") if isinstance(item, dict) else None
+            return {
+                "rank": int(rank),
+                "sample_id": sample_id,
+                "final_score": item.get("final_score") if isinstance(item, dict) else None,
+                "uncertainty": item.get("uncertainty") if isinstance(item, dict) else None,
+                "knowledge_gain": item.get("knowledge_gain")
+                if isinstance(item, dict)
+                else None,
+                "lambda_t": item.get("lambda_t") if isinstance(item, dict) else None,
+                "selected": bool(str(sample_id) in selected_id_set),
+            }
+
+        pool_limit = len(ranked_items)
+        if max_pool_items is not None and int(max_pool_items) > 0:
+            pool_limit = min(len(ranked_items), int(max_pool_items))
+        pool_rows = [_row(item, idx + 1) for idx, item in enumerate(ranked_items[:pool_limit])]
+
+        boundary_center = min(max(query_size, 1), len(ranked_items))
+        boundary_start = max(0, boundary_center - max(0, boundary_window))
+        boundary_end = min(len(ranked_items), boundary_center + max(0, boundary_window))
+        boundary_rows = [
+            _row(item, idx + 1)
+            for idx, item in enumerate(
+                ranked_items[boundary_start:boundary_end], start=boundary_start
+            )
+        ]
+
+        self._append_trace(
+            {
+                "type": "score_snapshot",
+                "round": int(self.current_round)
+                if self.current_round is not None
+                else None,
+                "source": source,
+                "pool_n": int(len(ranked_items)),
+                "query_size": int(query_size),
+                "pool_rows_limit": int(pool_limit),
+                "pool_rows_truncated": bool(pool_limit < len(ranked_items)),
+                "boundary_window": int(boundary_window),
+                "boundary_start_rank": int(boundary_start + 1)
+                if boundary_rows
+                else None,
+                "boundary_end_rank": int(boundary_end) if boundary_rows else None,
+                "rows": pool_rows,
+                "boundary_rows": boundary_rows,
+            }
+        )
+
     def _append_round_summary(
         self, round_idx: int, best_miou: float, best_f1: float, labeled_size: int
     ):
@@ -1178,6 +1263,7 @@ class ActiveLearningPipeline:
         if not ranked:
             return None
         k = max(1, int(top_k))
+        query_size = k
 
         def _extract(values, key: str, limit=None, allow_none: bool = False):
             out = []
@@ -1219,11 +1305,14 @@ class ActiveLearningPipeline:
         pool_u = _extract(ranked, "uncertainty")
         pool_kg = _extract(ranked, "knowledge_gain")
         pool_fs = _extract(ranked, "final_score")
+        pool_lambda = _extract(ranked, "lambda_t", limit=1)
 
         meta = {
             "pool_n": int(len(ranked)),
             "topk_n": int(k),
         }
+        if pool_lambda:
+            meta["lambda_effective"] = float(pool_lambda[0])
         if top_u:
             meta["avg_uncertainty"] = float(np.mean(np.asarray(top_u, dtype=float)))
         if top_kg:
@@ -1246,6 +1335,173 @@ class ActiveLearningPipeline:
             stats["final_score"] = {"topk": s_top, "pool": s_pool}
         if stats:
             meta["score_stats"] = stats
+
+        if pool_u and pool_kg and len(pool_u) == len(pool_kg):
+            u_arr = np.asarray(pool_u, dtype=float)
+            k_arr = np.asarray(pool_kg, dtype=float)
+            pool_n = int(len(u_arr))
+            boundary_ratio = 0.2
+            sensitivity_delta = 0.1
+            if isinstance(getattr(self, "exp_config", None), dict):
+                try:
+                    boundary_ratio = float(
+                        self.exp_config.get("geometry_boundary_delta_ratio", 0.2)
+                        or 0.2
+                    )
+                except Exception:
+                    boundary_ratio = 0.2
+                try:
+                    sensitivity_delta = float(
+                        self.exp_config.get(
+                            "geometry_sensitivity_delta_lambda", 0.1
+                        )
+                        or 0.1
+                    )
+                except Exception:
+                    sensitivity_delta = 0.1
+            boundary_half_width = max(1, int(np.ceil(float(query_size) * float(boundary_ratio))))
+            boundary_start = max(0, int(query_size) - boundary_half_width)
+            boundary_end = min(pool_n, int(query_size) + boundary_half_width)
+            boundary_u = u_arr[boundary_start:boundary_end]
+            boundary_k = k_arr[boundary_start:boundary_end]
+            geometry = {
+                "boundary_delta_ratio": float(boundary_ratio),
+                "boundary_half_width": int(boundary_half_width),
+                "boundary_start_rank": int(boundary_start + 1)
+                if boundary_end > boundary_start
+                else None,
+                "boundary_end_rank": int(boundary_end)
+                if boundary_end > boundary_start
+                else None,
+                "boundary_n": int(max(0, boundary_end - boundary_start)),
+                "boundary_u_std": float(np.std(boundary_u))
+                if boundary_u.size > 0
+                else None,
+                "boundary_k_std": float(np.std(boundary_k))
+                if boundary_k.size > 0
+                else None,
+            }
+            try:
+                from scipy.stats import spearmanr
+
+                rho_uk, pval = spearmanr(u_arr, k_arr)
+                geometry["spearman_rho_uk"] = (
+                    float(rho_uk) if rho_uk is not None and not np.isnan(rho_uk) else None
+                )
+                geometry["spearman_pvalue_uk"] = (
+                    float(pval) if pval is not None and not np.isnan(pval) else None
+                )
+            except Exception:
+                geometry["spearman_rho_uk"] = None
+                geometry["spearman_pvalue_uk"] = None
+
+            lambda_current = None
+            if pool_lambda:
+                try:
+                    lambda_current = float(pool_lambda[0])
+                except Exception:
+                    lambda_current = None
+            if lambda_current is not None and pool_n > 0:
+                current_scores = (
+                    (1.0 - float(lambda_current)) * u_arr
+                    + float(lambda_current) * k_arr
+                )
+                current_order = np.argsort(-current_scores)
+                current_top = set(
+                    int(idx) for idx in current_order[: min(int(query_size), pool_n)]
+                )
+                current_rank = np.empty(pool_n, dtype=int)
+                current_rank[current_order] = np.arange(pool_n, dtype=int)
+
+                def _jaccard_metrics(lambda_shifted: float):
+                    shifted_scores = (
+                        (1.0 - float(lambda_shifted)) * u_arr
+                        + float(lambda_shifted) * k_arr
+                    )
+                    shifted_order = np.argsort(-shifted_scores)
+                    shifted_top = set(
+                        int(idx)
+                        for idx in shifted_order[: min(int(query_size), pool_n)]
+                    )
+                    union_n = len(current_top | shifted_top)
+                    overlap_n = len(current_top & shifted_top)
+                    shifted_rank = np.empty(pool_n, dtype=int)
+                    shifted_rank[shifted_order] = np.arange(pool_n, dtype=int)
+                    boundary_index = current_order[boundary_start:boundary_end]
+                    boundary_pairs_flipped = 0
+                    boundary_pair_total = 0
+                    if boundary_index.size >= 2:
+                        for i_pos in range(int(boundary_index.size)):
+                            ii = int(boundary_index[i_pos])
+                            for j_pos in range(i_pos + 1, int(boundary_index.size)):
+                                jj = int(boundary_index[j_pos])
+                                current_lt = int(current_rank[ii]) < int(current_rank[jj])
+                                shifted_lt = int(shifted_rank[ii]) < int(shifted_rank[jj])
+                                boundary_pair_total += 1
+                                if current_lt != shifted_lt:
+                                    boundary_pairs_flipped += 1
+                    return {
+                        "lambda": float(lambda_shifted),
+                        "overlap": float(overlap_n) / float(union_n)
+                        if union_n > 0
+                        else None,
+                        "distance": 1.0 - (float(overlap_n) / float(union_n))
+                        if union_n > 0
+                        else None,
+                        "replacements": int(min(int(query_size), pool_n) - overlap_n),
+                        "boundary_pairs_flipped": int(boundary_pairs_flipped),
+                        "boundary_pair_total": int(boundary_pair_total),
+                        "crossing_density": float(boundary_pairs_flipped)
+                        / float(boundary_pair_total)
+                        if boundary_pair_total > 0
+                        else None,
+                    }
+
+                lambda_up = min(1.0, lambda_current + float(sensitivity_delta))
+                lambda_down = max(0.0, lambda_current - float(sensitivity_delta))
+                geometry["sensitivity_delta_lambda"] = float(sensitivity_delta)
+
+                up_metrics = (
+                    _jaccard_metrics(lambda_up)
+                    if abs(lambda_up - lambda_current) > 1e-12
+                    else None
+                )
+                down_metrics = (
+                    _jaccard_metrics(lambda_down)
+                    if abs(lambda_down - lambda_current) > 1e-12
+                    else None
+                )
+                if up_metrics is not None:
+                    geometry["lambda_probe_up"] = float(up_metrics["lambda"])
+                    geometry["sens_up_overlap"] = up_metrics["overlap"]
+                    geometry["sens_up"] = up_metrics["distance"]
+                    geometry["topk_replacements_up"] = up_metrics["replacements"]
+                if down_metrics is not None:
+                    geometry["lambda_probe_down"] = float(down_metrics["lambda"])
+                    geometry["sens_down_overlap"] = down_metrics["overlap"]
+                    geometry["sens_down"] = down_metrics["distance"]
+                    geometry["topk_replacements_down"] = down_metrics["replacements"]
+                if up_metrics is not None and down_metrics is not None:
+                    sens_down = down_metrics["distance"]
+                    sens_up = up_metrics["distance"]
+                    geometry["asymmetry_ratio"] = (
+                        float(sens_up) / float(sens_down)
+                        if sens_down is not None and abs(float(sens_down)) > 1e-12
+                        else None
+                    )
+                crossing_source = up_metrics if up_metrics is not None else down_metrics
+                if crossing_source is not None:
+                    geometry["boundary_pairs_flipped"] = crossing_source[
+                        "boundary_pairs_flipped"
+                    ]
+                    geometry["boundary_pair_total"] = crossing_source[
+                        "boundary_pair_total"
+                    ]
+                    geometry["crossing_density"] = crossing_source["crossing_density"]
+                if up_metrics is not None:
+                    geometry["local_jaccard_overlap"] = up_metrics["overlap"]
+                    geometry["local_jaccard_distance"] = up_metrics["distance"]
+            meta["selection_geometry"] = geometry
         return meta or None
 
     def _deterministic_hash_order(self, indices, salt: str):
@@ -2325,6 +2581,21 @@ class ActiveLearningPipeline:
                     "grad_probe_source": grad_probe_source,
                     "train_u_median_selected": _u_med,
                     "train_k_median_selected": _k_med,
+                    "selection_geometry": (
+                        dict(
+                            (
+                                getattr(self, "_last_ranking_metadata", {}) or {}
+                            ).get("selection_geometry")
+                            or {}
+                        )
+                        if isinstance(
+                            (
+                                getattr(self, "_last_ranking_metadata", {}) or {}
+                            ).get("selection_geometry"),
+                            dict,
+                        )
+                        else None
+                    ),
                 }
                 if not isinstance(getattr(self, "training_state", None), dict):
                     self.training_state = {
@@ -3340,6 +3611,9 @@ class ActiveLearningPipeline:
             "context": ctx,
         }
         self._append_l3_selection(
+            selected, source=ctx.get("source") if isinstance(ctx, dict) else None
+        )
+        self._append_score_snapshot(
             selected, source=ctx.get("source") if isinstance(ctx, dict) else None
         )
         return {
