@@ -2793,6 +2793,8 @@ ABLATION_SETTINGS = {
         "score_snapshot_boundary_window": 64,
         "geometry_boundary_delta_ratio": 0.2,
         "geometry_sensitivity_delta_lambda": 0.1,
+        "geometry_sensitivity_delta_lambda_ratio": 0.2,
+        "geometry_sensitivity_delta_lambda_min": 0.05,
     },
     "geometry_fixed_lambda_02": {
         "description": "Geometry probe: fixed λ=0.2, no-agent",
@@ -2803,6 +2805,8 @@ ABLATION_SETTINGS = {
         "score_snapshot_boundary_window": 64,
         "geometry_boundary_delta_ratio": 0.2,
         "geometry_sensitivity_delta_lambda": 0.1,
+        "geometry_sensitivity_delta_lambda_ratio": 0.2,
+        "geometry_sensitivity_delta_lambda_min": 0.05,
     },
     "knowledge_only": {
         "description": "固定λ=1，仅使用知识增益",
@@ -2813,6 +2817,8 @@ ABLATION_SETTINGS = {
         "score_snapshot_boundary_window": 64,
         "geometry_boundary_delta_ratio": 0.2,
         "geometry_sensitivity_delta_lambda": 0.1,
+        "geometry_sensitivity_delta_lambda_ratio": 0.2,
+        "geometry_sensitivity_delta_lambda_min": 0.05,
     },
     "fixed_lambda": {
         "description": "消融：Fixed λ=0.5；保留Agent，隔离三阶段λ policy贡献",

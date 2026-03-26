@@ -71,6 +71,8 @@ def _geometry_enabled_cfg(base_cfg: dict, *, description: str | None = None, lam
     cfg.setdefault("score_snapshot_max_pool_items", None)
     cfg.setdefault("geometry_boundary_delta_ratio", 0.2)
     cfg.setdefault("geometry_sensitivity_delta_lambda", 0.1)
+    cfg.setdefault("geometry_sensitivity_delta_lambda_ratio", 0.2)
+    cfg.setdefault("geometry_sensitivity_delta_lambda_min", 0.05)
     return cfg
 
 
