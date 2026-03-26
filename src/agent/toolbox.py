@@ -51,6 +51,7 @@ class Toolbox:
         self._last_ema_update_round: int = -999
         self._last_overfit_risk_raw: Optional[float] = None
         self._last_lambda_down_round: int = -999
+        self._geometry_down_streak: int = 0
         self._signal_history: Dict[str, List[float]] = {}
         # P2: U/K 中位数历史（用于自适应 lambda 调整）
         self._u_median_history: List[tuple] = []
@@ -115,7 +116,7 @@ class Toolbox:
             progress = float(current_labeled) / float(total_budget)
         schedule = cfg.get("progressive_caps")
         if isinstance(schedule, list) and progress is not None:
-            chosen = None
+            points = []
             for item in schedule:
                 if not isinstance(item, dict):
                     continue
@@ -125,21 +126,42 @@ class Toolbox:
                 lambda_cap = self._safe_float(item.get("lambda_max"))
                 if progress_cap is None or lambda_cap is None:
                     continue
-                if float(progress) <= float(progress_cap):
-                    chosen = {
-                        "cap": float(lambda_cap),
-                        "source": "progressive_caps",
-                        "progress_cap": float(progress_cap),
-                    }
-                    break
-            if chosen is not None:
-                cap = float(chosen["cap"])
-                cap_source = str(chosen["source"])
+                points.append((float(progress_cap), float(lambda_cap)))
+            points = sorted(points, key=lambda x: x[0])
+            if points:
+                interpolate = bool(cfg.get("interpolate_progressive_caps", True))
+                chosen_cap = float(points[-1][1])
+                chosen_progress_cap = float(points[-1][0])
+                interpolated = False
+                if float(progress) <= float(points[0][0]):
+                    chosen_cap = float(points[0][1])
+                    chosen_progress_cap = float(points[0][0])
+                else:
+                    for idx in range(1, len(points)):
+                        prev_progress, prev_cap = points[idx - 1]
+                        curr_progress, curr_cap = points[idx]
+                        if float(progress) <= float(curr_progress):
+                            chosen_progress_cap = float(curr_progress)
+                            if interpolate and float(curr_progress) > float(prev_progress):
+                                alpha = (float(progress) - float(prev_progress)) / (
+                                    float(curr_progress) - float(prev_progress)
+                                )
+                                alpha = float(min(max(alpha, 0.0), 1.0))
+                                chosen_cap = float(
+                                    prev_cap + alpha * (curr_cap - prev_cap)
+                                )
+                                interpolated = True
+                            else:
+                                chosen_cap = float(curr_cap)
+                            break
+                cap = float(chosen_cap)
+                cap_source = "progressive_caps_interp" if interpolated else "progressive_caps"
                 return {
                     "cap": float(min(default_cap, cap)),
                     "source": cap_source,
                     "progress": progress,
-                    "progress_cap": chosen.get("progress_cap"),
+                    "progress_cap": chosen_progress_cap,
+                    "interpolated": bool(interpolated),
                 }
         if cap is None:
             cap = float(default_cap)
@@ -149,6 +171,7 @@ class Toolbox:
             "source": str(cap_source),
             "progress": progress,
             "progress_cap": None,
+            "interpolated": False,
         }
 
     def _geometry_control_decision(
@@ -194,20 +217,35 @@ class Toolbox:
         step_up_base = self._safe_float(cfg.get("step_up", delta_up))
         if step_up_base is None:
             step_up_base = float(delta_up)
-        step_down_value = self._safe_float(cfg.get("step_down", delta_down))
+        step_down_value = self._safe_float(cfg.get("step_down", step_up_base))
         if step_down_value is None:
-            step_down_value = float(delta_down)
+            step_down_value = float(step_up_base)
         asymmetry_floor = self._safe_float(cfg.get("asymmetry_floor", 1.0))
         if asymmetry_floor is None:
             asymmetry_floor = 1.0
-        asymmetry_for_step = (
-            max(float(asymmetry_ratio), float(asymmetry_floor))
-            if asymmetry_ratio is not None
-            else float(asymmetry_floor)
-        )
-        step_up_value = float(step_up_base) / float(asymmetry_for_step)
+        asymmetry_boost_cap = self._safe_float(cfg.get("asymmetry_boost_cap", 2.0))
+        if asymmetry_boost_cap is None:
+            asymmetry_boost_cap = 2.0
+        asymmetry_eps = 1e-12
+        asymmetry_mode = "neutral"
+        asymmetry_scale = 1.0
+        asymmetry_for_step = float(asymmetry_floor)
+        if asymmetry_ratio is not None:
+            if float(asymmetry_ratio) >= float(asymmetry_floor):
+                asymmetry_for_step = max(float(asymmetry_ratio), float(asymmetry_floor))
+                asymmetry_scale = 1.0 / float(asymmetry_for_step)
+                asymmetry_mode = "shrink_up"
+            elif float(asymmetry_ratio) > asymmetry_eps:
+                asymmetry_for_step = float(asymmetry_ratio)
+                asymmetry_scale = min(
+                    1.0 / float(asymmetry_ratio), float(asymmetry_boost_cap)
+                )
+                asymmetry_mode = "boost_up"
+        step_up_value = float(step_up_base) * float(asymmetry_scale)
         cap_info = self._resolve_geometry_lambda_cap(cfg, clamp_max)
         effective_cap = float(cap_info.get("cap", clamp_max))
+        max_consecutive_down = int(cfg.get("max_consecutive_down", 2) or 0)
+        current_down_streak = int(getattr(self, "_geometry_down_streak", 0) or 0)
         diagnostics.update(
             {
                 "selection_geometry": {
@@ -222,11 +260,17 @@ class Toolbox:
                 "step_up_effective": float(step_up_value),
                 "step_down": float(step_down_value),
                 "asymmetry_floor": float(asymmetry_floor),
+                "asymmetry_boost_cap": float(asymmetry_boost_cap),
+                "asymmetry_mode": str(asymmetry_mode),
+                "asymmetry_scale": float(asymmetry_scale),
                 "asymmetry_for_step": float(asymmetry_for_step),
                 "lambda_cap": float(effective_cap),
                 "lambda_cap_source": cap_info.get("source"),
                 "progress_ratio": cap_info.get("progress"),
                 "progress_cap": cap_info.get("progress_cap"),
+                "cap_interpolated": bool(cap_info.get("interpolated", False)),
+                "max_consecutive_down": int(max_consecutive_down),
+                "current_down_streak": int(current_down_streak),
                 "fallback_to_risk_policy": bool(cfg.get("fallback_to_risk_policy", True)),
             }
         )
@@ -234,6 +278,18 @@ class Toolbox:
             diagnostics["reason"] = "missing_sens_up"
             return {"enabled": True, "handled": False, "diagnostics": diagnostics}
         if float(sens_up) > float(sens_threshold):
+            if int(max_consecutive_down) > 0 and int(current_down_streak) >= int(
+                max_consecutive_down
+            ):
+                diagnostics["direction"] = "hold"
+                diagnostics["reason"] = "down_streak_cap"
+                return {
+                    "enabled": True,
+                    "handled": True,
+                    "applied": float(min(max(float(base), float(clamp_min)), float(effective_cap))),
+                    "rule": "geometry_sensitive_hold_streak_cap",
+                    "diagnostics": diagnostics,
+                }
             applied = float(
                 min(
                     max(float(base) - float(step_down_value), float(clamp_min)),
@@ -1438,6 +1494,11 @@ class Toolbox:
                 "base": payload.get("base"),
             },
         }
+        rule = str(payload.get("rule") or "")
+        if rule == "geometry_sensitive_down":
+            self._geometry_down_streak = int(getattr(self, "_geometry_down_streak", 0)) + 1
+        else:
+            self._geometry_down_streak = 0
         self._last_lambda_applied = float(applied)
         if hasattr(self.controller, "_append_trace"):
             ts = self.training_state if isinstance(self.training_state, dict) else {}

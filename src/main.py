@@ -1341,7 +1341,9 @@ class ActiveLearningPipeline:
             k_arr = np.asarray(pool_kg, dtype=float)
             pool_n = int(len(u_arr))
             boundary_ratio = 0.2
-            sensitivity_delta = 0.1
+            sensitivity_delta_cap = 0.1
+            sensitivity_delta_ratio = 0.2
+            sensitivity_delta_min = 0.05
             if isinstance(getattr(self, "exp_config", None), dict):
                 try:
                     boundary_ratio = float(
@@ -1351,14 +1353,37 @@ class ActiveLearningPipeline:
                 except Exception:
                     boundary_ratio = 0.2
                 try:
-                    sensitivity_delta = float(
+                    sensitivity_delta_cap = float(
                         self.exp_config.get(
                             "geometry_sensitivity_delta_lambda", 0.1
                         )
                         or 0.1
                     )
                 except Exception:
-                    sensitivity_delta = 0.1
+                    sensitivity_delta_cap = 0.1
+                try:
+                    sensitivity_delta_ratio = float(
+                        self.exp_config.get(
+                            "geometry_sensitivity_delta_lambda_ratio", 0.2
+                        )
+                        or 0.2
+                    )
+                except Exception:
+                    sensitivity_delta_ratio = 0.2
+                try:
+                    sensitivity_delta_min = float(
+                        self.exp_config.get(
+                            "geometry_sensitivity_delta_lambda_min", 0.05
+                        )
+                        or 0.05
+                    )
+                except Exception:
+                    sensitivity_delta_min = 0.05
+            sensitivity_delta_cap = float(max(sensitivity_delta_cap, 0.0))
+            sensitivity_delta_ratio = float(max(sensitivity_delta_ratio, 0.0))
+            sensitivity_delta_min = float(
+                min(max(sensitivity_delta_min, 0.0), sensitivity_delta_cap)
+            )
             boundary_half_width = max(1, int(np.ceil(float(query_size) * float(boundary_ratio))))
             boundary_start = max(0, int(query_size) - boundary_half_width)
             boundary_end = min(pool_n, int(query_size) + boundary_half_width)
@@ -1402,6 +1427,15 @@ class ActiveLearningPipeline:
                 except Exception:
                     lambda_current = None
             if lambda_current is not None and pool_n > 0:
+                sensitivity_delta = float(
+                    min(
+                        sensitivity_delta_cap,
+                        max(
+                            sensitivity_delta_min,
+                            sensitivity_delta_ratio * max(float(lambda_current), 0.0),
+                        ),
+                    )
+                )
                 current_scores = (
                     (1.0 - float(lambda_current)) * u_arr
                     + float(lambda_current) * k_arr
@@ -1460,6 +1494,11 @@ class ActiveLearningPipeline:
                 lambda_up = min(1.0, lambda_current + float(sensitivity_delta))
                 lambda_down = max(0.0, lambda_current - float(sensitivity_delta))
                 geometry["sensitivity_delta_lambda"] = float(sensitivity_delta)
+                geometry["sensitivity_delta_lambda_cap"] = float(sensitivity_delta_cap)
+                geometry["sensitivity_delta_lambda_ratio"] = float(
+                    sensitivity_delta_ratio
+                )
+                geometry["sensitivity_delta_lambda_min"] = float(sensitivity_delta_min)
 
                 up_metrics = (
                     _jaccard_metrics(lambda_up)

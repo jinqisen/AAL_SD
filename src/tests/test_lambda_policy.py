@@ -129,9 +129,8 @@ def test_geometry_controller_scales_step_up_and_applies_progress_cap():
         "risk_control_start_round": 1,
         "geometry_controller": {
             "enabled": True,
-            "sens_up_threshold": 0.1,
+            "sens_up_threshold": 0.12,
             "step_up": 0.08,
-            "step_down": 0.12,
             "progressive_caps": [
                 {"max_progress": 0.3, "lambda_max": 0.23},
                 {"max_progress": 1.0, "lambda_max": 0.6},
@@ -175,11 +174,155 @@ def test_geometry_controller_reduces_lambda_when_sens_up_is_high():
         "risk_control_start_round": 1,
         "geometry_controller": {
             "enabled": True,
-            "sens_up_threshold": 0.1,
+            "sens_up_threshold": 0.12,
             "step_up": 0.08,
-            "step_down": 0.12,
+            "step_down": 0.08,
         },
     }
     payload = tools._compute_policy_lambda_for_round(2, policy)
-    assert abs(float(payload.get("applied")) - 0.23) < 1e-12
+    assert abs(float(payload.get("applied")) - 0.27) < 1e-12
     assert payload.get("rule") == "geometry_sensitive_down"
+
+
+def test_geometry_controller_boosts_step_up_when_asymmetry_ratio_is_below_one():
+    controller = _Controller()
+    tools = Toolbox(controller, types.SimpleNamespace(), model=None)
+    tools._last_lambda_applied = 0.2
+    tools.training_state = {
+        "last_miou": 0.7,
+        "prev_miou": 0.7,
+        "miou_delta": 0.0,
+        "rollback_flag": False,
+        "current_labeled_count": 20,
+        "total_budget": 100,
+        "overfit_risk": 0.1,
+        "grad_train_val_cos_min": 0.0,
+        "grad_train_val_cos_last": 0.0,
+        "selection_geometry": {
+            "sens_up": 0.04,
+            "sens_down": 0.08,
+            "asymmetry_ratio": 0.5,
+        },
+    }
+    policy = {
+        "mode": "warmup_risk_closed_loop",
+        "uncertainty_only_rounds": 0,
+        "warmup_rounds": 0,
+        "risk_control_start_round": 1,
+        "geometry_controller": {
+            "enabled": True,
+            "sens_up_threshold": 0.12,
+            "step_up": 0.08,
+            "asymmetry_boost_cap": 2.0,
+            "lambda_cap": 0.5,
+        },
+    }
+    payload = tools._compute_policy_lambda_for_round(2, policy)
+    assert abs(float(payload.get("applied")) - 0.36) < 1e-12
+    diag = payload.get("diagnostics") or {}
+    geom = (diag.get("geometry_controller") or {}) if isinstance(diag, dict) else {}
+    assert geom.get("asymmetry_mode") == "boost_up"
+    assert abs(float(geom.get("step_up_effective")) - 0.16) < 1e-12
+
+
+def test_geometry_controller_progressive_cap_interpolates_across_boundary():
+    controller = _Controller()
+    tools = Toolbox(controller, types.SimpleNamespace(), model=None)
+    cfg = {
+        "progressive_caps": [
+            {"max_progress": 0.3, "lambda_max": 0.23},
+            {"max_progress": 1.0, "lambda_max": 0.6},
+        ]
+    }
+    tools.training_state = {"current_labeled_count": 29, "total_budget": 100}
+    cap_before = tools._resolve_geometry_lambda_cap(cfg, 0.8)
+    tools.training_state = {"current_labeled_count": 31, "total_budget": 100}
+    cap_after = tools._resolve_geometry_lambda_cap(cfg, 0.8)
+    assert abs(float(cap_before.get("cap")) - 0.23) < 1e-12
+    assert float(cap_after.get("cap")) > 0.23
+    assert float(cap_after.get("cap")) < 0.25
+    assert bool(cap_after.get("interpolated")) is True
+
+
+def test_geometry_controller_falls_back_to_risk_policy_when_signal_missing():
+    controller = _Controller()
+    tools = Toolbox(controller, types.SimpleNamespace(), model=None)
+    tools._last_lambda_applied = 0.2
+    tools.current_scores = {
+        "a": {"U": 0.1, "K": 0.9},
+        "b": {"U": 0.2, "K": 0.8},
+        "c": {"U": 0.15, "K": 0.85},
+    }
+    tools.training_state = {
+        "last_miou": 0.7,
+        "prev_miou": 0.7,
+        "miou_delta": 0.0,
+        "rollback_flag": False,
+        "current_labeled_count": 20,
+        "total_budget": 100,
+        "overfit_risk": 0.1,
+        "grad_train_val_cos_min": 0.0,
+        "grad_train_val_cos_last": 0.0,
+    }
+    policy = {
+        "mode": "warmup_risk_closed_loop",
+        "uncertainty_only_rounds": 0,
+        "warmup_rounds": 0,
+        "risk_control_start_round": 1,
+        "geometry_controller": {
+            "enabled": True,
+            "sens_up_threshold": 0.12,
+            "step_up": 0.08,
+            "fallback_to_risk_policy": True,
+        },
+    }
+    payload = tools._compute_policy_lambda_for_round(2, policy)
+    assert abs(float(payload.get("applied")) - 0.25) < 1e-12
+    assert payload.get("rule") == "low_risk_k_dominant_up"
+
+
+def test_geometry_controller_limits_consecutive_down_rounds():
+    controller = _Controller()
+    tools = Toolbox(controller, types.SimpleNamespace(), model=None)
+    policy = {
+        "mode": "warmup_risk_closed_loop",
+        "uncertainty_only_rounds": 0,
+        "warmup_rounds": 0,
+        "risk_control_start_round": 1,
+        "geometry_controller": {
+            "enabled": True,
+            "sens_up_threshold": 0.12,
+            "step_up": 0.08,
+            "step_down": 0.08,
+            "max_consecutive_down": 2,
+            "lambda_cap": 0.8,
+        },
+    }
+    tools._last_lambda_applied = 0.3
+    for round_num, expected, expected_rule in (
+        (2, 0.22, "geometry_sensitive_down"),
+        (3, 0.14, "geometry_sensitive_down"),
+        (4, 0.14, "geometry_sensitive_hold_streak_cap"),
+    ):
+        tools.training_state = {
+            "last_miou": 0.7,
+            "prev_miou": 0.7,
+            "miou_delta": 0.0,
+            "rollback_flag": False,
+            "current_labeled_count": 20,
+            "total_budget": 100,
+            "overfit_risk": 0.1,
+            "grad_train_val_cos_min": 0.0,
+            "grad_train_val_cos_last": 0.0,
+            "selection_geometry": {
+                "sens_up": 0.18,
+                "sens_down": 0.05,
+                "asymmetry_ratio": 3.6,
+            },
+        }
+        payload = tools._compute_policy_lambda_for_round(round_num, policy)
+        assert abs(float(payload.get("applied")) - expected) < 1e-12
+        assert payload.get("rule") == expected_rule
+        tools._last_lambda_applied = float(payload.get("applied"))
+        if payload.get("rule") == "geometry_sensitive_down":
+            tools._geometry_down_streak += 1

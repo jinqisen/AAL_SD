@@ -11,6 +11,8 @@ class TestSelectionGeometryLogging(unittest.TestCase):
         p.exp_config = {
             "geometry_boundary_delta_ratio": 0.5,
             "geometry_sensitivity_delta_lambda": 0.1,
+            "geometry_sensitivity_delta_lambda_ratio": 0.2,
+            "geometry_sensitivity_delta_lambda_min": 0.05,
         }
         p.config = SimpleNamespace(QUERY_SIZE=2)
         p.current_round = 1
@@ -73,6 +75,7 @@ class TestSelectionGeometryLogging(unittest.TestCase):
         self.assertIsNotNone(geometry["sens_down"])
         self.assertIsNotNone(geometry["crossing_density"])
         self.assertIsNotNone(geometry["local_jaccard_distance"])
+        self.assertAlmostEqual(geometry["sensitivity_delta_lambda"], 0.05)
 
     def test_append_score_snapshot_logs_ranked_rows_and_boundary_rows(self):
         p = self._make_pipeline()
