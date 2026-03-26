@@ -1,7 +1,7 @@
 {
   "run_id": "ablation_matrix_p3_20260323_235540_seed45",
   "experiment_name": "full_model_A_lambda_policy",
-  "updated_at": "2026-03-26T05:20:59.067396",
+  "updated_at": "2026-03-26T05:54:36.490818",
   "pid": 92330,
   "ppid": 92318,
   "pool_integrity": {
@@ -28,7 +28,7 @@
       }
     }
   ],
-  "status": "running",
+  "status": "completed",
   "pools_dir": "/Users/anykong/AD-KUCS/AAL_SD/results/pools/ablation_matrix_p3_20260323_235540_seed45/full_model_A_lambda_policy",
   "checkpoint_path": "results/checkpoints/ablation_matrix_p3_20260323_235540_seed45/full_model_A_lambda_policy_state.json",
   "initial": {
@@ -43,13 +43,38 @@
     "start_round": 2
   },
   "progress": {
-    "round": 14,
-    "epoch": 1,
-    "labeled_size": 1157,
-    "loss": 0.25326892745036345,
-    "mIoU": 0.5639992212732641,
-    "f1": 0.6214774077339839,
-    "best_mIoU_round": 0.5639992212732641,
-    "warnings": []
+    "round": 16,
+    "epoch": "finished",
+    "labeled_size": 1333
+  },
+  "result": {
+    "alc": 0.591800885360372,
+    "final_mIoU": 0.6758938210123145,
+    "final_f1": 0.764366516299861,
+    "final_selected_mIoU": 0.6922507092124732,
+    "final_selected_f1": 0.78091255603126,
+    "final_report_mIoU": 0.6758938210123145,
+    "final_report_f1": 0.764366516299861,
+    "final_miou_source": "final_report",
+    "final_f1_source": "final_report",
+    "test_split": "test",
+    "budget_history": [
+      189,
+      189,
+      189,
+      277,
+      365,
+      453,
+      541,
+      629,
+      717,
+      805,
+      893,
+      981,
+      1069,
+      1157,
+      1245,
+      1333
+    ]
   }
 }

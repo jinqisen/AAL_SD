@@ -65,6 +65,17 @@ class Toolbox:
         except Exception:
             return 0
 
+    def _safe_float(self, value: Any) -> Optional[float]:
+        if value is None:
+            return None
+        try:
+            out = float(value)
+        except Exception:
+            return None
+        if np.isnan(out) or np.isinf(out):
+            return None
+        return float(out)
+
     def _lambda_policy_config(self) -> Optional[Dict[str, Any]]:
         controller = getattr(self, "controller", None)
         exp_cfg = getattr(controller, "exp_config", None)
@@ -73,6 +84,186 @@ class Toolbox:
             if isinstance(pol, dict):
                 return dict(pol)
         return None
+
+    def _current_selection_geometry(self) -> Optional[Dict[str, Any]]:
+        state = self.training_state if isinstance(self.training_state, dict) else {}
+        geometry = state.get("selection_geometry")
+        if isinstance(geometry, dict):
+            return dict(geometry)
+        controller = getattr(self, "controller", None)
+        ranking_meta = getattr(controller, "_last_ranking_metadata", None)
+        if isinstance(ranking_meta, dict):
+            geometry = ranking_meta.get("selection_geometry")
+            if isinstance(geometry, dict):
+                return dict(geometry)
+        return None
+
+    def _resolve_geometry_lambda_cap(
+        self, cfg: Dict[str, Any], default_cap: float
+    ) -> Dict[str, Any]:
+        cap = self._safe_float(cfg.get("lambda_cap"))
+        cap_source = "lambda_cap"
+        progress = None
+        state = self.training_state if isinstance(self.training_state, dict) else {}
+        current_labeled = self._safe_float(state.get("current_labeled_count"))
+        total_budget = self._safe_float(state.get("total_budget"))
+        if (
+            current_labeled is not None
+            and total_budget is not None
+            and float(total_budget) > 0.0
+        ):
+            progress = float(current_labeled) / float(total_budget)
+        schedule = cfg.get("progressive_caps")
+        if isinstance(schedule, list) and progress is not None:
+            chosen = None
+            for item in schedule:
+                if not isinstance(item, dict):
+                    continue
+                progress_cap = self._safe_float(
+                    item.get("max_progress", item.get("progress_lte"))
+                )
+                lambda_cap = self._safe_float(item.get("lambda_max"))
+                if progress_cap is None or lambda_cap is None:
+                    continue
+                if float(progress) <= float(progress_cap):
+                    chosen = {
+                        "cap": float(lambda_cap),
+                        "source": "progressive_caps",
+                        "progress_cap": float(progress_cap),
+                    }
+                    break
+            if chosen is not None:
+                cap = float(chosen["cap"])
+                cap_source = str(chosen["source"])
+                return {
+                    "cap": float(min(default_cap, cap)),
+                    "source": cap_source,
+                    "progress": progress,
+                    "progress_cap": chosen.get("progress_cap"),
+                }
+        if cap is None:
+            cap = float(default_cap)
+            cap_source = "clamp_max"
+        return {
+            "cap": float(min(default_cap, cap)),
+            "source": str(cap_source),
+            "progress": progress,
+            "progress_cap": None,
+        }
+
+    def _geometry_control_decision(
+        self,
+        *,
+        round_num: int,
+        policy: Dict[str, Any],
+        base: float,
+        clamp_min: float,
+        clamp_max: float,
+        delta_up: float,
+        delta_down: float,
+    ) -> Dict[str, Any]:
+        cfg = policy.get("geometry_controller")
+        if not isinstance(cfg, dict) or not bool(cfg.get("enabled", False)):
+            return {"enabled": False, "handled": False, "diagnostics": {"enabled": False}}
+        start_round = int(cfg.get("start_round", policy.get("risk_control_start_round", 1)))
+        diagnostics: Dict[str, Any] = {
+            "enabled": True,
+            "start_round": int(start_round),
+        }
+        if int(round_num) < int(start_round):
+            diagnostics["active"] = False
+            diagnostics["reason"] = "before_start_round"
+            return {"enabled": True, "handled": False, "diagnostics": diagnostics}
+        geometry = self._current_selection_geometry()
+        diagnostics["active"] = True
+        diagnostics["geometry_available"] = isinstance(geometry, dict)
+        if not isinstance(geometry, dict):
+            diagnostics["reason"] = "missing_selection_geometry"
+            return {"enabled": True, "handled": False, "diagnostics": diagnostics}
+        sens_up = self._safe_float(geometry.get("sens_up"))
+        sens_down = self._safe_float(geometry.get("sens_down"))
+        asymmetry_ratio = self._safe_float(geometry.get("asymmetry_ratio"))
+        if asymmetry_ratio is None and sens_up is not None and sens_down is not None:
+            if abs(float(sens_down)) > 1e-12:
+                asymmetry_ratio = float(sens_up) / float(sens_down)
+        sens_threshold = self._safe_float(
+            cfg.get("sens_up_threshold", cfg.get("tau", 0.12))
+        )
+        if sens_threshold is None:
+            sens_threshold = 0.12
+        step_up_base = self._safe_float(cfg.get("step_up", delta_up))
+        if step_up_base is None:
+            step_up_base = float(delta_up)
+        step_down_value = self._safe_float(cfg.get("step_down", delta_down))
+        if step_down_value is None:
+            step_down_value = float(delta_down)
+        asymmetry_floor = self._safe_float(cfg.get("asymmetry_floor", 1.0))
+        if asymmetry_floor is None:
+            asymmetry_floor = 1.0
+        asymmetry_for_step = (
+            max(float(asymmetry_ratio), float(asymmetry_floor))
+            if asymmetry_ratio is not None
+            else float(asymmetry_floor)
+        )
+        step_up_value = float(step_up_base) / float(asymmetry_for_step)
+        cap_info = self._resolve_geometry_lambda_cap(cfg, clamp_max)
+        effective_cap = float(cap_info.get("cap", clamp_max))
+        diagnostics.update(
+            {
+                "selection_geometry": {
+                    "sens_up": sens_up,
+                    "sens_down": sens_down,
+                    "asymmetry_ratio": asymmetry_ratio,
+                    "crossing_density": self._safe_float(geometry.get("crossing_density")),
+                    "lambda_effective": self._safe_float(geometry.get("lambda_effective")),
+                },
+                "sens_up_threshold": float(sens_threshold),
+                "step_up_base": float(step_up_base),
+                "step_up_effective": float(step_up_value),
+                "step_down": float(step_down_value),
+                "asymmetry_floor": float(asymmetry_floor),
+                "asymmetry_for_step": float(asymmetry_for_step),
+                "lambda_cap": float(effective_cap),
+                "lambda_cap_source": cap_info.get("source"),
+                "progress_ratio": cap_info.get("progress"),
+                "progress_cap": cap_info.get("progress_cap"),
+                "fallback_to_risk_policy": bool(cfg.get("fallback_to_risk_policy", True)),
+            }
+        )
+        if sens_up is None:
+            diagnostics["reason"] = "missing_sens_up"
+            return {"enabled": True, "handled": False, "diagnostics": diagnostics}
+        if float(sens_up) > float(sens_threshold):
+            applied = float(
+                min(
+                    max(float(base) - float(step_down_value), float(clamp_min)),
+                    float(effective_cap),
+                )
+            )
+            diagnostics["direction"] = "down"
+            return {
+                "enabled": True,
+                "handled": True,
+                "applied": float(applied),
+                "rule": "geometry_sensitive_down",
+                "diagnostics": diagnostics,
+            }
+        applied = float(
+            min(float(base) + float(step_up_value), float(clamp_max), float(effective_cap))
+        )
+        diagnostics["direction"] = "up"
+        diagnostics["cap_hit"] = bool(float(applied) >= float(effective_cap) - 1e-12)
+        if float(applied) < float(base) - 1e-12:
+            rule = "geometry_cap_down"
+        else:
+            rule = "geometry_safe_up_capped" if diagnostics["cap_hit"] else "geometry_safe_up"
+        return {
+            "enabled": True,
+            "handled": True,
+            "applied": float(applied),
+            "rule": str(rule),
+            "diagnostics": diagnostics,
+        }
 
     def _selection_guardrail_config(self) -> Optional[Dict[str, Any]]:
         policy = self._lambda_policy_config()
@@ -947,6 +1138,20 @@ class Toolbox:
         else:
             diagnostics["u_adaptive"] = {"enabled": False}
 
+        geometry_control = self._geometry_control_decision(
+            round_num=int(round_num),
+            policy=policy,
+            base=float(applied),
+            clamp_min=float(clamp_min),
+            clamp_max=float(clamp_max),
+            delta_up=float(delta_up),
+            delta_down=float(delta_down),
+        )
+        diagnostics["geometry_controller"] = geometry_control.get("diagnostics")
+        geometry_fallback = bool(
+            (geometry_control.get("diagnostics") or {}).get("fallback_to_risk_policy", True)
+        )
+
         if round_num >= risk_control_start_round:
             epoch_vol = self.training_state.get("epoch_miou_volatility")
             tvc_flip = self.training_state.get("tvc_sign_flip_rate")
@@ -997,6 +1202,11 @@ class Toolbox:
                     rule = "severe_overfit_lambda_down"
                 else:
                     rule = "severe_overfit_lambda_down_no_delta"
+            elif bool(geometry_control.get("handled")):
+                applied = float(geometry_control.get("applied"))
+                rule = str(geometry_control.get("rule"))
+            elif bool(geometry_control.get("enabled")) and (not geometry_fallback):
+                rule = "geometry_hold_missing_signal"
             else:
                 allow_up = False
                 allow_up_reason = None

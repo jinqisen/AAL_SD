@@ -1,9 +1,9 @@
 {
   "run_id": "ablation_matrix_p3_20260323_235540_seed45",
   "experiment_name": "full_model_B_lambda_agent",
-  "updated_at": "2026-03-25T22:47:37.157511",
-  "pid": 53232,
-  "ppid": 53222,
+  "updated_at": "2026-03-26T09:54:39.486158",
+  "pid": 92330,
+  "ppid": 92318,
   "pool_integrity": {
     "counts": {
       "labeled": 189,
@@ -28,7 +28,7 @@
       }
     }
   ],
-  "status": "failed",
+  "status": "completed",
   "pools_dir": "/Users/anykong/AD-KUCS/AAL_SD/results/pools/ablation_matrix_p3_20260323_235540_seed45/full_model_B_lambda_agent",
   "checkpoint_path": "results/checkpoints/ablation_matrix_p3_20260323_235540_seed45/full_model_B_lambda_agent_state.json",
   "initial": {
@@ -40,28 +40,41 @@
     "sha256": "ab1c6ed6ffcd25606a577ecf266996d10127065c72db2f5cc8c43cb90fd7c95a"
   },
   "resume": {
-    "start_round": 0
+    "start_round": 1
   },
   "progress": {
-    "round": 1,
-    "epoch": 10,
-    "labeled_size": 189,
-    "loss": 0.053059893349806465,
-    "mIoU": 0.5620908472831037,
-    "f1": 0.6188096991923625,
-    "best_mIoU_round": 0.6086459645172497,
-    "warnings": []
+    "round": 16,
+    "epoch": "finished",
+    "labeled_size": 1421
   },
-  "current_error": {
-    "round": 1,
-    "message": "LLM Agent failed at Round 1: LLMAPIError: Error calling API: HTTPSConnectionPool(host='api.siliconflow.cn', port=443): Max retries exceeded with url: /v1/chat/completions (Caused by SSLError(SSLEOFError(8, '[SSL: UNEXPECTED_EOF_WHILE_READING] EOF occurred in violation of protocol (_ssl.c:1032)')))",
-    "type": "unknown",
-    "exception": "RuntimeError"
-  },
-  "error": {
-    "round": 1,
-    "message": "LLM Agent failed at Round 1: LLMAPIError: Error calling API: HTTPSConnectionPool(host='api.siliconflow.cn', port=443): Max retries exceeded with url: /v1/chat/completions (Caused by SSLError(SSLEOFError(8, '[SSL: UNEXPECTED_EOF_WHILE_READING] EOF occurred in violation of protocol (_ssl.c:1032)')))",
-    "type": "unknown",
-    "exception": "RuntimeError"
+  "result": {
+    "alc": 0.5985080316156959,
+    "final_mIoU": 0.6964753666194802,
+    "final_f1": 0.7859815758016986,
+    "final_selected_mIoU": 0.7109182447982183,
+    "final_selected_f1": 0.799646384140948,
+    "final_report_mIoU": 0.6964753666194802,
+    "final_report_f1": 0.7859815758016986,
+    "final_miou_source": "final_report",
+    "final_f1_source": "final_report",
+    "test_split": "test",
+    "budget_history": [
+      189,
+      189,
+      277,
+      365,
+      453,
+      541,
+      629,
+      717,
+      805,
+      893,
+      981,
+      1069,
+      1157,
+      1245,
+      1333,
+      1421
+    ]
   }
 }

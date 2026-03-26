@@ -265,3 +265,59 @@ Round=13, Labeled=1069, mIoU=0.7010, F1=0.7897
 Labeled Pool Size: 1157
 
 - Epoch 1: Loss=0.2533, mIoU=0.5640, F1=0.6215
+- Epoch 2: Loss=0.1234, mIoU=0.5327, F1=0.5714
+- Epoch 3: Loss=0.1093, mIoU=0.5848, F1=0.6519
+- Epoch 4: Loss=0.1001, mIoU=0.6900, F1=0.7789
+- Epoch 5: Loss=0.0938, mIoU=0.7006, F1=0.7901
+- Epoch 6: Loss=0.0911, mIoU=0.6579, F1=0.7443
+- Epoch 7: Loss=0.0873, mIoU=0.7090, F1=0.7978
+- Epoch 8: Loss=0.0829, mIoU=0.6566, F1=0.7429
+- Epoch 9: Loss=0.0812, mIoU=0.6545, F1=0.7405
+- Epoch 10: Loss=0.0771, mIoU=0.6946, F1=0.7835
+
+本轮结果: Round=14, Labeled=1157, Selection=best_val (epoch=7), mIoU=0.7090, F1=0.7978, peak_mIoU=0.7090
+
+Round=14, Labeled=1157, mIoU=0.7090, F1=0.7978
+
+## Round 15
+
+Labeled Pool Size: 1245
+
+- Epoch 1: Loss=0.2274, mIoU=0.5059, F1=0.5236
+- Epoch 2: Loss=0.1166, mIoU=0.6223, F1=0.7020
+- Epoch 3: Loss=0.1030, mIoU=0.5513, F1=0.6016
+- Epoch 4: Loss=0.0968, mIoU=0.6082, F1=0.6837
+- Epoch 5: Loss=0.0892, mIoU=0.6923, F1=0.7809
+- Epoch 6: Loss=0.0844, mIoU=0.6279, F1=0.7094
+- Epoch 7: Loss=0.0816, mIoU=0.6904, F1=0.7799
+- Epoch 8: Loss=0.0790, mIoU=0.6518, F1=0.7405
+- Epoch 9: Loss=0.0766, mIoU=0.6493, F1=0.7350
+- Epoch 10: Loss=0.0738, mIoU=0.6837, F1=0.7731
+
+本轮结果: Round=15, Labeled=1245, Selection=best_val (epoch=5), mIoU=0.6923, F1=0.7809, peak_mIoU=0.6923
+
+Round=15, Labeled=1245, mIoU=0.6923, F1=0.7809
+
+## Round 16
+
+Labeled Pool Size: 1333
+
+- Test-only mode: Round 16 loads Round 15 best_val checkpoint (epoch=5, val_mIoU=0.6923, val_F1=0.7809)
+
+本轮结果: Round=16, Labeled=1333, Selection=prev_round_best_val (source_round=15, epoch=5), mIoU=0.6923, F1=0.7809, peak_mIoU=0.6923
+
+Round=16, Labeled=1333, mIoU=0.6923, F1=0.7809
+
+
+## 实验汇总
+
+预算历史: [189, 189, 189, 277, 365, 453, 541, 629, 717, 805, 893, 981, 1069, 1157, 1245, 1333]
+ALC(基于每轮选模val mIoU): 0.5918
+最后一轮选模 mIoU(val): 0.6922507092124732
+最后一轮选模 F1(val): 0.78091255603126
+最终报告 mIoU(test): 0.6758938210123145
+最终报告 F1(test): 0.764366516299861
+最终输出 mIoU: 0.6759 (source=final_report)
+最终输出 F1: 0.7644 (source=final_report)
+最终 Test Split: test
+最终 Report: {'loss': 0.04308165920549072, 'mIoU': 0.6758938210123145, 'f1_score': 0.764366516299861}

@@ -14,8 +14,7 @@ from typing import Dict, List, Optional, Any, Union
 # Add project root to path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from src.agent.agent_manager import SiliconFlowClient
-from src.config import Config
+from typing import Any as _AnyAlias  # placeholder to avoid unused import issues
 
 MONITOR_INTERVAL = 30
 STALL_THRESHOLD = 600
@@ -42,7 +41,6 @@ class TrainingMonitor:
         orphan_shm_kill_timeout_seconds: float = 2.0,
         orphan_shm_only_when_main_stopped: bool = True,
     ):
-        self.config = Config()
         self.run_id = run_id
         parsed_run_ids: List[str] = []
         if isinstance(run_ids, list):
@@ -55,7 +53,7 @@ class TrainingMonitor:
         self.runs_dir = runs_dir or RUNS_DIR
         self.monitor_interval = int(monitor_interval)
         self.stall_threshold = int(stall_threshold)
-        self.llm_client: Optional[SiliconFlowClient] = self._setup_llm_client() if bool(enable_llm) else None
+        self.llm_client: Optional[Any] = self._setup_llm_client() if bool(enable_llm) else None
         self.enable_summary = bool(enable_summary)
         self.last_report_time: Dict[str, datetime] = {}  # exp_name -> timestamp (for LLM rate limit)
         self.last_round_seen: Dict[str, int] = {}        # exp_name -> round_number
@@ -270,8 +268,9 @@ class TrainingMonitor:
 
         return {"target": int(len(pids)), "term": int(killed_term), "kill": int(killed_kill), "denied": int(denied), "missing": int(missing)}
 
-    def _setup_llm_client(self) -> Optional[SiliconFlowClient]:
+    def _setup_llm_client(self) -> Optional[Any]:
         try:
+            from src.agent.agent_manager import SiliconFlowClient
             config_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'llm_config.json')
             if os.path.exists(config_path):
                 with open(config_path, 'r') as f:

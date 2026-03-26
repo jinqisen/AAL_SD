@@ -1,7 +1,7 @@
 {
   "run_id": "ablation_matrix_p3_20260323_235540_seed46",
   "experiment_name": "full_model_A_lambda_policy",
-  "updated_at": "2026-03-26T05:21:09.395409",
+  "updated_at": "2026-03-26T07:05:36.081625",
   "pid": 97882,
   "ppid": 97873,
   "pool_integrity": {
@@ -16,8 +16,19 @@
     }
   },
   "pool_integrity_ok": true,
-  "errors": [],
-  "status": "running",
+  "errors": [
+    {
+      "ts": "2026-03-26T05:51:28.066736",
+      "status": "failed",
+      "error": {
+        "round": 16,
+        "message": "Missing previous round best checkpoint for final test-only round: results/runs/ablation_matrix_p3_20260323_235540_seed46/full_model_A_lambda_policy_round_models/round_15_best_val.pt",
+        "type": "unknown",
+        "exception": "RuntimeError"
+      }
+    }
+  ],
+  "status": "completed",
   "pools_dir": "/Users/anykong/AD-KUCS/AAL_SD/results/pools/ablation_matrix_p3_20260323_235540_seed46/full_model_A_lambda_policy",
   "checkpoint_path": "results/checkpoints/ablation_matrix_p3_20260323_235540_seed46/full_model_A_lambda_policy_state.json",
   "initial": {
@@ -32,13 +43,38 @@
     "start_round": 0
   },
   "progress": {
-    "round": 9,
-    "epoch": 10,
-    "labeled_size": 893,
-    "loss": 0.09120524635733064,
-    "mIoU": 0.7041571866742563,
-    "f1": 0.7928723744959891,
-    "best_mIoU_round": 0.7275582855632587,
-    "warnings": []
+    "round": 16,
+    "epoch": "finished",
+    "labeled_size": 1509
+  },
+  "result": {
+    "alc": 0.6036464018815497,
+    "final_mIoU": 0.706011707982644,
+    "final_f1": 0.7953387635276729,
+    "final_selected_mIoU": 0.7332019297185448,
+    "final_selected_f1": 0.8205063384199253,
+    "final_report_mIoU": 0.706011707982644,
+    "final_report_f1": 0.7953387635276729,
+    "final_miou_source": "final_report",
+    "final_f1_source": "final_report",
+    "test_split": "test",
+    "budget_history": [
+      189,
+      277,
+      365,
+      453,
+      541,
+      629,
+      717,
+      805,
+      893,
+      981,
+      1069,
+      1157,
+      1245,
+      1333,
+      1421,
+      1509
+    ]
   }
 }
