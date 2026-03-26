@@ -1,6 +1,6 @@
 # 详细实验结果报告
 
-**生成时间**: 2026-03-26 03:36:35
+**生成时间**: 2026-03-26 22:29:54
 
 ---
 
@@ -10,9 +10,34 @@
 
 **描述**: 对照A / AAL-SD (Full)：基于 auto_opt_iter15_cand2_02（warmup+risk闭环 + 后期ramp + U-guardrail；train_holdout grad_probe）
 
-**状态**: failed
+**状态**: success
 
-**错误**: LLM Agent failed at Round 1: LLMAPIError: Error calling API: HTTPSConnectionPool(host='api.siliconflow.cn', port=443): Max retries exceeded with url: /v1/chat/completions (Caused by SSLError(SSLEOFError(8, '[SSL: UNEXPECTED_EOF_WHILE_READING] EOF occurred in violation of protocol (_ssl.c:1032)')))
+**ALC**: 0.5918
+
+**最终 mIoU**: 0.6759
+
+**最终 F1-Score**: 0.7644
+
+#### 性能历史
+
+| 轮次 | mIoU | F1-Score | 标注样本数 |
+|------|------|----------|-----------|
+| 1 | 0.5500 | 0.5998 | 189 |
+| 2 | 0.5461 | 0.5938 | 189 |
+| 3 | 0.5571 | 0.6135 | 189 |
+| 4 | 0.5264 | 0.5605 | 277 |
+| 5 | 0.6707 | 0.7584 | 365 |
+| 6 | 0.6679 | 0.7558 | 453 |
+| 7 | 0.6815 | 0.7702 | 541 |
+| 8 | 0.6863 | 0.7750 | 629 |
+| 9 | 0.6951 | 0.7839 | 717 |
+| 10 | 0.7103 | 0.7992 | 805 |
+| 11 | 0.7066 | 0.7958 | 893 |
+| 12 | 0.6805 | 0.7691 | 981 |
+| 13 | 0.7010 | 0.7897 | 1069 |
+| 14 | 0.7090 | 0.7978 | 1157 |
+| 15 | 0.6923 | 0.7809 | 1245 |
+| 16 | 0.6923 | 0.7809 | 1333 |
 
 ---
 
@@ -20,19 +45,34 @@
 
 **描述**: 对照B / AAL-SD (Agent-λ)：与 full_model_A_lambda_policy 完全一致，唯一区别：λ 由 LLM Agent 通过 set_lambda 显式决定，而非 policy 自动填充
 
-**状态**: failed
+**状态**: success
 
-**错误**: LLM Agent failed at Round 1: LLMAPIError: Error calling API: HTTPSConnectionPool(host='api.siliconflow.cn', port=443): Max retries exceeded with url: /v1/chat/completions (Caused by SSLError(SSLEOFError(8, '[SSL: UNEXPECTED_EOF_WHILE_READING] EOF occurred in violation of protocol (_ssl.c:1032)')))
+**ALC**: 0.5985
 
----
+**最终 mIoU**: 0.6965
 
-### fixed_lambda
+**最终 F1-Score**: 0.7860
 
-**描述**: 消融：Fixed λ=0.5；保留Agent，隔离三阶段λ policy贡献
+#### 性能历史
 
-**状态**: failed
-
-**错误**: LLM Agent failed at Round 1: LLMAPIError: Error calling API: HTTPSConnectionPool(host='api.siliconflow.cn', port=443): Max retries exceeded with url: /v1/chat/completions (Caused by SSLError(SSLEOFError(8, '[SSL: UNEXPECTED_EOF_WHILE_READING] EOF occurred in violation of protocol (_ssl.c:1032)')))
+| 轮次 | mIoU | F1-Score | 标注样本数 |
+|------|------|----------|-----------|
+| 1 | 0.6086 | 0.6845 | 189 |
+| 2 | 0.5626 | 0.6194 | 189 |
+| 3 | 0.5830 | 0.6504 | 277 |
+| 4 | 0.6774 | 0.7656 | 365 |
+| 5 | 0.6725 | 0.7606 | 453 |
+| 6 | 0.6493 | 0.7356 | 541 |
+| 7 | 0.6972 | 0.7866 | 629 |
+| 8 | 0.7023 | 0.7910 | 717 |
+| 9 | 0.7009 | 0.7900 | 805 |
+| 10 | 0.6881 | 0.7772 | 893 |
+| 11 | 0.6960 | 0.7848 | 981 |
+| 12 | 0.6795 | 0.7681 | 1069 |
+| 13 | 0.7059 | 0.7947 | 1157 |
+| 14 | 0.7166 | 0.8054 | 1245 |
+| 15 | 0.7109 | 0.7996 | 1333 |
+| 16 | 0.7109 | 0.7996 | 1421 |
 
 ---
 
@@ -68,6 +108,41 @@
 | 14 | 0.7028 | 0.7918 | 1333 |
 | 15 | 0.6999 | 0.7889 | 1421 |
 | 16 | 0.6999 | 0.7889 | 1509 |
+
+---
+
+### fixed_lambda
+
+**描述**: 消融：Fixed λ=0.5；保留Agent，隔离三阶段λ policy贡献
+
+**状态**: success
+
+**ALC**: 0.5917
+
+**最终 mIoU**: 0.7103
+
+**最终 F1-Score**: 0.7998
+
+#### 性能历史
+
+| 轮次 | mIoU | F1-Score | 标注样本数 |
+|------|------|----------|-----------|
+| 1 | 0.5348 | 0.5751 | 189 |
+| 2 | 0.5417 | 0.5862 | 189 |
+| 3 | 0.5960 | 0.6674 | 277 |
+| 4 | 0.6186 | 0.6973 | 365 |
+| 5 | 0.6704 | 0.7584 | 453 |
+| 6 | 0.6782 | 0.7676 | 541 |
+| 7 | 0.6791 | 0.7677 | 629 |
+| 8 | 0.6631 | 0.7503 | 717 |
+| 9 | 0.6862 | 0.7754 | 805 |
+| 10 | 0.6733 | 0.7619 | 893 |
+| 11 | 0.6948 | 0.7837 | 981 |
+| 12 | 0.6587 | 0.7461 | 1069 |
+| 13 | 0.7174 | 0.8059 | 1157 |
+| 14 | 0.7009 | 0.7896 | 1245 |
+| 15 | 0.7296 | 0.8174 | 1333 |
+| 16 | 0.7296 | 0.8174 | 1421 |
 
 ---
 
@@ -142,4 +217,4 @@
 ---
 
 
-*报告生成于 2026-03-26 03:36:35*
+*报告生成于 2026-03-26 22:29:54*

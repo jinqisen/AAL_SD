@@ -156,3 +156,299 @@ Labeled Pool Size: 805
 
 Round=8, Labeled=805, mIoU=0.7212, F1=0.8095
 
+## Round 9
+
+Labeled Pool Size: 893
+
+- Epoch 1: Loss=0.2974, mIoU=0.5110, F1=0.5330
+- Epoch 2: Loss=0.1443, mIoU=0.6238, F1=0.7035
+- Epoch 3: Loss=0.1245, mIoU=0.6298, F1=0.7110
+- Epoch 4: Loss=0.1131, mIoU=0.6750, F1=0.7629
+- Epoch 5: Loss=0.1114, mIoU=0.6886, F1=0.7771
+- Epoch 6: Loss=0.1026, mIoU=0.6299, F1=0.7111
+- Epoch 7: Loss=0.0980, mIoU=0.6769, F1=0.7651
+- Epoch 8: Loss=0.0962, mIoU=0.6614, F1=0.7487
+- Epoch 9: Loss=0.0894, mIoU=0.6854, F1=0.7747
+- Epoch 10: Loss=0.0878, mIoU=0.7023, F1=0.7915
+
+本轮结果: Round=9, Labeled=893, Selection=best_val (epoch=10), mIoU=0.7023, F1=0.7915, peak_mIoU=0.7023
+
+Round=9, Labeled=893, mIoU=0.7023, F1=0.7915
+
+## Round 10
+
+Labeled Pool Size: 981
+
+- Epoch 1: Loss=0.2223, mIoU=0.5571, F1=0.6109
+- Epoch 2: Loss=0.1336, mIoU=0.5590, F1=0.6139
+- Epoch 3: Loss=0.1151, mIoU=0.6462, F1=0.7315
+- Epoch 4: Loss=0.1065, mIoU=0.6460, F1=0.7305
+- Epoch 5: Loss=0.0992, mIoU=0.6620, F1=0.7485
+- Epoch 6: Loss=0.0955, mIoU=0.6673, F1=0.7549
+- Epoch 7: Loss=0.0917, mIoU=0.6263, F1=0.7068
+- Epoch 8: Loss=0.0884, mIoU=0.6993, F1=0.7880
+
+--- [Checkpoint] 续跑开始时间: 2026-03-26T05:51:28.359192 ---
+
+## Round 10
+
+Labeled Pool Size: 981
+
+- Epoch 9: Loss=0.0884, mIoU=0.6464, F1=0.7310
+- Epoch 1: Loss=0.2214, mIoU=0.5469, F1=0.5947
+- Epoch 10: Loss=0.0833, mIoU=0.6662, F1=0.7540
+
+本轮结果: Round=10, Labeled=981, Selection=best_val (epoch=8), mIoU=0.6993, F1=0.7880, peak_mIoU=0.6993
+
+Round=10, Labeled=981, mIoU=0.6993, F1=0.7880
+
+- Epoch 2: Loss=0.1335, mIoU=0.5356, F1=0.5762
+- Epoch 3: Loss=0.1140, mIoU=0.6316, F1=0.7140
+- Epoch 4: Loss=0.1049, mIoU=0.6153, F1=0.6929
+- Epoch 5: Loss=0.0981, mIoU=0.6323, F1=0.7143
+- Epoch 6: Loss=0.0958, mIoU=0.6271, F1=0.7082
+- Epoch 7: Loss=0.0907, mIoU=0.5579, F1=0.6122
+- Epoch 8: Loss=0.0884, mIoU=0.6900, F1=0.7789
+- Epoch 9: Loss=0.0888, mIoU=0.6769, F1=0.7657
+- Epoch 10: Loss=0.0831, mIoU=0.6774, F1=0.7659
+
+本轮结果: Round=10, Labeled=981, Selection=best_val (epoch=8), mIoU=0.6900, F1=0.7789, peak_mIoU=0.6900
+
+Round=10, Labeled=981, mIoU=0.6900, F1=0.7789
+
+## Round 11
+
+Labeled Pool Size: 1069
+
+- Epoch 1: Loss=0.2607, mIoU=0.5034, F1=0.5188
+- Epoch 2: Loss=0.1309, mIoU=0.5989, F1=0.6715
+- Epoch 3: Loss=0.1145, mIoU=0.5960, F1=0.6677
+- Epoch 4: Loss=0.1057, mIoU=0.5610, F1=0.6170
+- Epoch 5: Loss=0.0987, mIoU=0.6823, F1=0.7721
+- Epoch 6: Loss=0.0938, mIoU=0.6723, F1=0.7601
+## Round 11
+
+Labeled Pool Size: 1069
+
+- Epoch 7: Loss=0.0927, mIoU=0.6105, F1=0.6867
+- Epoch 8: Loss=0.0885, mIoU=0.6275, F1=0.7082
+- Epoch 1: Loss=0.2663, mIoU=0.5544, F1=0.6066
+- Epoch 9: Loss=0.0859, mIoU=0.6436, F1=0.7293
+- Epoch 2: Loss=0.1302, mIoU=0.6406, F1=0.7249
+- Epoch 10: Loss=0.0835, mIoU=0.6515, F1=0.7378
+- Epoch 3: Loss=0.1156, mIoU=0.5611, F1=0.6171
+
+本轮结果: Round=11, Labeled=1069, Selection=best_val (epoch=5), mIoU=0.6823, F1=0.7721, peak_mIoU=0.6823
+
+Round=11, Labeled=1069, mIoU=0.6823, F1=0.7721
+
+- Epoch 4: Loss=0.1057, mIoU=0.6178, F1=0.6962
+- Epoch 5: Loss=0.0982, mIoU=0.6812, F1=0.7699
+- Epoch 6: Loss=0.0936, mIoU=0.6508, F1=0.7362
+- Epoch 7: Loss=0.0903, mIoU=0.6889, F1=0.7780
+- Epoch 8: Loss=0.0905, mIoU=0.6419, F1=0.7257
+- Epoch 9: Loss=0.0857, mIoU=0.6896, F1=0.7787
+## Round 12
+
+Labeled Pool Size: 1157
+
+- Epoch 10: Loss=0.0826, mIoU=0.7143, F1=0.8032
+
+本轮结果: Round=11, Labeled=1069, Selection=best_val (epoch=10), mIoU=0.7143, F1=0.8032, peak_mIoU=0.7143
+
+Round=11, Labeled=1069, mIoU=0.7143, F1=0.8032
+
+- Epoch 1: Loss=0.2449, mIoU=0.5947, F1=0.6660
+- Epoch 2: Loss=0.1237, mIoU=0.5296, F1=0.5660
+- Epoch 3: Loss=0.1084, mIoU=0.6287, F1=0.7101
+- Epoch 4: Loss=0.0996, mIoU=0.6409, F1=0.7262
+## Round 12
+
+Labeled Pool Size: 1157
+
+- Epoch 5: Loss=0.0945, mIoU=0.7233, F1=0.8114
+- Epoch 1: Loss=0.2527, mIoU=0.5536, F1=0.6056
+- Epoch 6: Loss=0.0912, mIoU=0.7097, F1=0.7989
+- Epoch 2: Loss=0.1250, mIoU=0.5959, F1=0.6677
+- Epoch 7: Loss=0.0861, mIoU=0.6975, F1=0.7869
+- Epoch 3: Loss=0.1062, mIoU=0.5639, F1=0.6213
+- Epoch 8: Loss=0.0871, mIoU=0.6851, F1=0.7738
+- Epoch 4: Loss=0.0992, mIoU=0.6649, F1=0.7529
+- Epoch 9: Loss=0.0806, mIoU=0.7034, F1=0.7923
+- Epoch 5: Loss=0.0944, mIoU=0.7012, F1=0.7902
+- Epoch 10: Loss=0.0782, mIoU=0.6051, F1=0.6800
+
+本轮结果: Round=12, Labeled=1157, Selection=best_val (epoch=5), mIoU=0.7233, F1=0.8114, peak_mIoU=0.7233
+
+Round=12, Labeled=1157, mIoU=0.7233, F1=0.8114
+
+- Epoch 6: Loss=0.0925, mIoU=0.7133, F1=0.8021
+- Epoch 7: Loss=0.0866, mIoU=0.6959, F1=0.7854
+- Epoch 8: Loss=0.0848, mIoU=0.7296, F1=0.8172
+## Round 13
+
+Labeled Pool Size: 1245
+
+- Epoch 9: Loss=0.0791, mIoU=0.6636, F1=0.7508
+- Epoch 1: Loss=0.2412, mIoU=0.5689, F1=0.6291
+- Epoch 10: Loss=0.0769, mIoU=0.6182, F1=0.6970
+
+本轮结果: Round=12, Labeled=1157, Selection=best_val (epoch=8), mIoU=0.7296, F1=0.8172, peak_mIoU=0.7296
+
+Round=12, Labeled=1157, mIoU=0.7296, F1=0.8172
+
+- Epoch 2: Loss=0.1194, mIoU=0.6590, F1=0.7456
+- Epoch 3: Loss=0.1024, mIoU=0.6761, F1=0.7645
+- Epoch 4: Loss=0.0965, mIoU=0.6007, F1=0.6740
+- Epoch 5: Loss=0.0899, mIoU=0.6796, F1=0.7679
+- Epoch 6: Loss=0.0874, mIoU=0.7069, F1=0.7957
+## Round 13
+
+Labeled Pool Size: 1245
+
+- Epoch 7: Loss=0.0827, mIoU=0.6890, F1=0.7780
+- Epoch 1: Loss=0.2351, mIoU=0.5233, F1=0.5551
+- Epoch 8: Loss=0.0796, mIoU=0.7090, F1=0.7977
+- Epoch 2: Loss=0.1161, mIoU=0.5483, F1=0.5972
+- Epoch 9: Loss=0.0783, mIoU=0.7165, F1=0.8052
+- Epoch 3: Loss=0.1035, mIoU=0.6499, F1=0.7350
+- Epoch 10: Loss=0.0765, mIoU=0.6071, F1=0.6908
+
+本轮结果: Round=13, Labeled=1245, Selection=best_val (epoch=9), mIoU=0.7165, F1=0.8052, peak_mIoU=0.7165
+
+Round=13, Labeled=1245, mIoU=0.7165, F1=0.8052
+
+- Epoch 4: Loss=0.0967, mIoU=0.6274, F1=0.7111
+- Epoch 5: Loss=0.0907, mIoU=0.5996, F1=0.6723
+- Epoch 6: Loss=0.0871, mIoU=0.6807, F1=0.7691
+- Epoch 7: Loss=0.0831, mIoU=0.6378, F1=0.7210
+- Epoch 8: Loss=0.0791, mIoU=0.6405, F1=0.7245
+- Epoch 9: Loss=0.0764, mIoU=0.6682, F1=0.7560
+## Round 14
+
+Labeled Pool Size: 1333
+
+- Epoch 10: Loss=0.0736, mIoU=0.6322, F1=0.7152
+
+本轮结果: Round=13, Labeled=1245, Selection=best_val (epoch=6), mIoU=0.6807, F1=0.7691, peak_mIoU=0.6807
+
+Round=13, Labeled=1245, mIoU=0.6807, F1=0.7691
+
+- Epoch 1: Loss=0.2202, mIoU=0.5269, F1=0.5613
+- Epoch 2: Loss=0.1137, mIoU=0.5767, F1=0.6402
+- Epoch 3: Loss=0.0992, mIoU=0.5304, F1=0.5674
+- Epoch 4: Loss=0.0903, mIoU=0.6752, F1=0.7630
+- Epoch 5: Loss=0.0844, mIoU=0.6994, F1=0.7881
+- Epoch 6: Loss=0.0802, mIoU=0.6357, F1=0.7225
+- Epoch 7: Loss=0.0786, mIoU=0.6901, F1=0.7789
+- Epoch 8: Loss=0.0754, mIoU=0.6720, F1=0.7613
+## Round 14
+
+Labeled Pool Size: 1333
+
+- Epoch 9: Loss=0.0737, mIoU=0.6608, F1=0.7474
+- Epoch 1: Loss=0.2185, mIoU=0.5111, F1=0.5333
+- Epoch 10: Loss=0.0716, mIoU=0.6316, F1=0.7136
+
+本轮结果: Round=14, Labeled=1333, Selection=best_val (epoch=5), mIoU=0.6994, F1=0.7881, peak_mIoU=0.6994
+
+Round=14, Labeled=1333, mIoU=0.6994, F1=0.7881
+
+- Epoch 2: Loss=0.1134, mIoU=0.6413, F1=0.7249
+- Epoch 3: Loss=0.0977, mIoU=0.7043, F1=0.7935
+## Round 15
+
+Labeled Pool Size: 1421
+
+- Epoch 4: Loss=0.0924, mIoU=0.6515, F1=0.7384
+- Epoch 1: Loss=0.2340, mIoU=0.5831, F1=0.6495
+- Epoch 5: Loss=0.0863, mIoU=0.6740, F1=0.7616
+- Epoch 2: Loss=0.1114, mIoU=0.6497, F1=0.7349
+- Epoch 6: Loss=0.0820, mIoU=0.6932, F1=0.7828
+- Epoch 7: Loss=0.0787, mIoU=0.6938, F1=0.7831
+- Epoch 3: Loss=0.0990, mIoU=0.6430, F1=0.7270
+- Epoch 8: Loss=0.0756, mIoU=0.6780, F1=0.7670
+- Epoch 4: Loss=0.0903, mIoU=0.6178, F1=0.7018
+- Epoch 9: Loss=0.0734, mIoU=0.6737, F1=0.7617
+- Epoch 5: Loss=0.0875, mIoU=0.6629, F1=0.7496
+- Epoch 10: Loss=0.0714, mIoU=0.6346, F1=0.7177
+
+本轮结果: Round=14, Labeled=1333, Selection=best_val (epoch=3), mIoU=0.7043, F1=0.7935, peak_mIoU=0.7043
+
+Round=14, Labeled=1333, mIoU=0.7043, F1=0.7935
+
+- Epoch 6: Loss=0.0811, mIoU=0.6856, F1=0.7745
+- Epoch 7: Loss=0.0801, mIoU=0.6809, F1=0.7692
+- Epoch 8: Loss=0.0778, mIoU=0.7318, F1=0.8191
+## Round 15
+
+Labeled Pool Size: 1421
+
+- Epoch 9: Loss=0.0743, mIoU=0.7319, F1=0.8191
+- Epoch 1: Loss=0.2306, mIoU=0.6266, F1=0.7072
+- Epoch 10: Loss=0.0716, mIoU=0.7180, F1=0.8065
+
+本轮结果: Round=15, Labeled=1421, Selection=best_val (epoch=9), mIoU=0.7319, F1=0.8191, peak_mIoU=0.7319
+
+Round=15, Labeled=1421, mIoU=0.7319, F1=0.8191
+
+- Epoch 2: Loss=0.1084, mIoU=0.6161, F1=0.6940
+- Epoch 3: Loss=0.0945, mIoU=0.5523, F1=0.6034
+## Round 16
+
+Labeled Pool Size: 1509
+
+- Test-only mode: Round 16 loads Round 15 best_val checkpoint (epoch=9, val_mIoU=0.7319, val_F1=0.8191)
+
+本轮结果: Round=16, Labeled=1509, Selection=prev_round_best_val (source_round=15, epoch=9), mIoU=0.7319, F1=0.8191, peak_mIoU=0.7319
+
+Round=16, Labeled=1509, mIoU=0.7319, F1=0.8191
+
+
+## 实验汇总
+
+预算历史: [189, 277, 365, 453, 541, 629, 717, 805, 893, 981, 1069, 1157, 1245, 1333, 1421, 1509]
+ALC(基于每轮选模val mIoU): 0.6025
+最后一轮选模 mIoU(val): 0.7319207415406184
+最后一轮选模 F1(val): 0.8191272382600443
+最终报告 mIoU(test): 0.731620456353631
+最终报告 F1(test): 0.8191912294691078
+最终输出 mIoU: 0.7316 (source=final_report)
+最终输出 F1: 0.8192 (source=final_report)
+最终 Test Split: test
+最终 Report: {'loss': 0.03565651314333081, 'mIoU': 0.731620456353631, 'f1_score': 0.8191912294691078}
+- Epoch 4: Loss=0.0872, mIoU=0.6292, F1=0.7105
+- Epoch 5: Loss=0.0828, mIoU=0.7092, F1=0.7978
+- Epoch 6: Loss=0.0804, mIoU=0.6393, F1=0.7226
+- Epoch 7: Loss=0.0773, mIoU=0.6308, F1=0.7141
+- Epoch 8: Loss=0.0746, mIoU=0.6429, F1=0.7278
+- Epoch 9: Loss=0.0732, mIoU=0.7047, F1=0.7937
+- Epoch 10: Loss=0.0698, mIoU=0.6880, F1=0.7769
+
+本轮结果: Round=15, Labeled=1421, Selection=best_val (epoch=5), mIoU=0.7092, F1=0.7978, peak_mIoU=0.7092
+
+Round=15, Labeled=1421, mIoU=0.7092, F1=0.7978
+
+## Round 16
+
+Labeled Pool Size: 1509
+
+- Test-only mode: Round 16 loads Round 15 best_val checkpoint (epoch=5, val_mIoU=0.7092, val_F1=0.7978)
+
+本轮结果: Round=16, Labeled=1509, Selection=prev_round_best_val (source_round=15, epoch=5), mIoU=0.7092, F1=0.7978, peak_mIoU=0.7092
+
+Round=16, Labeled=1509, mIoU=0.7092, F1=0.7978
+
+
+## 实验汇总
+
+预算历史: [189, 277, 365, 453, 541, 629, 717, 805, 893, 981, 1069, 1157, 1245, 1333, 1421, 1509]
+ALC(基于每轮选模val mIoU): 0.6002
+最后一轮选模 mIoU(val): 0.7091689049428538
+最后一轮选模 F1(val): 0.7977621793659082
+最终报告 mIoU(test): 0.7041864724956826
+最终报告 F1(test): 0.7933782649728105
+最终输出 mIoU: 0.7042 (source=final_report)
+最终输出 F1: 0.7934 (source=final_report)
+最终 Test Split: test
+最终 Report: {'loss': 0.04127183911012253, 'mIoU': 0.7041864724956826, 'f1_score': 0.7933782649728105}

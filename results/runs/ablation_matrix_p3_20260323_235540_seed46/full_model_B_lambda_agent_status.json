@@ -1,13 +1,13 @@
 {
   "run_id": "ablation_matrix_p3_20260323_235540_seed46",
   "experiment_name": "full_model_B_lambda_agent",
-  "updated_at": "2026-03-26T05:20:16.026621",
-  "pid": 97881,
-  "ppid": 97873,
+  "updated_at": "2026-03-26T08:00:45.003356",
+  "pid": 92329,
+  "ppid": 92318,
   "pool_integrity": {
     "counts": {
-      "labeled": 189,
-      "unlabeled": 3610,
+      "labeled": 981,
+      "unlabeled": 2818,
       "union": 3799,
       "dataset": 3799
     },
@@ -17,28 +17,53 @@
   },
   "pool_integrity_ok": true,
   "errors": [],
-  "status": "running",
+  "status": "completed",
   "pools_dir": "/Users/anykong/AD-KUCS/AAL_SD/results/pools/ablation_matrix_p3_20260323_235540_seed46/full_model_B_lambda_agent",
   "checkpoint_path": "results/checkpoints/ablation_matrix_p3_20260323_235540_seed46/full_model_B_lambda_agent_state.json",
   "initial": {
-    "labeled": 189,
-    "unlabeled": 3610
+    "labeled": 981,
+    "unlabeled": 2818
   },
   "dataset_fingerprint": {
     "count": 3799,
     "sha256": "ab1c6ed6ffcd25606a577ecf266996d10127065c72db2f5cc8c43cb90fd7c95a"
   },
   "resume": {
-    "start_round": 0
+    "start_round": 9
   },
   "progress": {
-    "round": 8,
-    "epoch": 10,
-    "labeled_size": 805,
-    "loss": 0.09004874438953005,
-    "mIoU": 0.705256261443233,
-    "f1": 0.7942623949070827,
-    "best_mIoU_round": 0.721245697494416,
-    "warnings": []
+    "round": 16,
+    "epoch": "finished",
+    "labeled_size": 1509
+  },
+  "result": {
+    "alc": 0.600239466176568,
+    "final_mIoU": 0.7041864724956826,
+    "final_f1": 0.7933782649728105,
+    "final_selected_mIoU": 0.7091689049428538,
+    "final_selected_f1": 0.7977621793659082,
+    "final_report_mIoU": 0.7041864724956826,
+    "final_report_f1": 0.7933782649728105,
+    "final_miou_source": "final_report",
+    "final_f1_source": "final_report",
+    "test_split": "test",
+    "budget_history": [
+      189,
+      277,
+      365,
+      453,
+      541,
+      629,
+      717,
+      805,
+      893,
+      981,
+      1069,
+      1157,
+      1245,
+      1333,
+      1421,
+      1509
+    ]
   }
 }
