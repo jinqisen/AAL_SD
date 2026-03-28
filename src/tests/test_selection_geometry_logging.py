@@ -123,6 +123,54 @@ class TestSelectionGeometryLogging(unittest.TestCase):
         selected_rows = [row for row in payload["rows"] if row["selected"]]
         self.assertEqual({row["sample_id"] for row in selected_rows}, {1, 3})
 
+    def test_refresh_selection_geometry_state_syncs_training_state_for_next_round(self):
+        p = self._make_pipeline()
+        p.training_state = {"round_idx": 1}
+        p._last_training_state = {"round_idx": 1, "report_miou": 0.7}
+        p._last_ranking_metadata = {
+            "selection_geometry": {
+                "sens_up": 0.08,
+                "sens_down": 0.04,
+                "asymmetry_ratio": 2.0,
+            }
+        }
+        synced_states = []
+        p.use_agent = True
+        p.agent_manager = object()
+        p.toolbox = SimpleNamespace(
+            set_training_state=lambda state: synced_states.append(state)
+        )
+
+        p._refresh_selection_geometry_state()
+
+        self.assertEqual(p.training_state["selection_geometry"]["sens_up"], 0.08)
+        self.assertEqual(
+            p._last_training_state["selection_geometry"]["asymmetry_ratio"], 2.0
+        )
+        self.assertEqual(p._last_training_state["report_miou"], 0.7)
+        self.assertEqual(synced_states[-1]["selection_geometry"]["sens_down"], 0.04)
+
+    def test_selection_geometry_for_training_state_preserves_previous_geometry(self):
+        p = self._make_pipeline()
+        p._last_ranking_metadata = None
+        p.training_state = {
+            "selection_geometry": {
+                "sens_up": 0.11,
+                "sens_down": 0.07,
+            }
+        }
+        p._last_training_state = {
+            "selection_geometry": {
+                "sens_up": 0.09,
+                "sens_down": 0.03,
+            }
+        }
+
+        geometry = p._selection_geometry_for_training_state()
+
+        self.assertEqual(geometry["sens_up"], 0.11)
+        self.assertEqual(geometry["sens_down"], 0.07)
+
 
 if __name__ == "__main__":
     unittest.main()
