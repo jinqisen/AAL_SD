@@ -1199,6 +1199,47 @@ class ActiveLearningPipeline:
             }
         )
 
+    def _refresh_selection_geometry_state(self):
+        geometry = None
+        ranking_meta = getattr(self, "_last_ranking_metadata", None)
+        if isinstance(ranking_meta, dict):
+            raw_geometry = ranking_meta.get("selection_geometry")
+            if isinstance(raw_geometry, dict):
+                geometry = dict(raw_geometry)
+        if not isinstance(getattr(self, "training_state", None), dict):
+            self.training_state = {}
+        self.training_state["selection_geometry"] = (
+            dict(geometry) if isinstance(geometry, dict) else None
+        )
+        if isinstance(getattr(self, "_last_training_state", None), dict):
+            training_state = dict(self._last_training_state)
+        else:
+            training_state = dict(self.training_state)
+        training_state["selection_geometry"] = (
+            dict(geometry) if isinstance(geometry, dict) else None
+        )
+        self._last_training_state = training_state
+        if self.use_agent and self.agent_manager and hasattr(self, "toolbox"):
+            self.toolbox.set_training_state(dict(self.training_state))
+
+    def _selection_geometry_for_training_state(self):
+        ranking_meta = getattr(self, "_last_ranking_metadata", None)
+        if isinstance(ranking_meta, dict):
+            geometry = ranking_meta.get("selection_geometry")
+            if isinstance(geometry, dict):
+                return dict(geometry)
+        training_state = getattr(self, "training_state", None)
+        if isinstance(training_state, dict):
+            geometry = training_state.get("selection_geometry")
+            if isinstance(geometry, dict):
+                return dict(geometry)
+        last_training_state = getattr(self, "_last_training_state", None)
+        if isinstance(last_training_state, dict):
+            geometry = last_training_state.get("selection_geometry")
+            if isinstance(geometry, dict):
+                return dict(geometry)
+        return None
+
     def _append_round_summary(
         self, round_idx: int, best_miou: float, best_f1: float, labeled_size: int
     ):
@@ -1341,7 +1382,9 @@ class ActiveLearningPipeline:
             k_arr = np.asarray(pool_kg, dtype=float)
             pool_n = int(len(u_arr))
             boundary_ratio = 0.2
-            sensitivity_delta = 0.1
+            sensitivity_delta_cap = 0.1
+            sensitivity_delta_ratio = 0.2
+            sensitivity_delta_min = 0.05
             if isinstance(getattr(self, "exp_config", None), dict):
                 try:
                     boundary_ratio = float(
@@ -1351,14 +1394,37 @@ class ActiveLearningPipeline:
                 except Exception:
                     boundary_ratio = 0.2
                 try:
-                    sensitivity_delta = float(
+                    sensitivity_delta_cap = float(
                         self.exp_config.get(
                             "geometry_sensitivity_delta_lambda", 0.1
                         )
                         or 0.1
                     )
                 except Exception:
-                    sensitivity_delta = 0.1
+                    sensitivity_delta_cap = 0.1
+                try:
+                    sensitivity_delta_ratio = float(
+                        self.exp_config.get(
+                            "geometry_sensitivity_delta_lambda_ratio", 0.2
+                        )
+                        or 0.2
+                    )
+                except Exception:
+                    sensitivity_delta_ratio = 0.2
+                try:
+                    sensitivity_delta_min = float(
+                        self.exp_config.get(
+                            "geometry_sensitivity_delta_lambda_min", 0.05
+                        )
+                        or 0.05
+                    )
+                except Exception:
+                    sensitivity_delta_min = 0.05
+            sensitivity_delta_cap = float(max(sensitivity_delta_cap, 0.0))
+            sensitivity_delta_ratio = float(max(sensitivity_delta_ratio, 0.0))
+            sensitivity_delta_min = float(
+                min(max(sensitivity_delta_min, 0.0), sensitivity_delta_cap)
+            )
             boundary_half_width = max(1, int(np.ceil(float(query_size) * float(boundary_ratio))))
             boundary_start = max(0, int(query_size) - boundary_half_width)
             boundary_end = min(pool_n, int(query_size) + boundary_half_width)
@@ -1402,6 +1468,15 @@ class ActiveLearningPipeline:
                 except Exception:
                     lambda_current = None
             if lambda_current is not None and pool_n > 0:
+                sensitivity_delta = float(
+                    min(
+                        sensitivity_delta_cap,
+                        max(
+                            sensitivity_delta_min,
+                            sensitivity_delta_ratio * max(float(lambda_current), 0.0),
+                        ),
+                    )
+                )
                 current_scores = (
                     (1.0 - float(lambda_current)) * u_arr
                     + float(lambda_current) * k_arr
@@ -1460,6 +1535,11 @@ class ActiveLearningPipeline:
                 lambda_up = min(1.0, lambda_current + float(sensitivity_delta))
                 lambda_down = max(0.0, lambda_current - float(sensitivity_delta))
                 geometry["sensitivity_delta_lambda"] = float(sensitivity_delta)
+                geometry["sensitivity_delta_lambda_cap"] = float(sensitivity_delta_cap)
+                geometry["sensitivity_delta_lambda_ratio"] = float(
+                    sensitivity_delta_ratio
+                )
+                geometry["sensitivity_delta_lambda_min"] = float(sensitivity_delta_min)
 
                 up_metrics = (
                     _jaccard_metrics(lambda_up)
@@ -2581,21 +2661,7 @@ class ActiveLearningPipeline:
                     "grad_probe_source": grad_probe_source,
                     "train_u_median_selected": _u_med,
                     "train_k_median_selected": _k_med,
-                    "selection_geometry": (
-                        dict(
-                            (
-                                getattr(self, "_last_ranking_metadata", {}) or {}
-                            ).get("selection_geometry")
-                            or {}
-                        )
-                        if isinstance(
-                            (
-                                getattr(self, "_last_ranking_metadata", {}) or {}
-                            ).get("selection_geometry"),
-                            dict,
-                        )
-                        else None
-                    ),
+                    "selection_geometry": self._selection_geometry_for_training_state(),
                 }
                 if not isinstance(getattr(self, "training_state", None), dict):
                     self.training_state = {
@@ -3616,6 +3682,7 @@ class ActiveLearningPipeline:
         self._append_score_snapshot(
             selected, source=ctx.get("source") if isinstance(ctx, dict) else None
         )
+        self._refresh_selection_geometry_state()
         return {
             "status": "success",
             "expected_count": expected,

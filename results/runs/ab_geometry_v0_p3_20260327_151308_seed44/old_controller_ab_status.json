@@ -1,0 +1,69 @@
+{
+  "run_id": "ab_geometry_v0_p3_20260327_151308_seed44",
+  "experiment_name": "old_controller_ab",
+  "updated_at": "2026-03-27T23:56:30.701000",
+  "pid": 30842,
+  "ppid": 30831,
+  "pool_integrity": {
+    "counts": {
+      "labeled": 189,
+      "unlabeled": 3610,
+      "union": 3799,
+      "dataset": 3799
+    },
+    "overlaps": {
+      "labeled_unlabeled": 0
+    }
+  },
+  "pool_integrity_ok": true,
+  "errors": [],
+  "status": "completed",
+  "pools_dir": "/Users/anykong/AD-KUCS/AAL_SD/results/pools/ab_geometry_v0_p3_20260327_151308_seed44/old_controller_ab",
+  "checkpoint_path": "results/checkpoints/ab_geometry_v0_p3_20260327_151308_seed44/old_controller_ab_state.json",
+  "initial": {
+    "labeled": 189,
+    "unlabeled": 3610
+  },
+  "dataset_fingerprint": {
+    "count": 3799,
+    "sha256": "ab1c6ed6ffcd25606a577ecf266996d10127065c72db2f5cc8c43cb90fd7c95a"
+  },
+  "resume": {
+    "start_round": 0
+  },
+  "progress": {
+    "round": 16,
+    "epoch": "finished",
+    "labeled_size": 1509
+  },
+  "result": {
+    "alc": 0.5943340748107275,
+    "final_mIoU": 0.69974532076713,
+    "final_f1": 0.7893670614125602,
+    "final_selected_mIoU": 0.7111462986858887,
+    "final_selected_f1": 0.8000113318846964,
+    "final_report_mIoU": 0.69974532076713,
+    "final_report_f1": 0.7893670614125602,
+    "final_miou_source": "final_report",
+    "final_f1_source": "final_report",
+    "test_split": "test",
+    "budget_history": [
+      189,
+      277,
+      365,
+      453,
+      541,
+      629,
+      717,
+      805,
+      893,
+      981,
+      1069,
+      1157,
+      1245,
+      1333,
+      1421,
+      1509
+    ]
+  }
+}

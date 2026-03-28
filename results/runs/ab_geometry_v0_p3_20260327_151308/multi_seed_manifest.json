@@ -1,0 +1,18 @@
+{
+  "base_run_id": "ab_geometry_v0_p3_20260327_151308",
+  "seeds": [
+    42,
+    43,
+    44
+  ],
+  "run_ids": [
+    "ab_geometry_v0_p3_20260327_151308_seed42",
+    "ab_geometry_v0_p3_20260327_151308_seed43",
+    "ab_geometry_v0_p3_20260327_151308_seed44"
+  ],
+  "created_at": "2026-03-28T12:57:10.179454",
+  "experiments": [
+    "geometry_controller_v0",
+    "old_controller_ab"
+  ]
+}

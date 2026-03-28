@@ -1,6 +1,6 @@
 {
   "run_id": "ablation_matrix_p3_20260323_235540_seed44",
-  "created_at": "2026-03-25T01:14:01.541835",
+  "created_at": "2026-03-27T09:01:00.061681",
   "data_dir": "/Users/anykong/AAL_SD/data/Landslide4Sense",
   "pools_dir": "/Users/anykong/AD-KUCS/AAL_SD/results/pools",
   "checkpoint_dir": "results/checkpoints",
@@ -17,12 +17,8 @@
     "segmentation_models_pytorch": "0.5.0"
   },
   "experiments": [
-    "full_model_A_lambda_policy",
-    "full_model_B_lambda_agent",
-    "no_agent",
-    "fixed_lambda",
-    "uncertainty_only",
-    "knowledge_only"
+    "old_controller_ab",
+    "geometry_controller_v0"
   ],
   "config": {
     "INITIAL_LABELED_SIZE": 0.05,
