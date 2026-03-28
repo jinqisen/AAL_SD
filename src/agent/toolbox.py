@@ -1510,6 +1510,9 @@ class Toolbox:
                 "k_median_selected": ts.get("k_median_selected"),
                 "u_median_top": ts.get("u_median_top"),
                 "k_median_top": ts.get("k_median_top"),
+                "selection_geometry": dict(ts.get("selection_geometry"))
+                if isinstance(ts.get("selection_geometry"), dict)
+                else None,
                 "train_u_median_selected": ts.get("train_u_median_selected"),
                 "train_k_median_selected": ts.get("train_k_median_selected"),
                 "train_u_median_history": list(u_hist)
@@ -2805,31 +2808,45 @@ class Toolbox:
                 "LLM_API_KEY is missing: agent fallback is forbidden (reason=mock_no_api_key)."
             )
         if not getattr(self.controller, "_last_ranked_items", None) and isinstance(
-            self.candidates_cache, list
+            self.current_scores, dict
         ):
             items = []
             lambda_t = self.control_state.get("lambda_override_round")
-            for raw in self.candidates_cache:
-                if not isinstance(raw, dict):
-                    continue
-                sid = raw.get("id", raw.get("sample_id"))
-                if sid is None:
-                    continue
+            if lambda_t is None:
+                lambda_t = self._default_lambda()
+            for sid, scores in self.current_scores.items():
+                u = float(scores["U"])
+                k_score = float(scores["K"])
+                s = (1 - float(lambda_t)) * u + float(lambda_t) * k_score
                 try:
-                    sid = int(sid)
+                    sid_int = int(sid)
                 except Exception:
-                    sid = str(sid)
+                    sid_int = str(sid)
                 items.append(
                     {
-                        "sample_id": sid,
-                        "final_score": raw.get("final_score"),
-                        "uncertainty": raw.get("U_score", raw.get("uncertainty")),
-                        "knowledge_gain": raw.get("K_score", raw.get("knowledge_gain")),
-                        "lambda_t": lambda_t,
+                        "sample_id": sid_int,
+                        "final_score": float(s),
+                        "uncertainty": u,
+                        "knowledge_gain": k_score,
+                        "lambda_t": float(lambda_t),
                     }
                 )
             if items:
+                items.sort(key=lambda x: x["final_score"], reverse=True)
                 self.controller._last_ranked_items = items
+                # Compute ranking metadata to ensure geometry metrics are populated
+                controller_cfg = getattr(self.controller, "config", None)
+                query_size = int(getattr(controller_cfg, "QUERY_SIZE", 0) or 0)
+                if query_size <= 0:
+                    query_size = int(len(sample_ids or []))
+                query_size = max(1, query_size)
+                
+                if hasattr(self.controller, "_compute_ranking_metadata"):
+                    base_meta = self.controller._compute_ranking_metadata(items, query_size)
+                    if isinstance(base_meta, dict):
+                        if not isinstance(getattr(self.controller, "_last_ranking_metadata", None), dict):
+                            self.controller._last_ranking_metadata = {}
+                        self.controller._last_ranking_metadata.update(base_meta)
         controller_cfg = getattr(self.controller, "config", None)
         expected = int(getattr(controller_cfg, "QUERY_SIZE", 0) or 0)
         if expected <= 0:
