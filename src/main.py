@@ -204,6 +204,10 @@ class ActiveLearningPipeline:
         self.score_normalization = sampler_result.score_normalization
         self.rollback_config = sampler_result.rollback_config
 
+        # 3a. Oracle hard-positive sampler: precompute GT foreground fractions
+        if hasattr(self.sampler, "set_gt_frac_map"):
+            self._init_oracle_gt_frac_map()
+
         # 4. Agent Setup
         self.use_agent = self.exp_config["use_agent"]
         self.agent_manager = None
@@ -535,6 +539,22 @@ class ActiveLearningPipeline:
             if name in name_to_idx:
                 indices.append(name_to_idx[name])
         return indices
+
+    def _init_oracle_gt_frac_map(self):
+        """Precompute GT foreground fractions for the oracle hard-positive sampler.
+
+        Scans *all* training masks (both labeled and unlabeled pools) so the
+        map stays valid across rounds as samples move between pools.
+        """
+        import pandas as pd
+        from baselines.oracle_hardpos_sampler import compute_gt_frac_map_from_pool
+
+        name_to_idx = {
+            os.path.splitext(f)[0]: i for i, f in enumerate(self.full_dataset.images)
+        }
+        all_pool = pd.concat([self.labeled_df, self.unlabeled_df], ignore_index=True)
+        gt_frac_map = compute_gt_frac_map_from_pool(all_pool, name_to_idx)
+        self.sampler.set_gt_frac_map(gt_frac_map)
 
     def _pool_integrity(self):
         labeled_ids = (
@@ -3469,7 +3489,9 @@ class ActiveLearningPipeline:
         else:
             unlabeled_info, labeled_features = self._prepare_unlabeled_info(model)
             ranked = self.sampler.rank_samples(
-                unlabeled_info, labeled_features=labeled_features
+                unlabeled_info,
+                labeled_features=labeled_features,
+                query_size=int(self.config.QUERY_SIZE),
             )
             self._last_ranked_items = list(ranked or [])
             self._last_ranking_metadata = (

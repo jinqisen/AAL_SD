@@ -21,6 +21,7 @@ def build_sampler(config: Any, exp_config: Mapping[str, Any]) -> SamplerBuildRes
     from baselines.entropy_sampler import EntropySampler
     from baselines.llm_rs_sampler import LLMRandomSampler
     from baselines.llm_us_sampler import LLMUncertaintySampler
+    from baselines.oracle_hardpos_sampler import OracleHardPosSampler
     from baselines.random_sampler import RandomSampler
     from baselines.wang_sampler import WangStyleSampler
     from core.sampler import ADKUCSSampler
@@ -52,6 +53,14 @@ def build_sampler(config: Any, exp_config: Mapping[str, Any]) -> SamplerBuildRes
     def _build_wang() -> tuple[Any, Optional[dict]]:
         return WangStyleSampler(config), None
 
+    def _build_oracle_hardpos() -> tuple[Any, Optional[dict]]:
+        oracle_cfg = exp_config.get("oracle_hardpos", {})
+        return OracleHardPosSampler(
+            config,
+            replace_ratio=float(oracle_cfg.get("replace_ratio", 0.25)),
+            hardpos_percentile=float(oracle_cfg.get("hardpos_percentile", 0.0)),
+        ), None
+
     def _build_ad_kucs() -> tuple[Any, Optional[dict]]:
         rollback_config = exp_config.get("rollback_config") or {
             "mode": "adaptive_threshold",
@@ -78,6 +87,7 @@ def build_sampler(config: Any, exp_config: Mapping[str, Any]) -> SamplerBuildRes
         "llm_rs": _build_llm_rs,
         "dial": _build_dial,
         "wang": _build_wang,
+        "oracle_hardpos": _build_oracle_hardpos,
         "ad_kucs": _build_ad_kucs,
     }
     builder = sampler_builders.get(sampler_type)

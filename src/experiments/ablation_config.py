@@ -2924,6 +2924,52 @@ ABLATION_SETTINGS = {
             "diversity_postprocess": "none",
         },
     },
+    # ── Phase 1: Oracle hard-positive experiments ──────────────────────
+    # Replace a fraction of the entropy batch with GT-oracle hard-positive
+    # samples to test whether U's blind spot is exploitable.
+    # Three replacement ratios: 10%, 25%, 50%.
+    "oracle_hardpos_r10": {
+        "description": "Oracle hard-positive injection (10% replacement) on entropy baseline",
+        "use_agent": False,
+        "sampler_type": "oracle_hardpos",
+        "lambda_override": None,
+        "oracle_hardpos": {
+            "replace_ratio": 0.10,
+            "hardpos_percentile": 0.0,
+        },
+        "acquisition_protocol": {
+            "uncertainty_aggregation": "mean",
+            "diversity_postprocess": "none",
+        },
+    },
+    "oracle_hardpos_r25": {
+        "description": "Oracle hard-positive injection (25% replacement) on entropy baseline",
+        "use_agent": False,
+        "sampler_type": "oracle_hardpos",
+        "lambda_override": None,
+        "oracle_hardpos": {
+            "replace_ratio": 0.25,
+            "hardpos_percentile": 0.0,
+        },
+        "acquisition_protocol": {
+            "uncertainty_aggregation": "mean",
+            "diversity_postprocess": "none",
+        },
+    },
+    "oracle_hardpos_r50": {
+        "description": "Oracle hard-positive injection (50% replacement) on entropy baseline",
+        "use_agent": False,
+        "sampler_type": "oracle_hardpos",
+        "lambda_override": None,
+        "oracle_hardpos": {
+            "replace_ratio": 0.50,
+            "hardpos_percentile": 0.0,
+        },
+        "acquisition_protocol": {
+            "uncertainty_aggregation": "mean",
+            "diversity_postprocess": "none",
+        },
+    },
     "baseline_coreset": {
         "description": "Core-Set采样基线",
         "use_agent": False,
