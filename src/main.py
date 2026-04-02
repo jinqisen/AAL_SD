@@ -58,6 +58,10 @@ class ActiveLearningPipeline:
         self.experiment_spec = build_spec_from_legacy_dict(requested, self.exp_config)
         self.experiment_runtime = self.experiment_spec.build(config)
 
+        # Apply per-experiment fg_loss_weight override
+        fg_w = self.exp_config.get("fg_loss_weight") if isinstance(self.exp_config, dict) else None
+        self.config.FG_LOSS_WEIGHT = float(fg_w) if fg_w is not None else 1.0
+
         # Centralized Randomness Control
         self.seed = int(getattr(self.config, "RANDOM_SEED", 42) or 42)
         self.deterministic = getattr(self.config, "DETERMINISTIC", True)

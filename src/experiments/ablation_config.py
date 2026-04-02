@@ -2970,6 +2970,63 @@ ABLATION_SETTINGS = {
             "diversity_postprocess": "none",
         },
     },
+    # ── Phase 2a: Oracle + foreground loss reweight ──────────────────────
+    # Test whether the bottleneck is training signal density rather than
+    # acquisition function.  Combines oracle r50 injection with foreground
+    # class loss upweighting (5× and 10×).
+    "oracle_hardpos_r50_fgw5": {
+        "description": "Oracle hard-positive r50 + foreground loss weight 5×",
+        "use_agent": False,
+        "sampler_type": "oracle_hardpos",
+        "lambda_override": None,
+        "oracle_hardpos": {
+            "replace_ratio": 0.50,
+            "hardpos_percentile": 0.0,
+        },
+        "fg_loss_weight": 5.0,
+        "acquisition_protocol": {
+            "uncertainty_aggregation": "mean",
+            "diversity_postprocess": "none",
+        },
+    },
+    "oracle_hardpos_r50_fgw10": {
+        "description": "Oracle hard-positive r50 + foreground loss weight 10×",
+        "use_agent": False,
+        "sampler_type": "oracle_hardpos",
+        "lambda_override": None,
+        "oracle_hardpos": {
+            "replace_ratio": 0.50,
+            "hardpos_percentile": 0.0,
+        },
+        "fg_loss_weight": 10.0,
+        "acquisition_protocol": {
+            "uncertainty_aggregation": "mean",
+            "diversity_postprocess": "none",
+        },
+    },
+    # Control: entropy baseline + fg loss reweight (isolate reweight effect)
+    "baseline_entropy_fgw5": {
+        "description": "Entropy baseline + foreground loss weight 5×",
+        "use_agent": False,
+        "sampler_type": "entropy",
+        "lambda_override": None,
+        "fg_loss_weight": 5.0,
+        "acquisition_protocol": {
+            "uncertainty_aggregation": "mean",
+            "diversity_postprocess": "none",
+        },
+    },
+    "baseline_entropy_fgw10": {
+        "description": "Entropy baseline + foreground loss weight 10×",
+        "use_agent": False,
+        "sampler_type": "entropy",
+        "lambda_override": None,
+        "fg_loss_weight": 10.0,
+        "acquisition_protocol": {
+            "uncertainty_aggregation": "mean",
+            "diversity_postprocess": "none",
+        },
+    },
     "baseline_coreset": {
         "description": "Core-Set采样基线",
         "use_agent": False,

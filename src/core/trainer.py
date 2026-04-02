@@ -224,8 +224,14 @@ class Trainer:
         return images, masks
 
     def _get_loss_function(self, loss_type):
+        fg_w = float(getattr(self.config, "FG_LOSS_WEIGHT", 1.0) or 1.0)
         if loss_type == "FocalLoss":
+            if fg_w != 1.0:
+                return FocalLoss(alpha=[1.0, fg_w])
             return FocalLoss()
+        if fg_w != 1.0:
+            weight = torch.tensor([1.0, fg_w], dtype=torch.float32).to(self.device)
+            return nn.CrossEntropyLoss(weight=weight)
         return nn.CrossEntropyLoss()
 
     def train_one_epoch(self, loader, grad_probe_loader=None):
